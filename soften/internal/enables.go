@@ -9,7 +9,8 @@ type StatusEnables struct {
 	RetryingEnable bool
 	UpgradeEnable  bool
 	DegradeEnable  bool
+	ShiftEnable    bool
 	DeadEnable     bool
 	DiscardEnable  bool
-	RerouteEnable  bool
+	TransferEnable bool
 }

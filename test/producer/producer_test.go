@@ -13,7 +13,7 @@ import (
 )
 
 func TestSend_1Msg(t *testing.T) {
-	topic := internal.GenerateTestTopic()
+	topic := internal.GenerateTestTopic(internal.PrefixTestProduce)
 	manager := admin.NewAdminManager(internal.DefaultPulsarHttpUrl)
 
 	internal.CleanUpTopic(t, manager, topic)
@@ -37,7 +37,7 @@ func TestSend_1Msg(t *testing.T) {
 }
 
 func TestSendAsync_1Msg(t *testing.T) {
-	topic := internal.GenerateTestTopic()
+	topic := internal.GenerateTestTopic(internal.PrefixTestProduce)
 	manager := admin.NewAdminManager(internal.DefaultPulsarHttpUrl)
 
 	internal.CleanUpTopic(t, manager, topic)

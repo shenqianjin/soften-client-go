@@ -1,28 +1,39 @@
 package checker
 
+import "github.com/shenqianjin/soften-client-go/soften/decider"
+
 // ------ check status implementation ------
 
 type checkStatus struct {
 	passed       bool
 	handledDefer func()
-	//CheckTo      MessageGoto
-	rerouteTopic string
+	gotoExtra    decider.GotoExtra
 }
 
 func (s *checkStatus) WithPassed(passed bool) *checkStatus {
-	s.passed = passed
-	return s
-}
-
-func (s *checkStatus) WithHandledDefer(handledDefer func()) *checkStatus {
-	r := &checkStatus{passed: s.passed, handledDefer: s.handledDefer, rerouteTopic: s.rerouteTopic}
-	r.handledDefer = handledDefer
+	r := &checkStatus{
+		passed:       passed,
+		handledDefer: s.handledDefer,
+		gotoExtra:    s.gotoExtra,
+	}
 	return r
 }
 
-func (s *checkStatus) WithRerouteTopic(topic string) *checkStatus {
-	r := &checkStatus{passed: s.passed, handledDefer: s.handledDefer, rerouteTopic: s.rerouteTopic}
-	r.rerouteTopic = topic
+func (s *checkStatus) WithHandledDefer(handledDefer func()) *checkStatus {
+	r := &checkStatus{
+		passed:       s.passed,
+		handledDefer: handledDefer,
+		gotoExtra:    s.gotoExtra,
+	}
+	return r
+}
+
+func (s *checkStatus) WithGotoExtra(gotoExtra decider.GotoExtra) *checkStatus {
+	r := &checkStatus{
+		passed:       s.passed,
+		handledDefer: s.handledDefer,
+		gotoExtra:    gotoExtra,
+	}
 	return r
 }
 
@@ -34,8 +45,8 @@ func (s *checkStatus) GetHandledDefer() func() {
 	return s.handledDefer
 }
 
-func (s *checkStatus) GetRerouteTopic() string {
-	return s.rerouteTopic
+func (s *checkStatus) GetGotoExtra() decider.GotoExtra {
+	return s.gotoExtra
 }
 
 // ------ check status enums ------

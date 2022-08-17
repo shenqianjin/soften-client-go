@@ -11,6 +11,7 @@ import (
 	"github.com/shenqianjin/soften-client-go/soften/checker"
 	"github.com/shenqianjin/soften-client-go/soften/config"
 	"github.com/shenqianjin/soften-client-go/soften/handler"
+	"github.com/shenqianjin/soften-client-go/soften/message"
 )
 
 func main() {
@@ -26,7 +27,7 @@ func main() {
 		Type:                        pulsar.Shared,
 		SubscriptionInitialPosition: pulsar.SubscriptionPositionEarliest,
 		Concurrency:                 &config.ConcurrencyPolicy{CorePoolSize: 10},
-	}, checker.PostHandleRetrying(func(msg pulsar.Message, err error) checker.CheckStatus {
+	}, checker.PostHandleRetrying(func(ctx context.Context, msg message.Message, err error) checker.CheckStatus {
 		if err != nil {
 			return checker.CheckStatusPassed
 		}
@@ -37,12 +38,12 @@ func main() {
 	}
 	defer listener.Close()
 
-	messageHandle := func(msg pulsar.Message) handler.HandleStatus {
+	messageHandle := func(ctx context.Context, msg message.Message) handler.HandleStatus {
 		fmt.Printf("Received message  msgId: %v -- content: '%s'\n", msg.ID(), string(msg.Payload()))
 		if _, ok := msg.Properties()["invalid-param"]; ok {
-			return handler.HandleStatusBuilder().Goto(handler.GotoDead).Build()
+			return handler.StatusDead
 		}
-		return handler.HandleStatusOk
+		return handler.StatusDone
 	}
 	ctx, cancel := context.WithCancel(context.Background())
 	err = listener.StartPremium(ctx, messageHandle)

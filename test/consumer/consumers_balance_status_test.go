@@ -72,7 +72,7 @@ func testConsumerBalanceStatus(t *testing.T, testCase consumerBalanceCase) {
 	assert.True(t, len(testCase.consumeTypes) > 0)
 	assert.Equal(t, len(testCase.consumeTypes), len(testCase.weights))
 	assert.Equal(t, len(testCase.consumeTypes), len(testCase.totals))
-	topic := internal.GenerateTestTopic()
+	topic := internal.GenerateTestTopic(internal.PrefixTestConsume)
 	consumeTypes := testCase.consumeTypes
 	totals := testCase.totals
 	expectedTotal := 0
@@ -84,7 +84,11 @@ func testConsumerBalanceStatus(t *testing.T, testCase consumerBalanceCase) {
 	for index, status := range consumeTypes {
 		st, err := message.StatusOf(status)
 		assert.Nil(t, err)
-		producedTopics[index] = topic + st.TopicSuffix()
+		if st == message.StatusReady {
+			producedTopics[index] = topic + st.TopicSuffix()
+		} else {
+			producedTopics[index] = topic + "-" + internal.TestSubscriptionName() + st.TopicSuffix()
+		}
 		expectedTotal += totals[index]
 	}
 
@@ -148,14 +152,21 @@ func testConsumerBalanceStatus(t *testing.T, testCase consumerBalanceCase) {
 
 	// ---------------
 
+	testPolicy := &config.StatusPolicy{
+		BackoffDelays:  []string{"1s"},
+		ReentrantDelay: 1,
+	}
+	leveledPolicy := &config.LevelPolicy{
+		PendingEnable:  true,
+		BlockingEnable: true,
+		RetryingEnable: true,
+	}
 	// create listener
 	consumerConf := config.ConsumerConfig{
 		Topic:                       topic,
-		SubscriptionName:            internal.GenerateSubscribeNameByTopic(topic),
+		SubscriptionName:            internal.TestSubscriptionName(),
 		SubscriptionInitialPosition: pulsar.SubscriptionPositionEarliest,
-		PendingEnable:               true,
-		BlockingEnable:              true,
-		RetryingEnable:              true,
+		LevelPolicy:                 leveledPolicy,
 		Concurrency: &config.ConcurrencyPolicy{
 			CorePoolSize: 4,
 		},
@@ -164,13 +175,13 @@ func testConsumerBalanceStatus(t *testing.T, testCase consumerBalanceCase) {
 		consumerConf.Ready = &config.StatusPolicy{ConsumeWeight: uint(w)}
 	}
 	if w, ok := expectedWeights[message.StatusPending.String()]; ok {
-		consumerConf.Pending = &config.StatusPolicy{ConsumeWeight: uint(w)}
+		consumerConf.Pending = &config.StatusPolicy{ConsumeWeight: uint(w), BackoffDelays: testPolicy.BackoffDelays, ReentrantDelay: testPolicy.ReentrantDelay}
 	}
 	if w, ok := expectedWeights[message.StatusRetrying.String()]; ok {
-		consumerConf.Retrying = &config.StatusPolicy{ConsumeWeight: uint(w)}
+		consumerConf.Retrying = &config.StatusPolicy{ConsumeWeight: uint(w), BackoffDelays: testPolicy.BackoffDelays, ReentrantDelay: testPolicy.ReentrantDelay}
 	}
 	if w, ok := expectedWeights[message.StatusBlocking.String()]; ok {
-		consumerConf.Blocking = &config.StatusPolicy{ConsumeWeight: uint(w)}
+		consumerConf.Blocking = &config.StatusPolicy{ConsumeWeight: uint(w), BackoffDelays: testPolicy.BackoffDelays, ReentrantDelay: testPolicy.ReentrantDelay}
 	}
 	listener, err := client.CreateListener(consumerConf)
 
@@ -182,8 +193,8 @@ func testConsumerBalanceStatus(t *testing.T, testCase consumerBalanceCase) {
 	ctx, cancel := context.WithCancel(context.Background())
 	consumedCh := make(chan string, 100)
 	doneCh := make(chan struct{}, 1)
-	err = listener.Start(ctx, func(msg pulsar.Message) (bool, error) {
-		time.Sleep(time.Millisecond * 20)
+	err = listener.Start(ctx, func(ctx context.Context, msg message.Message) (bool, error) {
+		time.Sleep(time.Millisecond * 50)
 		consumedCh <- msg.Properties()["ConsumeType"]
 		return true, nil
 	})
@@ -265,7 +276,7 @@ func consumeMonitor(t *testing.T, ctx context.Context, consumedCh <-chan string,
 					stat, count, expectedCount, diffCount, statRate, expectedStatRate, diffRate)
 				if roundMsg > 100 {
 					assert.True(t, count > 0)
-					assert.True(t, math.Abs(float64(diffCount)) < float64(roundMsg)*0.1)
+					assert.True(t, math.Abs(float64(diffCount)) < float64(roundMsg)*0.2)
 				}
 				consumedStats[stat] = 0
 			}

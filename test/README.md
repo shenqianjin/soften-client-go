@@ -18,7 +18,7 @@
     </tr>
     <tr align="left"><th>sendAsync 1msg (Ready) </th><th></th><th>Passed</th></tr>
     <tr align="left">
-        <th rowspan="9">Produce-Check<br>(Sync)</th><th >check 1msg goto Discard</th><th></th><th>Passed</th>
+        <th rowspan="10">Produce-Check<br>(Sync)</th><th >check 1msg goto Discard</th><th></th><th>Passed</th>
     </tr>
     <tr align="left"><th>check 1msg goto Dead</th><th></th><th>Passed</th></tr>
     <tr align="left"><th>check 1msg goto Pending</th><th></th><th>Passed</th></tr>
@@ -26,10 +26,11 @@
     <tr align="left"><th>check 1msg goto Retrying</th><th></th><th>Passed</th></tr>
     <tr align="left"><th>check 1msg goto Upgrade</th><th></th><th>Passed</th></tr>
     <tr align="left"><th>check 1msg goto Degrade</th><th></th><th>Passed</th></tr>
-    <tr align="left"><th>check 1msg goto Route (L1)</th><th></th><th>Passed</th></tr>
+    <tr align="left"><th>check 1msg goto Shift</th><th></th><th>Passed</th></tr>
+    <tr align="left"><th>check 1msg goto Transfer (L1)</th><th></th><th>Passed</th></tr>
     <tr align="left"><th>check 8msg goto ALL goto actions</th><th></th><th>Passed</th></tr>
     <tr align="left">
-        <th rowspan="9">Produce-Check<br>(Async)</th><th >check 1msg goto Discard</th><th></th><th>Passed</th>
+        <th rowspan="10">Produce-Check<br>(Async)</th><th >check 1msg goto Discard</th><th></th><th>Passed</th>
     </tr>
     <tr align="left"><th>check 1msg goto Dead</th><th></th><th>Passed</th></tr>
     <tr align="left"><th>check 1msg goto Pending</th><th></th><th>Passed</th></tr>
@@ -37,15 +38,16 @@
     <tr align="left"><th>check 1msg goto Retrying</th><th></th><th>Passed</th></tr>
     <tr align="left"><th>check 1msg goto Upgrade</th><th></th><th>Passed</th></tr>
     <tr align="left"><th>check 1msg goto Degrade</th><th></th><th>Passed</th></tr>
-    <tr align="left"><th>check 1msg goto Route (L1)</th><th></th><th>Passed</th></tr>
+    <tr align="left"><th>check 1msg goto Shift</th><th></th><th>Passed</th></tr>
+    <tr align="left"><th>check 1msg goto Transfer (L1)</th><th></th><th>Passed</th></tr>
     <tr align="left"><th>check 8msg goto ALL goto actions</th><th></th><th>Passed</th></tr>
 <tr align="left">
-        <th rowspan="2">Produce-Overall</th><th >send 2msg (Ready) + check 1msg (route to L1)</th><th></th><th>Passed</th>
+        <th rowspan="2">Produce-Overall</th><th >send 2msg (Ready) + check 1msg (Transfer to L1)</th><th></th><th>Passed</th>
     </tr>
-    <tr align="left"><th>sendAsync 2msg (Ready) + check 1msg (route to L1) </th><th></th><th>Passed</th></tr>
+    <tr align="left"><th>sendAsync 2msg (Ready) + check 1msg (Transfer to L1) </th><th></th><th>Passed</th></tr>
     <!-- listen cases -->
     <tr align="left">
-        <th rowspan="13">Listen</th></th><th>listen 1msg (Ready)</th><th></th><th>Passed</th>
+        <th rowspan="14">Listen</th></th><th>listen 1msg (Ready)</th><th></th><th>Passed</th>
     </tr>
     <tr align="left"><th>listen 1msg (Pending)</th><th></th><th>Passed</th></tr>
     <tr align="left"><th>listen 1msg (Blocking)</th><th></th><th>Passed</th></tr>
@@ -69,11 +71,12 @@
     <tr align="left"><th>check goto Retrying 1msg</th><th></th><th>Passed</th></tr>
     <tr align="left"><th>check goto Upgrade 1msg</th><th></th><th>Passed</th></tr>
     <tr align="left"><th>check goto Degrade 1msg</th><th></th><th>Passed</th></tr>
-    <tr align="left"><th>check goto Reroute 1msg</th><th></th><th>Passed</th></tr>
+    <tr align="left"><th>check goto Shift 1msg</th><th></th><th>Passed</th></tr>
+    <tr align="left"><th>check goto Transfer 1msg</th><th></th><th>Passed</th></tr>
     <tr align="left"><th>check goto ALL goto-actions 9msg</th><th></th><th>Passed</th></tr>
     <!-- handle cases -->
     <tr align="left">
-        <th rowspan="9">Handle</th></th><th>handle goto Done 1msg</th><th></th><th>Passed</th>
+        <th rowspan="10">Handle</th></th><th>handle goto Done 1msg</th><th></th><th>Passed</th>
     </tr>
     <tr align="left"><th>handle goto Discard 1msg</th><th></th><th>Passed</th></tr>
     <tr align="left"><th>handle goto Dead 1msg</th><th></th><th>Passed</th></tr>
@@ -82,10 +85,11 @@
     <tr align="left"><th>handle goto Retrying 1msg</th><th></th><th>Passed</th></tr>
     <tr align="left"><th>handle goto Upgrade 1msg</th><th></th><th>Passed</th></tr>
     <tr align="left"><th>handle goto Degrade 1msg</th><th></th><th>Passed</th></tr>
+    <tr align="left"><th>handle goto Shift 1msg</th><th></th><th>Passed</th></tr>
     <tr align="left"><th>handle goto ALL goto-actions 8msg</th><th></th><th>Passed</th></tr>
     <!-- after check cases -->
     <tr align="left">
-        <th rowspan="9">After-Check</th></th>
+        <th rowspan="10">After-Check</th></th>
         <th>check goto Discard 1msg</th><th></th><th>Passed</th>
     </tr>
     <tr align="left"><th>check goto Dead 1msg</th><th></th><th>Passed</th></tr>
@@ -94,7 +98,8 @@
     <tr align="left"><th>check goto Retrying 1msg</th><th></th><th>Passed</th></tr>
     <tr align="left"><th>check goto Upgrade 1msg</th><th></th><th>Passed</th></tr>
     <tr align="left"><th>check goto Degrade 1msg</th><th></th><th>Passed</th></tr>
-    <tr align="left"><th>check goto Reroute 1msg</th><th></th><th>Passed</th></tr>
+    <tr align="left"><th>check goto Shift 1msg</th><th></th><th>Passed</th></tr>
+    <tr align="left"><th>check goto Transfer 1msg</th><th></th><th>Passed</th></tr>
     <tr align="left"><th>check goto ALL goto-actions 9msg</th><th></th><th>Passed</th></tr>
     <!-- Status balance cases -->
     <tr align="left">

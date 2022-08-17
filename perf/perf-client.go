@@ -4,11 +4,9 @@ import (
 	"io/ioutil"
 	"os"
 
-	"github.com/shenqianjin/soften-client-go/soften/config"
-
-	"github.com/shenqianjin/soften-client-go/soften"
-
 	"github.com/apache/pulsar-client-go/pulsar"
+	"github.com/shenqianjin/soften-client-go/soften"
+	"github.com/shenqianjin/soften-client-go/soften/config"
 	log "github.com/sirupsen/logrus"
 )
 

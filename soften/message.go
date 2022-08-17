@@ -2,40 +2,37 @@ package soften
 
 import (
 	"fmt"
-	"github.com/shenqianjin/soften-client-go/soften/handler"
 	"reflect"
+	"time"
+
+	"github.com/shenqianjin/soften-client-go/soften/message"
 
 	"github.com/apache/pulsar-client-go/pulsar"
 	"github.com/shenqianjin/soften-client-go/soften/checker"
+	"github.com/shenqianjin/soften-client-go/soften/decider"
 	"github.com/shenqianjin/soften-client-go/soften/internal"
 	"github.com/shenqianjin/soften-client-go/soften/internal/strategy"
 )
 
-// ------ re-reRouter message ------
+// ------ Route message ------
 
-type RerouteMessage struct {
-	producerMsg pulsar.ProducerMessage
-	consumerMsg pulsar.ConsumerMessage
+type RouteMessage struct {
+	producerMsg *pulsar.ProducerMessage
+	callback    func(messageID pulsar.MessageID, producerMessage *pulsar.ProducerMessage, err error)
 }
 
-// ------ custom consumer message ------
+// ------ soften consumer message ------
 
-type ConsumerMessage struct {
-	pulsar.ConsumerMessage
-	StatusMessage
-	LeveledMessage
+type consumerMessage struct {
+	pulsar.Consumer
+	message.Message
+	internalExtra *internalExtraMessage
 }
 
-// ------ status message interface ------
-
-type StatusMessage interface {
-	Status() internal.MessageStatus
-}
-
-// ------ leveled message interface ------
-
-type LeveledMessage interface {
-	Level() internal.TopicLevel
+type messageImpl struct {
+	pulsar.Message
+	internal.StatusMessage
+	internal.LeveledMessage
 }
 
 // ---------------------------------------
@@ -60,6 +57,18 @@ func (m *leveledMessage) Level() internal.TopicLevel {
 	return m.level
 }
 
+// ------ message extra info ------
+
+type internalExtraMessage struct {
+	receivedTime       time.Time
+	listenedTime       time.Time
+	prevCheckBeginTime time.Time
+
+	consumerMetrics    *internal.ListenerConsumerMetrics
+	deciderMetrics     *internal.ListenerDeciderMetrics
+	messagesEndMetrics *internal.ListenerMessagesMetrics
+}
+
 // ------ message receiver help ------
 
 var messageChSelector = &messageChSelectorImpl{}
@@ -67,7 +76,7 @@ var messageChSelector = &messageChSelectorImpl{}
 type messageChSelectorImpl struct {
 }
 
-func (mcs *messageChSelectorImpl) receiveAny(chs []<-chan ConsumerMessage) (ConsumerMessage, bool) {
+func (mcs *messageChSelectorImpl) receiveAny(chs []<-chan consumerMessage) (consumerMessage, bool) {
 	/*select {
 	case msg, ok := <-chs[0]:
 		return msg, ok
@@ -84,14 +93,14 @@ func (mcs *messageChSelectorImpl) receiveAny(chs []<-chan ConsumerMessage) (Cons
 	}
 	_, value, ok := reflect.Select(cases)
 	// ok will be true if the channel has not been closed.
-	if rv, valid := value.Interface().(ConsumerMessage); !valid {
-		panic(fmt.Sprintf("convert %v to ConsumerMessage failed", value))
+	if rv, valid := value.Interface().(consumerMessage); !valid {
+		panic(fmt.Sprintf("convert %v to consumerMessage failed", value))
 	} else {
 		return rv, ok
 	}
 }
 
-func (mcs *messageChSelectorImpl) receiveOneByWeight(chs []<-chan ConsumerMessage, balanceStrategy strategy.IBalanceStrategy, excludedIndexes *[]int) (ConsumerMessage, bool) {
+func (mcs *messageChSelectorImpl) receiveOneByWeight(chs []<-chan consumerMessage, balanceStrategy strategy.IBalanceStrategy, excludedIndexes *[]int) (consumerMessage, bool) {
 	if len(*excludedIndexes) >= len(chs) {
 		excludedIndexes = &[]int{}
 		return mcs.receiveAny(chs)
@@ -108,34 +117,34 @@ func (mcs *messageChSelectorImpl) receiveOneByWeight(chs []<-chan ConsumerMessag
 
 // ------ helper ------
 
-var internalGotoReroute = internal.HandleGoto("Reroute") // for consumer
-var internalGotoRoute = internal.HandleGoto("Route")     // for producer
+var checkTypeGotoMap = map[checker.CheckType]internal.DecideGoto{
+	checker.CheckTypePrevDiscard:  decider.GotoDiscard,
+	checker.CheckTypePrevDead:     decider.GotoDead,
+	checker.CheckTypePrevUpgrade:  decider.GotoUpgrade,
+	checker.CheckTypePrevDegrade:  decider.GotoDegrade,
+	checker.CheckTypePrevShift:    decider.GotoShift,
+	checker.CheckTypePrevBlocking: decider.GotoBlocking,
+	checker.CheckTypePrevPending:  decider.GotoPending,
+	checker.CheckTypePrevRetrying: decider.GotoRetrying,
+	checker.CheckTypePrevTransfer: decider.GotoTransfer,
 
-var checkTypeGotoMap = map[checker.CheckType]internal.HandleGoto{
-	checker.CheckTypePrevDiscard:  handler.GotoDiscard,
-	checker.CheckTypePrevDead:     handler.GotoDead,
-	checker.CheckTypePrevUpgrade:  handler.GotoUpgrade,
-	checker.CheckTypePrevDegrade:  handler.GotoDegrade,
-	checker.CheckTypePrevBlocking: handler.GotoBlocking,
-	checker.CheckTypePrevPending:  handler.GotoPending,
-	checker.CheckTypePrevRetrying: handler.GotoRetrying,
-	checker.CheckTypePrevReroute:  internalGotoReroute,
+	checker.CheckTypePostDiscard:  decider.GotoDiscard,
+	checker.CheckTypePostDead:     decider.GotoDead,
+	checker.CheckTypePostUpgrade:  decider.GotoUpgrade,
+	checker.CheckTypePostDegrade:  decider.GotoDegrade,
+	checker.CheckTypePostShift:    decider.GotoShift,
+	checker.CheckTypePostBlocking: decider.GotoBlocking,
+	checker.CheckTypePostPending:  decider.GotoPending,
+	checker.CheckTypePostRetrying: decider.GotoRetrying,
+	checker.CheckTypePostTransfer: decider.GotoTransfer,
 
-	checker.CheckTypePostDiscard:  handler.GotoDiscard,
-	checker.CheckTypePostDead:     handler.GotoDead,
-	checker.CheckTypePostUpgrade:  handler.GotoUpgrade,
-	checker.CheckTypePostDegrade:  handler.GotoDegrade,
-	checker.CheckTypePostBlocking: handler.GotoBlocking,
-	checker.CheckTypePostPending:  handler.GotoPending,
-	checker.CheckTypePostRetrying: handler.GotoRetrying,
-	checker.CheckTypePostReroute:  internalGotoReroute,
-
-	checker.ProduceCheckTypeDiscard:  handler.GotoDiscard,
-	checker.ProduceCheckTypeDead:     handler.GotoDead,
-	checker.ProduceCheckTypeUpgrade:  handler.GotoUpgrade,
-	checker.ProduceCheckTypeDegrade:  handler.GotoDegrade,
-	checker.ProduceCheckTypeBlocking: handler.GotoBlocking,
-	checker.ProduceCheckTypePending:  handler.GotoPending,
-	checker.ProduceCheckTypeRetrying: handler.GotoRetrying,
-	checker.ProduceCheckTypeRoute:    internalGotoRoute,
+	checker.ProduceCheckTypeDiscard:  decider.GotoDiscard,
+	checker.ProduceCheckTypeDead:     decider.GotoDead,
+	checker.ProduceCheckTypeUpgrade:  decider.GotoUpgrade,
+	checker.ProduceCheckTypeDegrade:  decider.GotoDegrade,
+	checker.ProduceCheckTypeShift:    decider.GotoShift,
+	checker.ProduceCheckTypeBlocking: decider.GotoBlocking,
+	checker.ProduceCheckTypePending:  decider.GotoPending,
+	checker.ProduceCheckTypeRetrying: decider.GotoRetrying,
+	checker.ProduceCheckTypeTransfer: decider.GotoTransfer,
 }

@@ -11,13 +11,11 @@ import (
 	"syscall"
 	"time"
 
-	"go.uber.org/ratelimit"
-
-	"github.com/shenqianjin/soften-client-go/soften/config"
-
 	"github.com/apache/pulsar-client-go/pulsar"
 	"github.com/bmizerany/perks/quantile"
+	"github.com/shenqianjin/soften-client-go/soften/config"
 	log "github.com/sirupsen/logrus"
+	"go.uber.org/ratelimit"
 )
 
 // produceArgs define the parameters required by perfProduce

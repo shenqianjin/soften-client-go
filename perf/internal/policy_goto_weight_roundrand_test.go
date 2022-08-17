@@ -5,18 +5,17 @@ import (
 	"math"
 	"testing"
 
-	"github.com/shenqianjin/soften-client-go/soften/handler"
-
+	"github.com/shenqianjin/soften-client-go/soften/decider"
 	"github.com/stretchr/testify/assert"
 )
 
 func TestRoundRandWeightGotoPolicy(t *testing.T) {
-	weightMap := make(map[string]uint)
-	weightMap[string(handler.GotoDone)] = 19
-	weightMap[string(handler.GotoRetrying)] = 5
-	weightMap[string(handler.GotoPending)] = 5
-	weightMap[string(handler.GotoBlocking)] = 5
-	weightMap[string(handler.GotoDiscard)] = 1
+	weightMap := make(map[string]uint64)
+	weightMap[string(decider.GotoDone)] = 19
+	weightMap[string(decider.GotoRetrying)] = 5
+	weightMap[string(decider.GotoPending)] = 5
+	weightMap[string(decider.GotoBlocking)] = 5
+	weightMap[string(decider.GotoDiscard)] = 1
 
 	chooseMap := make(map[string]int)
 	loop := 500

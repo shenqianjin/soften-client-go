@@ -1,4 +1,4 @@
-package topic
+package message
 
 import (
 	"errors"

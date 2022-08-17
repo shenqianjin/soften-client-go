@@ -35,7 +35,7 @@
 ### 主题结构[业务开发者所见]
 ![img](topic-structure.png)
 ### 消息状态
-![img.png](message-status.jpeg)
+![img.png](../resources/images/message-status.jpg)
 ### 处理流程[消费端]
 ![img.png](topic-consume-flow.jpeg)
 

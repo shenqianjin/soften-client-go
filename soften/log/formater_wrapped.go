@@ -125,7 +125,6 @@ func getCaller() *runtime.Frame {
 }
 
 // getPackageName reduces a fully qualified function name to the package name
-// There really ought to be to be a better way...
 func getPackageName(f string) string {
 	for {
 		lastPeriod := strings.LastIndex(f, ".")

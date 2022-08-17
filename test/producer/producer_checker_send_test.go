@@ -7,12 +7,11 @@ import (
 	"strconv"
 	"testing"
 
-	"github.com/apache/pulsar-client-go/pulsar"
 	"github.com/shenqianjin/soften-client-go/soften/admin"
 	"github.com/shenqianjin/soften-client-go/soften/checker"
 	"github.com/shenqianjin/soften-client-go/soften/config"
+	"github.com/shenqianjin/soften-client-go/soften/decider"
 	"github.com/shenqianjin/soften-client-go/soften/message"
-	topiclevel "github.com/shenqianjin/soften-client-go/soften/topic"
 	"github.com/shenqianjin/soften-client-go/test/internal"
 	"github.com/stretchr/testify/assert"
 )
@@ -29,11 +28,11 @@ type testProduceCheckCase struct {
 }
 
 func TestProduceCheck_Discard_BySend(t *testing.T) {
-	topic := internal.GenerateTestTopic()
+	topic := internal.GenerateTestTopic(internal.PrefixTestProduce)
 	checkCase := testProduceCheckCase{
 		topic:               topic,
 		expectedStoredCount: 0,
-		checkpoint: checker.PrevSendDiscard(func(msg *pulsar.ProducerMessage) checker.CheckStatus {
+		checkpoint: checker.PrevSendDiscard(func(ctx context.Context, msg *message.ProducerMessage) checker.CheckStatus {
 			return checker.CheckStatusPassed
 		}),
 	}
@@ -41,12 +40,12 @@ func TestProduceCheck_Discard_BySend(t *testing.T) {
 }
 
 func TestProduceCheck_Dead_BySend(t *testing.T) {
-	topic := internal.GenerateTestTopic()
+	topic := internal.GenerateTestTopic(internal.PrefixTestProduce)
 	checkCase := testProduceCheckCase{
 		topic:               topic,
 		storedTopic:         topic + message.StatusDead.TopicSuffix(),
 		expectedStoredCount: 1,
-		checkpoint: checker.PrevSendDead(func(msg *pulsar.ProducerMessage) checker.CheckStatus {
+		checkpoint: checker.PrevSendDead(func(ctx context.Context, msg *message.ProducerMessage) checker.CheckStatus {
 			return checker.CheckStatusPassed
 		}),
 	}
@@ -54,12 +53,12 @@ func TestProduceCheck_Dead_BySend(t *testing.T) {
 }
 
 func TestProduceCheck_Pending_BySend(t *testing.T) {
-	topic := internal.GenerateTestTopic()
+	topic := internal.GenerateTestTopic(internal.PrefixTestProduce)
 	checkCase := testProduceCheckCase{
 		topic:               topic,
 		storedTopic:         topic + message.StatusPending.TopicSuffix(),
 		expectedStoredCount: 1,
-		checkpoint: checker.PrevSendPending(func(msg *pulsar.ProducerMessage) checker.CheckStatus {
+		checkpoint: checker.PrevSendPending(func(ctx context.Context, msg *message.ProducerMessage) checker.CheckStatus {
 			return checker.CheckStatusPassed
 		}),
 	}
@@ -67,12 +66,12 @@ func TestProduceCheck_Pending_BySend(t *testing.T) {
 }
 
 func TestProduceCheck_Blocking_BySend(t *testing.T) {
-	topic := internal.GenerateTestTopic()
+	topic := internal.GenerateTestTopic(internal.PrefixTestProduce)
 	checkCase := testProduceCheckCase{
 		topic:               topic,
 		storedTopic:         topic + message.StatusBlocking.TopicSuffix(),
 		expectedStoredCount: 1,
-		checkpoint: checker.PrevSendBlocking(func(msg *pulsar.ProducerMessage) checker.CheckStatus {
+		checkpoint: checker.PrevSendBlocking(func(ctx context.Context, msg *message.ProducerMessage) checker.CheckStatus {
 			return checker.CheckStatusPassed
 		}),
 	}
@@ -80,12 +79,12 @@ func TestProduceCheck_Blocking_BySend(t *testing.T) {
 }
 
 func TestProduceCheck_Retrying_BySend(t *testing.T) {
-	topic := internal.GenerateTestTopic()
+	topic := internal.GenerateTestTopic(internal.PrefixTestProduce)
 	checkCase := testProduceCheckCase{
 		topic:               topic,
 		storedTopic:         topic + message.StatusRetrying.TopicSuffix(),
 		expectedStoredCount: 1,
-		checkpoint: checker.PrevSendRetrying(func(msg *pulsar.ProducerMessage) checker.CheckStatus {
+		checkpoint: checker.PrevSendRetrying(func(ctx context.Context, msg *message.ProducerMessage) checker.CheckStatus {
 			return checker.CheckStatusPassed
 		}),
 	}
@@ -93,14 +92,14 @@ func TestProduceCheck_Retrying_BySend(t *testing.T) {
 }
 
 func TestProduceCheck_Upgrade_BySend(t *testing.T) {
-	upgradeLevel := topiclevel.L2
-	topic := internal.GenerateTestTopic()
+	upgradeLevel := message.L2
+	topic := internal.GenerateTestTopic(internal.PrefixTestProduce)
 	checkCase := testProduceCheckCase{
 		topic:               topic,
 		storedTopic:         topic + upgradeLevel.TopicSuffix(),
 		upgradeLevel:        string(upgradeLevel),
 		expectedStoredCount: 1,
-		checkpoint: checker.PrevSendUpgrade(func(msg *pulsar.ProducerMessage) checker.CheckStatus {
+		checkpoint: checker.PrevSendUpgrade(func(ctx context.Context, msg *message.ProducerMessage) checker.CheckStatus {
 			return checker.CheckStatusPassed
 		}),
 	}
@@ -108,29 +107,29 @@ func TestProduceCheck_Upgrade_BySend(t *testing.T) {
 }
 
 func TestProduceCheck_Degrade_BySend(t *testing.T) {
-	degradeLevel := topiclevel.B2
-	topic := internal.GenerateTestTopic()
+	degradeLevel := message.B2
+	topic := internal.GenerateTestTopic(internal.PrefixTestProduce)
 	checkCase := testProduceCheckCase{
 		topic:               topic,
 		storedTopic:         topic + degradeLevel.TopicSuffix(),
 		degradeLevel:        string(degradeLevel),
 		expectedStoredCount: 1,
-		checkpoint: checker.PrevSendDegrade(func(msg *pulsar.ProducerMessage) checker.CheckStatus {
+		checkpoint: checker.PrevSendDegrade(func(ctx context.Context, msg *message.ProducerMessage) checker.CheckStatus {
 			return checker.CheckStatusPassed
 		}),
 	}
 	testProduceCheckBySend(t, checkCase)
 }
 
-func TestProduceCheck_RouteToL2_BySend(t *testing.T) {
-	topic := internal.GenerateTestTopic()
-	routedTopic := topic + "-L2"
+func TestProduceCheck_TransferToL2_BySend(t *testing.T) {
+	topic := internal.GenerateTestTopic(internal.PrefixTestProduce)
+	transferredTopic := topic + "-L2"
 	checkCase := testProduceCheckCase{
 		topic:               topic,
-		storedTopic:         routedTopic,
+		storedTopic:         transferredTopic,
 		expectedStoredCount: 1,
-		checkpoint: checker.PrevSendRoute(func(msg *pulsar.ProducerMessage) checker.CheckStatus {
-			return checker.CheckStatusPassed.WithRerouteTopic(routedTopic)
+		checkpoint: checker.PrevSendTransfer(func(ctx context.Context, msg *message.ProducerMessage) checker.CheckStatus {
+			return checker.CheckStatusPassed.WithGotoExtra(decider.GotoExtra{Topic: transferredTopic})
 		}),
 	}
 	testProduceCheckBySend(t, checkCase)
@@ -149,21 +148,21 @@ func testProduceCheckBySend(t *testing.T, checkCase testProduceCheckCase) {
 
 	client := internal.NewClient(internal.DefaultPulsarUrl)
 	defer client.Close()
-	upgradeLevel, _ := topiclevel.LevelOf(checkCase.upgradeLevel)
-	degradeLevel, _ := topiclevel.LevelOf(checkCase.degradeLevel)
+	upgradeLevel, _ := message.LevelOf(checkCase.upgradeLevel)
+	degradeLevel, _ := message.LevelOf(checkCase.degradeLevel)
 	producer, err := client.CreateProducer(config.ProducerConfig{
-		Topic:             checkCase.topic,
-		RouteEnable:       checkCase.checkpoint.CheckType == checker.ProduceCheckTypeRoute,
-		DiscardEnable:     checkCase.checkpoint.CheckType == checker.ProduceCheckTypeDiscard,
-		DeadEnable:        checkCase.checkpoint.CheckType == checker.ProduceCheckTypeDead,
-		PendingEnable:     checkCase.checkpoint.CheckType == checker.ProduceCheckTypePending,
-		BlockingEnable:    checkCase.checkpoint.CheckType == checker.ProduceCheckTypeBlocking,
-		RetryingEnable:    checkCase.checkpoint.CheckType == checker.ProduceCheckTypeRetrying,
-		UpgradeEnable:     checkCase.checkpoint.CheckType == checker.ProduceCheckTypeUpgrade,
-		DegradeEnable:     checkCase.checkpoint.CheckType == checker.ProduceCheckTypeDegrade,
-		Route:             &config.RoutePolicy{ConnectInSyncEnable: true},
-		UpgradeTopicLevel: upgradeLevel,
-		DegradeTopicLevel: degradeLevel,
+		Topic:          checkCase.topic,
+		TransferEnable: checkCase.checkpoint.CheckType == checker.ProduceCheckTypeTransfer,
+		DiscardEnable:  checkCase.checkpoint.CheckType == checker.ProduceCheckTypeDiscard,
+		DeadEnable:     checkCase.checkpoint.CheckType == checker.ProduceCheckTypeDead,
+		PendingEnable:  checkCase.checkpoint.CheckType == checker.ProduceCheckTypePending,
+		BlockingEnable: checkCase.checkpoint.CheckType == checker.ProduceCheckTypeBlocking,
+		RetryingEnable: checkCase.checkpoint.CheckType == checker.ProduceCheckTypeRetrying,
+		UpgradeEnable:  checkCase.checkpoint.CheckType == checker.ProduceCheckTypeUpgrade,
+		DegradeEnable:  checkCase.checkpoint.CheckType == checker.ProduceCheckTypeDegrade,
+		Transfer:       &config.TransferPolicy{ConnectInSyncEnable: true},
+		Upgrade:        &config.ShiftPolicy{Level: upgradeLevel, ConnectInSyncEnable: true},
+		Degrade:        &config.ShiftPolicy{Level: degradeLevel, ConnectInSyncEnable: true},
 	}, checkCase.checkpoint)
 	if err != nil {
 		log.Fatal(err)
@@ -181,10 +180,10 @@ func testProduceCheckBySend(t *testing.T, checkCase testProduceCheckCase) {
 }
 
 func TestProduceCheck_All_BySend(t *testing.T) {
-	upgradeLevel := topiclevel.L2
-	degradeLevel := topiclevel.B2
-	topic := internal.GenerateTestTopic()
-	routedTopic := topic + "-S1"
+	upgradeLevel := message.L2
+	degradeLevel := message.B2
+	topic := internal.GenerateTestTopic(internal.PrefixTestProduce)
+	transferredTopic := topic + "-S1"
 	storedTopics := []string{
 		topic, // ready
 		"",    // discard
@@ -194,56 +193,55 @@ func TestProduceCheck_All_BySend(t *testing.T) {
 		topic + message.StatusRetrying.TopicSuffix(),
 		topic + upgradeLevel.TopicSuffix(),
 		topic + degradeLevel.TopicSuffix(),
-		routedTopic,
+		transferredTopic,
 	}
 	checkpoints := []checker.ProduceCheckpoint{
 		// 0 为 ready
-		checker.PrevSendDiscard(func(msg *pulsar.ProducerMessage) checker.CheckStatus {
-			fmt.Println("discard ..checking ..................")
+		checker.PrevSendDiscard(func(ctx context.Context, msg *message.ProducerMessage) checker.CheckStatus {
 			if index, ok := msg.Properties["Index"]; ok && index == "1" {
 				return checker.CheckStatusPassed
 			}
 			return checker.CheckStatusRejected
 		}),
-		checker.PrevSendDead(func(msg *pulsar.ProducerMessage) checker.CheckStatus {
+		checker.PrevSendDead(func(ctx context.Context, msg *message.ProducerMessage) checker.CheckStatus {
 			if index, ok := msg.Properties["Index"]; ok && index == "2" {
 				return checker.CheckStatusPassed
 			}
 			return checker.CheckStatusRejected
 		}),
-		checker.PrevSendPending(func(msg *pulsar.ProducerMessage) checker.CheckStatus {
+		checker.PrevSendPending(func(ctx context.Context, msg *message.ProducerMessage) checker.CheckStatus {
 			if index, ok := msg.Properties["Index"]; ok && index == "3" {
 				return checker.CheckStatusPassed
 			}
 			return checker.CheckStatusRejected
 		}),
-		checker.PrevSendBlocking(func(msg *pulsar.ProducerMessage) checker.CheckStatus {
+		checker.PrevSendBlocking(func(ctx context.Context, msg *message.ProducerMessage) checker.CheckStatus {
 			if index, ok := msg.Properties["Index"]; ok && index == "4" {
 				return checker.CheckStatusPassed
 			}
 			return checker.CheckStatusRejected
 		}),
-		checker.PrevSendRetrying(func(msg *pulsar.ProducerMessage) checker.CheckStatus {
+		checker.PrevSendRetrying(func(ctx context.Context, msg *message.ProducerMessage) checker.CheckStatus {
 			if index, ok := msg.Properties["Index"]; ok && index == "5" {
 				return checker.CheckStatusPassed
 			}
 			return checker.CheckStatusRejected
 		}),
-		checker.PrevSendUpgrade(func(msg *pulsar.ProducerMessage) checker.CheckStatus {
+		checker.PrevSendUpgrade(func(ctx context.Context, msg *message.ProducerMessage) checker.CheckStatus {
 			if index, ok := msg.Properties["Index"]; ok && index == "6" {
 				return checker.CheckStatusPassed
 			}
 			return checker.CheckStatusRejected
 		}),
-		checker.PrevSendDegrade(func(msg *pulsar.ProducerMessage) checker.CheckStatus {
+		checker.PrevSendDegrade(func(ctx context.Context, msg *message.ProducerMessage) checker.CheckStatus {
 			if index, ok := msg.Properties["Index"]; ok && index == "7" {
 				return checker.CheckStatusPassed
 			}
 			return checker.CheckStatusRejected
 		}),
-		checker.PrevSendRoute(func(msg *pulsar.ProducerMessage) checker.CheckStatus {
+		checker.PrevSendTransfer(func(ctx context.Context, msg *message.ProducerMessage) checker.CheckStatus {
 			if index, ok := msg.Properties["Index"]; ok && index == "8" {
-				return checker.CheckStatusPassed.WithRerouteTopic(routedTopic)
+				return checker.CheckStatusPassed.WithGotoExtra(decider.GotoExtra{Topic: transferredTopic})
 			}
 			return checker.CheckStatusRejected
 		}),
@@ -268,18 +266,18 @@ func TestProduceCheck_All_BySend(t *testing.T) {
 	client := internal.NewClient(internal.DefaultPulsarUrl)
 	defer client.Close()
 	producer, err := client.CreateProducer(config.ProducerConfig{
-		Topic:             topic,
-		RouteEnable:       true,
-		DiscardEnable:     true,
-		DeadEnable:        true,
-		PendingEnable:     true,
-		BlockingEnable:    true,
-		RetryingEnable:    true,
-		UpgradeEnable:     true,
-		DegradeEnable:     true,
-		Route:             &config.RoutePolicy{ConnectInSyncEnable: true},
-		UpgradeTopicLevel: upgradeLevel,
-		DegradeTopicLevel: degradeLevel,
+		Topic:          topic,
+		TransferEnable: true,
+		DiscardEnable:  true,
+		DeadEnable:     true,
+		PendingEnable:  true,
+		BlockingEnable: true,
+		RetryingEnable: true,
+		UpgradeEnable:  true,
+		DegradeEnable:  true,
+		Transfer:       &config.TransferPolicy{ConnectInSyncEnable: true},
+		Upgrade:        &config.ShiftPolicy{Level: upgradeLevel, ConnectInSyncEnable: true},
+		Degrade:        &config.ShiftPolicy{Level: degradeLevel, ConnectInSyncEnable: true},
 	}, checkpoints...)
 	if err != nil {
 		log.Fatal(err)
@@ -301,6 +299,7 @@ func TestProduceCheck_All_BySend(t *testing.T) {
 		}
 		stats, err := manager.Stats(storedTopic)
 		assert.Nil(t, err)
+		fmt.Println(index, "---------------")
 		assert.Equal(t, expected, stats.MsgInCounter, fmt.Sprintf("failed to validate stats for the %v topic: %v", index, storedTopic))
 	}
 }

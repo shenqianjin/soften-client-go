@@ -3,62 +3,86 @@ package soften
 import (
 	"context"
 	"fmt"
-	"sync"
 	"time"
-
-	"github.com/pkg/errors"
-
-	"github.com/shenqianjin/soften-client-go/soften/checker"
 
 	"github.com/apache/pulsar-client-go/pulsar"
 	"github.com/apache/pulsar-client-go/pulsar/log"
+	"github.com/pkg/errors"
+	"github.com/shenqianjin/soften-client-go/soften/checker"
 	"github.com/shenqianjin/soften-client-go/soften/config"
 	"github.com/shenqianjin/soften-client-go/soften/internal"
+	"github.com/shenqianjin/soften-client-go/soften/message"
 )
 
 type Producer interface {
+	// Send sends a message
 	Send(ctx context.Context, msg *pulsar.ProducerMessage) (pulsar.MessageID, error)
+
+	// SendAsync sends a message in asynchronous mode
 	SendAsync(ctx context.Context, msg *pulsar.ProducerMessage, callback func(pulsar.MessageID, *pulsar.ProducerMessage, error))
+
+	// Close the producer and releases resources allocated
 	Close()
 }
 
 type producer struct {
 	pulsar.Producer
-	client         *client
-	logger         log.Logger
-	topic          string
-	upgradeLevel   internal.TopicLevel
-	degradeLevel   internal.TopicLevel
-	enables        *internal.StatusEnables
-	routePolicy    *config.RoutePolicy
-	checkers       map[checker.CheckType]*wrappedProduceCheckpoint
-	deciders       produceDeciders
-	metrics        *internal.ProducerMetrics
-	deciderMetrics sync.Map // map[internal.HandleGoto]*internal.DecideGotoMetrics
+	client          *client
+	logger          log.Logger
+	groundTopic     string // same with topic for producer
+	level           internal.TopicLevel
+	topic           string //
+	upgradePolicy   *config.ShiftPolicy
+	degradePolicy   *config.ShiftPolicy
+	enables         *internal.StatusEnables
+	routePolicy     *config.TransferPolicy
+	prevCheckOrders []checker.CheckType
+	checkers        map[checker.CheckType]*produceCheckpointChain
+	deciders        produceDeciders
+	metricsProvider *internal.MetricsProvider
+	BackoffMaxTimes uint // 发送失败补偿次数。补偿次数大于0, 客户端异步发送时, 重试会使用同步请求
+	BackoffPolicy   config.BackoffPolicy
 }
 
-func newProducer(client *client, conf *config.ProducerConfig, checkpoints map[checker.CheckType]*checker.ProduceCheckpoint) (*producer, error) {
+func newProducer(client *client, conf *config.ProducerConfig, checkpoints map[checker.CheckType][]*checker.ProduceCheckpoint) (*producer, error) {
 	options := pulsar.ProducerOptions{
-		Topic: conf.Topic,
+		Topic:                   conf.Topic + conf.Level.TopicSuffix(),
+		Name:                    conf.Name,
+		SendTimeout:             time.Second * time.Duration(conf.SendTimeout),
+		MaxPendingMessages:      conf.MaxPendingMessages,
+		HashingScheme:           pulsar.HashingScheme(conf.HashingScheme),
+		CompressionType:         pulsar.CompressionType(conf.CompressionType),
+		CompressionLevel:        pulsar.CompressionLevel(conf.CompressionLevel),
+		DisableBatching:         conf.DisableBatching,
+		BatchingMaxPublishDelay: time.Second * time.Duration(conf.BatchingMaxPublishDelay),
+		BatchingMaxMessages:     conf.BatchingMaxMessages,
+		BatchingMaxSize:         conf.BatchingMaxSize,
+		BatcherBuilderType:      pulsar.BatcherBuilderType(conf.BatcherBuilderType),
 	}
 	pulsarProducer, err := client.Client.CreateProducer(options)
 	if err != nil {
 		return nil, err
 	}
 	p := &producer{
-		Producer:     pulsarProducer,
-		client:       client,
-		logger:       client.logger.SubLogger(log.Fields{"topic": options.Topic}),
-		topic:        conf.Topic,
-		upgradeLevel: conf.UpgradeTopicLevel,
-		degradeLevel: conf.DegradeTopicLevel,
-		routePolicy:  conf.Route,
-		metrics:      client.metricsProvider.GetProducerMetrics(conf.Topic),
+		Producer:        pulsarProducer,
+		client:          client,
+		logger:          client.logger.SubLogger(log.Fields{"ground_topic": conf.Topic, "level": conf.Level}),
+		groundTopic:     conf.Topic,
+		topic:           conf.Topic + conf.Level.TopicSuffix(),
+		level:           conf.Level,
+		upgradePolicy:   conf.Upgrade,
+		degradePolicy:   conf.Degrade,
+		routePolicy:     conf.Transfer,
+		metricsProvider: client.metricsProvider,
+		BackoffMaxTimes: conf.BackoffMaxTimes,
+		BackoffPolicy:   conf.BackoffPolicy,
 	}
 	// collect enables
 	p.enables = p.collectEnables(conf)
 	// initialize checkers
 	p.checkers = p.collectCheckers(p.enables, checkpoints)
+	// collect check orders
+	p.prevCheckOrders = p.collectCheckOrders()
 	// initialize deciders
 	produceDecidersOpts := p.formatDecidersOptions(conf)
 	if deciders, err := newProduceDeciders(p, produceDecidersOpts); err != nil {
@@ -67,7 +91,7 @@ func newProducer(client *client, conf *config.ProducerConfig, checkpoints map[ch
 		p.deciders = deciders
 	}
 	p.logger.Infof("created soften producer")
-	p.metrics.ProducersOpened.Inc()
+	p.metricsProvider.GetProducerMetrics(p.groundTopic, p.topic).ProducersOpened.Inc()
 	return p, nil
 }
 
@@ -79,17 +103,17 @@ func (p *producer) collectEnables(conf *config.ProducerConfig) *internal.StatusE
 		BlockingEnable: conf.BlockingEnable,
 		PendingEnable:  conf.PendingEnable,
 		RetryingEnable: conf.RetryingEnable,
-		RerouteEnable:  conf.RouteEnable,
+		TransferEnable: conf.TransferEnable,
 		UpgradeEnable:  conf.UpgradeEnable,
 		DegradeEnable:  conf.DegradeEnable,
 	}
 	return &enables
 }
 
-func (p *producer) collectCheckers(enables *internal.StatusEnables, checkpointMap map[checker.CheckType]*checker.ProduceCheckpoint) map[checker.CheckType]*wrappedProduceCheckpoint {
-	checkers := make(map[checker.CheckType]*wrappedProduceCheckpoint)
-	if enables.RerouteEnable {
-		p.tryLoadConfiguredChecker(&checkers, checker.ProduceCheckTypeRoute, checkpointMap)
+func (p *producer) collectCheckers(enables *internal.StatusEnables, checkpointMap map[checker.CheckType][]*checker.ProduceCheckpoint) map[checker.CheckType]*produceCheckpointChain {
+	checkers := make(map[checker.CheckType]*produceCheckpointChain)
+	if enables.TransferEnable {
+		p.tryLoadConfiguredChecker(&checkers, checker.ProduceCheckTypeTransfer, checkpointMap)
 	}
 	if enables.PendingEnable {
 		p.tryLoadConfiguredChecker(&checkers, checker.ProduceCheckTypePending, checkpointMap)
@@ -115,34 +139,52 @@ func (p *producer) collectCheckers(enables *internal.StatusEnables, checkpointMa
 	return checkers
 }
 
-func (p *producer) tryLoadConfiguredChecker(checkers *map[checker.CheckType]*wrappedProduceCheckpoint, checkType checker.CheckType, checkpointMap map[checker.CheckType]*checker.ProduceCheckpoint) {
-	if ckp, ok := checkpointMap[checkType]; ok {
-		metrics := p.client.metricsProvider.GetProducerTypedCheckMetrics(p.topic, checkType)
-		(*checkers)[checkType] = newWrappedProduceCheckpoint(ckp, metrics)
+func (p *producer) collectCheckOrders() []checker.CheckType {
+	prevCheckOrders := make([]checker.CheckType, 0)
+	for _, checkType := range checker.DefaultPrevSendCheckOrders() {
+		if _, ok := p.checkers[checkType]; ok {
+			prevCheckOrders = append(prevCheckOrders, checkType)
+		}
+	}
+	return prevCheckOrders
+}
+
+func (p *producer) tryLoadConfiguredChecker(checkers *map[checker.CheckType]*produceCheckpointChain, checkType checker.CheckType, checkpointMap map[checker.CheckType][]*checker.ProduceCheckpoint) {
+	if checkChains, ok := checkpointMap[checkType]; ok {
+		options := produceCheckpointChainOptions{groundTopic: p.groundTopic, topic: p.topic, checkType: checkType}
+		(*checkers)[checkType] = newProduceCheckpointChains(checkChains, options, p.metricsProvider)
 	}
 }
 
 func (p *producer) formatDecidersOptions(conf *config.ProducerConfig) produceDecidersOptions {
 	options := produceDecidersOptions{
+		groundTopic:    conf.Topic,
+		level:          conf.Level,
 		DiscardEnable:  conf.DiscardEnable,
 		DeadEnable:     conf.DeadEnable,
 		BlockingEnable: conf.BlockingEnable,
 		PendingEnable:  conf.PendingEnable,
 		RetryingEnable: conf.RetryingEnable,
 		UpgradeEnable:  conf.UpgradeEnable,
+		Upgrade:        conf.Upgrade,
 		DegradeEnable:  conf.DegradeEnable,
-		RouteEnable:    conf.RouteEnable,
-		Route:          conf.Route,
+		Degrade:        conf.Degrade,
+		ShiftEnable:    conf.ShiftEnable,
+		Shift:          conf.Shift,
+		TransferEnable: conf.TransferEnable,
+		Transfer:       conf.Transfer,
 	}
 	return options
 }
 
-// Send aim to send message synchronously
-func (p *producer) Send(ctx context.Context, msg *pulsar.ProducerMessage) (pulsar.MessageID, error) {
+// Send sends a message
+func (p *producer) Send(ctx context.Context, msg *pulsar.ProducerMessage) (msgId pulsar.MessageID, err error) {
+	start := time.Now()
 	// do checkers
-	for _, checkType := range checker.DefaultPrevSendCheckOrders() {
-		if checkpoint, ok := p.checkers[checkType]; ok && checkpoint.CheckFunc != nil {
-			checkStatus := p.internalCheck(checkpoint, msg)
+	cMsg := &message.ProducerMessage{ProducerMessage: msg, LeveledMessage: &leveledMessage{level: p.level}}
+	for _, checkType := range p.prevCheckOrders {
+		if wpCheckpoint, ok := p.checkers[checkType]; ok && len(wpCheckpoint.checkChains) > 0 {
+			checkStatus := p.internalCheck(ctx, wpCheckpoint, cMsg)
 			if handledDeferFunc := checkStatus.GetHandledDefer(); handledDeferFunc != nil {
 				defer handledDeferFunc()
 			}
@@ -156,31 +198,57 @@ func (p *producer) Send(ctx context.Context, msg *pulsar.ProducerMessage) (pulsa
 		}
 	}
 	// send
-	start := time.Now()
-	msgId, err := p.Producer.Send(ctx, msg)
-	p.metrics.PublishLatency.Observe(time.Now().Sub(start).Seconds())
+	msgId, err = p.Producer.Send(ctx, msg)
+	// backoff
+	for i := uint(0); err != nil && i < p.BackoffMaxTimes; i++ {
+		msgId, err = p.Producer.Send(ctx, msg)
+	}
+	if err == nil {
+		now := time.Now()
+		p.metricsProvider.GetProducerMetrics(p.groundTopic, p.topic).PublishLatencyFromPCheck.Observe(now.Sub(start).Seconds())
+		if !msg.EventTime.IsZero() && msg.EventTime.After(internal.EarliestEventTime) {
+			p.metricsProvider.GetProducerMetrics(p.groundTopic, p.topic).PublishLatencyFromEvent.Observe(now.Sub(msg.EventTime).Seconds())
+		}
+		p.metricsProvider.GetProducerMetrics(p.groundTopic, p.topic).PublishSuccess.Inc()
+	} else {
+		p.metricsProvider.GetProducerMetrics(p.groundTopic, p.topic).PublishFailed.Inc()
+	}
 	return msgId, err
 }
 
-// SendAsync send message asynchronously
+// SendAsync sends a message in asynchronous
 func (p *producer) SendAsync(ctx context.Context, msg *pulsar.ProducerMessage,
 	callback func(pulsar.MessageID, *pulsar.ProducerMessage, error)) {
 	start := time.Now()
 	callbackNew := func(msgID pulsar.MessageID, msg *pulsar.ProducerMessage, err error) {
-		p.metrics.PublishLatency.Observe(time.Now().Sub(start).Seconds())
+		// backoff with synchronous send
+		for i := uint(0); err != nil && i < p.BackoffMaxTimes; i++ {
+			_, err = p.Producer.Send(ctx, msg)
+		}
+		if err == nil {
+			now := time.Now()
+			p.metricsProvider.GetProducerMetrics(p.groundTopic, p.topic).PublishLatencyFromPCheck.Observe(now.Sub(start).Seconds())
+			if !msg.EventTime.IsZero() && msg.EventTime.After(internal.EarliestEventTime) {
+				p.metricsProvider.GetProducerMetrics(p.groundTopic, p.topic).PublishLatencyFromEvent.Observe(now.Sub(msg.EventTime).Seconds())
+			}
+			p.metricsProvider.GetProducerMetrics(p.groundTopic, p.topic).PublishSuccess.Inc()
+		} else {
+			p.metricsProvider.GetProducerMetrics(p.groundTopic, p.topic).PublishFailed.Inc()
+		}
 		callback(msgID, msg, err)
 	}
 	// do checkers
-	for _, checkType := range checker.DefaultPrevSendCheckOrders() {
-		if checkpoint, ok := p.checkers[checkType]; ok && checkpoint.CheckFunc != nil {
-			checkStatus := p.internalCheck(checkpoint, msg)
+	cMsg := &message.ProducerMessage{ProducerMessage: msg, LeveledMessage: &leveledMessage{level: p.level}}
+	for _, checkType := range p.prevCheckOrders {
+		if wpCheckpoint, ok := p.checkers[checkType]; ok && len(wpCheckpoint.checkChains) > 0 {
+			checkStatus := p.internalCheck(ctx, wpCheckpoint, cMsg)
 			if handledDeferFunc := checkStatus.GetHandledDefer(); handledDeferFunc != nil {
 				defer handledDeferFunc()
 			}
 			if !checkStatus.IsPassed() {
 				continue
 			}
-			if _, decided := p.internalSendAsyncDecideByCheckType(ctx, msg, checkType, checkStatus, callback); decided {
+			if _, decided := p.internalSendAsyncDecideByCheckType(ctx, msg, checkType, checkStatus, callbackNew); decided {
 				// return to skip biz decider if check handle succeeded
 				return
 			}
@@ -191,15 +259,24 @@ func (p *producer) SendAsync(ctx context.Context, msg *pulsar.ProducerMessage,
 	return
 }
 
-func (p *producer) internalCheck(checkpoint *wrappedProduceCheckpoint, msg *pulsar.ProducerMessage) checker.CheckStatus {
+func (p *producer) internalCheck(ctx context.Context, chain *produceCheckpointChain, msg *message.ProducerMessage) checker.CheckStatus {
+	// execute check chains
 	start := time.Now()
-	checkStatus := checkpoint.CheckFunc(msg)
+	var checkStatus checker.CheckStatus = checker.CheckStatusRejected
+	for _, checkpoint := range chain.checkChains {
+		checkStatus = checkpoint.CheckFunc(ctx, msg)
+		if checkStatus.IsPassed() {
+			break
+		}
+	}
+	// observe metrics
 	latency := time.Now().Sub(start).Seconds()
-	checkpoint.metrics.CheckLatency.Observe(latency)
+	metrics := p.metricsProvider.GetProducerCheckerMetrics(chain.options.groundTopic, chain.options.topic, chain.options.checkType.String())
+	metrics.CheckLatency.Observe(latency)
 	if checkStatus.IsPassed() {
-		checkpoint.metrics.CheckPassed.Inc()
+		metrics.CheckPassed.Inc()
 	} else {
-		checkpoint.metrics.CheckRejected.Inc()
+		metrics.CheckRejected.Inc()
 	}
 	return checkStatus
 }
@@ -214,11 +291,11 @@ func (p *producer) internalSendDecideByCheckType(ctx context.Context, msg *pulsa
 		p.logger.Warnf("failed to get decider by checkType: %v, err: %v", checkType, err)
 		return nil, err, false
 	}
-	metrics := p.getDecideMetrics(msgGoto)
 
 	start := time.Now()
 	mid, err, decided = decider.Decide(ctx, msg, checkStatus)
 	latency := time.Since(start).Seconds()
+	metrics := p.metricsProvider.GetProducerDeciderMetrics(p.groundTopic, p.topic, msgGoto.String())
 	metrics.DecideLatency.Observe(latency)
 	if decided {
 		metrics.DecideSuccess.Inc()
@@ -240,11 +317,11 @@ func (p *producer) internalSendAsyncDecideByCheckType(ctx context.Context, msg *
 		p.logger.Warnf("failed to get decider by checkType: %v, err: %v", checkType, err)
 		return err, false
 	}
-	metrics := p.getDecideMetrics(msgGoto)
 
 	start := time.Now()
 	decided = decider.DecideAsync(ctx, msg, checkStatus, callback)
 	latency := time.Since(start).Seconds()
+	metrics := p.metricsProvider.GetProducerDeciderMetrics(p.groundTopic, p.topic, msgGoto.String())
 	metrics.DecideLatency.Observe(latency)
 	if decided {
 		metrics.DecideSuccess.Inc()
@@ -254,7 +331,7 @@ func (p *producer) internalSendAsyncDecideByCheckType(ctx context.Context, msg *
 	return err, decided
 }
 
-func (p *producer) internalGetDeciderByGoto(msgGoto internal.HandleGoto) internalProduceDecider {
+func (p *producer) internalGetDeciderByGoto(msgGoto internal.DecideGoto) internalProduceDecider {
 	if decider, ok := p.deciders[msgGoto]; ok {
 		return decider
 	} else {
@@ -263,37 +340,37 @@ func (p *producer) internalGetDeciderByGoto(msgGoto internal.HandleGoto) interna
 	}
 }
 
-func (p *producer) getDecideMetrics(msgGoto internal.HandleGoto) *internal.DecideGotoMetrics {
-	if metrics, ok := p.deciderMetrics.Load(msgGoto); ok {
-		return metrics.(*internal.DecideGotoMetrics)
-	}
-	metrics := p.client.metricsProvider.GetProducerDecideGotoMetrics(p.topic, msgGoto.String())
-	p.deciderMetrics.Store(msgGoto, metrics)
-	return metrics
-}
-
 func (p *producer) Close() {
 	p.Producer.Close()
 	for _, decider := range p.deciders {
 		decider.close()
 	}
 	p.logger.Info("closed soften producer")
-	p.metrics.ProducersOpened.Dec()
+	p.metricsProvider.GetProducerMetrics(p.groundTopic, p.topic).ProducersOpened.Dec()
 }
 
 // ------ helper ------
 
-type wrappedProduceCheckpoint struct {
-	*checker.ProduceCheckpoint
-	metrics *internal.TypedCheckMetrics
+type produceCheckpointChain struct {
+	checkChains     []*checker.ProduceCheckpoint
+	options         produceCheckpointChainOptions
+	metricsProvider *internal.MetricsProvider
 }
 
-func newWrappedProduceCheckpoint(ckp *checker.ProduceCheckpoint, metrics *internal.TypedCheckMetrics) *wrappedProduceCheckpoint {
-	wrappedCkp := &wrappedProduceCheckpoint{ProduceCheckpoint: ckp, metrics: metrics}
-	wrappedCkp.metrics.CheckersOpened.Inc()
-	return wrappedCkp
+type produceCheckpointChainOptions struct {
+	groundTopic string
+	topic       string
+	checkType   checker.CheckType
 }
 
-func (c *wrappedProduceCheckpoint) Close() {
-	c.metrics.CheckersOpened.Dec()
+func newProduceCheckpointChains(checkChains []*checker.ProduceCheckpoint, options produceCheckpointChainOptions,
+	metricsProvider *internal.MetricsProvider) *produceCheckpointChain {
+	c := &produceCheckpointChain{checkChains: checkChains, metricsProvider: metricsProvider, options: options}
+	c.metricsProvider.GetProducerCheckersMetrics(c.options.groundTopic, c.options.topic, c.options.checkType.String()).CheckersOpened.Inc()
+	return c
+}
+
+func (c *produceCheckpointChain) Close() {
+	c.metricsProvider.GetProducerCheckersMetrics(c.options.groundTopic, c.options.topic, c.options.checkType.String()).CheckersOpened.Dec()
+
 }

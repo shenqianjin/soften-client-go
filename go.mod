@@ -1,14 +1,14 @@
 module github.com/shenqianjin/soften-client-go
 
-go 1.17
+go 1.18
 
 require (
 	github.com/apache/pulsar-client-go v0.8.1
-	github.com/beefsack/go-rate v0.0.0-20220214233405-116f4ca011a0
 	github.com/bmizerany/perks v0.0.0-20141205001514-d9a9656a3a4b
 	github.com/panjf2000/ants/v2 v2.5.0
 	github.com/pkg/errors v0.9.1
 	github.com/prometheus/client_golang v1.11.1
+	github.com/prometheus/client_model v0.2.0
 	github.com/sirupsen/logrus v1.6.0
 	github.com/spf13/cobra v1.2.1
 	github.com/spf13/pflag v1.0.5
@@ -44,7 +44,6 @@ require (
 	github.com/mtibben/percent v0.2.1 // indirect
 	github.com/pierrec/lz4 v2.0.5+incompatible // indirect
 	github.com/pmezard/go-difflib v1.0.0 // indirect
-	github.com/prometheus/client_model v0.2.0 // indirect
 	github.com/prometheus/common v0.26.0 // indirect
 	github.com/prometheus/procfs v0.6.0 // indirect
 	github.com/spaolacci/murmur3 v1.1.0 // indirect
@@ -58,4 +57,4 @@ require (
 	gopkg.in/yaml.v3 v3.0.0-20210107192922-496545a6307b // indirect
 )
 
-replace github.com/apache/pulsar-client-go v0.8.1 => github.com/shenqianjin/pulsar-client-go v0.8.2-0.20220527085409-bd7025011b20
+replace github.com/apache/pulsar-client-go v0.8.1 => github.com/shenqianjin/pulsar-client-go v0.8.2-0.20220817101440-58496f79735a

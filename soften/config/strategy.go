@@ -12,9 +12,9 @@ import (
 
 const (
 	BalanceStrategyEachRand    = internal.BalanceStrategy("EachRand")    // 每次随机选择
-	BalanceStrategyRoundRand   = internal.BalanceStrategy("RoundRand")   // 每伦随机选择
+	BalanceStrategyRoundRand   = internal.BalanceStrategy("RoundRand")   // 每伦乱序轮训选择
 	BalanceStrategyRoundWeight = internal.BalanceStrategy("RoundWeight") // 根据权重轮训
-	BalanceStrategyRoundRobin  = internal.BalanceStrategy("RoundRobin")  // 轮训(权重无关)
+	BalanceStrategyRoundRobin  = internal.BalanceStrategy("RoundRobin")  // 常规轮训(权重无关)
 )
 
 func BalanceStrategyValues() []internal.BalanceStrategy {

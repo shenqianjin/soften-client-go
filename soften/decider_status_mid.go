@@ -1,115 +1,115 @@
 package soften
 
 import (
+	"errors"
 	"strconv"
 	"time"
 
-	"github.com/shenqianjin/soften-client-go/soften/checker"
-
-	"github.com/shenqianjin/soften-client-go/soften/config"
-	"github.com/shenqianjin/soften-client-go/soften/message"
-
 	"github.com/apache/pulsar-client-go/pulsar"
+	"github.com/apache/pulsar-client-go/pulsar/log"
+	"github.com/shenqianjin/soften-client-go/soften/checker"
+	"github.com/shenqianjin/soften-client-go/soften/config"
 	"github.com/shenqianjin/soften-client-go/soften/internal"
+	"github.com/shenqianjin/soften-client-go/soften/message"
 )
 
 type statusDeciderOptions struct {
-	topic      string                 // default ${TOPIC}_RETRYING, 固定后缀，不允许定制
-	status     internal.MessageStatus // MessageStatus
-	msgGoto    internal.HandleGoto    // MessageStatus
-	deaDecider internalDecider        //
-	level      internal.TopicLevel
-	//levels      []TopicLevel    //
-	//enable      bool                   // 内部判断使用
+	groundTopic  string
+	subscription string
+	status       internal.MessageStatus // MessageStatus
+	msgGoto      internal.DecideGoto    // MessageStatus
+	deaDecider   internalConsumeDecider //
+	level        internal.TopicLevel
 }
 
+// statusDecider routes messages to ${TOPIC}-${subscription}-${status} 主题, 固定后缀，不允许定制
 type statusDecider struct {
-	router  *reRouter
-	policy  *config.StatusPolicy
-	options statusDeciderOptions
-	metrics *internal.ListenerDecideGotoMetrics
+	router          *router
+	logger          log.Logger
+	policy          *config.StatusPolicy
+	options         statusDeciderOptions
+	metricsProvider *internal.MetricsProvider
 }
 
-func newStatusDecider(client *client, listener *consumeListener, policy *config.StatusPolicy, options statusDeciderOptions) (*statusDecider, error) {
-	rt, err := newReRouter(client.logger, client.Client, reRouterOptions{Topic: options.topic, connectInSyncEnable: true})
+func newStatusDecider(client *client, policy *config.StatusPolicy, options statusDeciderOptions, metricsProvider *internal.MetricsProvider) (*statusDecider, error) {
+	if options.groundTopic == "" {
+		return nil, errors.New("topic is blank")
+	}
+	if options.subscription == "" {
+		return nil, errors.New("subscription is blank")
+	}
+	subscriptionSuffix := "-" + options.subscription
+	rtOptions := routerOptions{
+		Topic:               options.groundTopic + policy.TransferLevel.TopicSuffix() + subscriptionSuffix + options.status.TopicSuffix(),
+		connectInSyncEnable: true,
+	}
+	rt, err := newRouter(client.logger, client.Client, rtOptions)
 	if err != nil {
 		return nil, err
 	}
-	metrics := client.metricsProvider.GetListenerLeveledDecideGotoMetrics(listener.logTopics, listener.logLevels, options.level, options.msgGoto)
-	statusRouter := &statusDecider{router: rt, policy: policy, options: options, metrics: metrics}
-	metrics.DecidersOpened.Inc()
-	return statusRouter, nil
+	d := &statusDecider{router: rt, logger: client.logger, policy: policy, options: options, metricsProvider: metricsProvider}
+	d.metricsProvider.GetListenerDecidersMetrics(d.options.groundTopic, d.options.subscription, d.options.msgGoto).DecidersOpened.Inc()
+	return d, nil
 }
 
-func (hd *statusDecider) Decide(msg pulsar.ConsumerMessage, cheStatus checker.CheckStatus) bool {
+func (d *statusDecider) Decide(msg consumerMessage, cheStatus checker.CheckStatus) bool {
 	if !cheStatus.IsPassed() {
 		return false
 	}
-	statusReconsumeTimes := message.Parser.GetStatusReconsumeTimes(hd.options.status, msg)
+	statusReconsumeTimes := message.Parser.GetStatusConsumeTimes(d.options.status, msg.Message)
 	// check to dead if exceed max status reconsume times
-	if statusReconsumeTimes >= hd.policy.ConsumeMaxTimes {
-		return hd.tryDeadInternal(msg)
+	if statusReconsumeTimes >= d.policy.ConsumeMaxTimes {
+		return d.tryDeadInternal(msg)
 	}
-	statusReentrantTimes := message.Parser.GetStatusReentrantTimes(hd.options.status, msg)
+	statusReentrantTimes := message.Parser.GetStatusReentrantTimes(d.options.status, msg.Message)
 	// check to dead if exceed max reentrant times
-	if statusReentrantTimes >= hd.policy.ReentrantMaxTimes {
-		return hd.tryDeadInternal(msg)
+	if statusReentrantTimes >= d.policy.ReentrantMaxTimes {
+		return d.tryDeadInternal(msg)
 	}
-	currentStatus := message.Parser.GetCurrentStatus(msg)
-	delay := uint(0)
 	// check Nack for equal status
-	if currentStatus == hd.options.status {
-		delay = hd.policy.BackoffPolicy.Next(0, statusReconsumeTimes)
-		if delay < hd.policy.ReentrantDelay { // delay equals or larger than reentrant delay is the essential condition to switch status
-			msg.Consumer.Nack(msg.Message)
-			return true
-		}
+	delay := d.policy.BackoffPolicy.Next(0, statusReconsumeTimes)
+	if delay == 0 {
+		delay = d.policy.ReentrantDelay // default a newStatus.reentrantDelay
+	} else if delay < d.policy.ReentrantDelay { // delay equals or larger than reentrant delay is the essential condition to switch status
+		msg.Consumer.NackLater(msg.Message, time.Duration(delay)*time.Second)
+		msg.internalExtra.consumerMetrics.ConsumeMessageNacks.Inc()
+		return true
 	}
 
-	// prepare to re-route
+	// prepare to re-Transfer
 	props := make(map[string]string)
 	for k, v := range msg.Properties() {
 		props[k] = v
 	}
-	//fmt.Println("----", props)
-	if currentStatus != hd.options.status {
-		// first time to happen status switch
-		previousMessageStatus := message.Parser.GetPreviousStatus(msg)
-		if (previousMessageStatus == "" || previousMessageStatus == message.StatusReady) && hd.options.status != message.StatusReady {
-			// record origin information when re-route first time
-			if _, ok := props[message.XPropertyOriginTopic]; !ok {
-				props[message.XPropertyOriginTopic] = msg.Message.Topic()
-			}
-			if _, ok := props[message.XPropertyOriginMessageID]; !ok {
-				props[message.XPropertyOriginMessageID] = message.Parser.GetMessageId(msg)
-			}
-			if _, ok := props[message.XPropertyOriginPublishTime]; !ok {
-				props[message.XPropertyOriginPublishTime] = msg.PublishTime().UTC().Format(internal.RFC3339TimeInSecondPattern)
-			}
-		}
-		props[message.XPropertyPreviousMessageStatus] = string(currentStatus)
-		delay = hd.policy.ReentrantDelay // default a newStatus.reentrantDelay if status switch happens
+	// record origin information when re-Transfer first time
+	message.Helper.InjectOriginTopic(msg.Message, &props)
+	message.Helper.InjectOriginMessageId(msg.Message, &props)
+	message.Helper.InjectOriginPublishTime(msg.Message, &props)
+	message.Helper.InjectOriginLevel(msg.Message, &props)
+	message.Helper.InjectOriginStatus(msg.Message, &props)
+	// status switch
+	currentStatus := message.Parser.GetCurrentStatus(msg.Message)
+	if currentStatus != d.options.status {
+		message.Helper.InjectPreviousLevel(msg.Message, &props)
+		message.Helper.InjectPreviousStatus(msg.Message, &props)
 	}
-	now := time.Now()
-	reentrantStartRedeliveryCount := message.Parser.GetReentrantStartRedeliveryCount(msg)
-	props[message.XPropertyReentrantStartRedeliveryCount] = strconv.FormatUint(uint64(msg.RedeliveryCount()), 10)
-
-	xReconsumeTimes := message.Parser.GetXReconsumeTimes(msg)
+	// total consume times on the message
+	xReconsumeTimes := message.Parser.GetReconsumeTimes(msg.Message)
 	xReconsumeTimes++
 	props[message.XPropertyReconsumeTimes] = strconv.Itoa(xReconsumeTimes) // initialize continuous consume times for the new msg
+	// reconsume time and reentrant time
+	now := time.Now()
+	message.Helper.InjectConsumeTime(&props, now.Add(time.Duration(delay)*time.Second))
+	message.Helper.InjectReentrantTime(&props, now.Add(time.Duration(d.policy.ReentrantDelay)*time.Second))
+	// reconsume times for goto status
+	reentrantStartRedeliveryCount := message.Parser.GetReentrantStartRedeliveryCount(msg.Message)
+	statusReconsumeTimes += int(msg.RedeliveryCount() - reentrantStartRedeliveryCount + 1) // the subtraction is the nack times in current status
+	message.Helper.InjectStatusReconsumeTimes(d.options.status, statusReconsumeTimes, &props)
+	props[message.XPropertyReentrantStartRedeliveryCount] = strconv.FormatUint(uint64(msg.RedeliveryCount()), 10)
+	// reentrant times for goto status
+	statusReentrantTimes++
+	message.Helper.InjectStatusReentrantTimes(d.options.status, statusReentrantTimes, &props)
 
-	props[message.XPropertyReconsumeTime] = now.Add(time.Duration(delay) * time.Second).UTC().Format(internal.RFC3339TimeInSecondPattern)
-	props[message.XPropertyReentrantTime] = now.Add(time.Duration(hd.policy.ReentrantDelay) * time.Second).UTC().Format(internal.RFC3339TimeInSecondPattern)
-	//logrus.Infof("-----now: %v, reconsumeTime: %v, reentrantTime: %v\n", now, props[message.XPropertyReconsumeTime], props[message.XPropertyReentrantTime])
-
-	if statusReconsumeTimesHeader, ok := message.XPropertyConsumeTimes(hd.options.status); ok {
-		statusReconsumeTimes += int(msg.RedeliveryCount() - reentrantStartRedeliveryCount) // the subtraction is the nack times in current status
-		props[statusReconsumeTimesHeader] = strconv.Itoa(statusReconsumeTimes)
-	}
-	if statusReentrantTimesHeader, ok := message.XPropertyReentrantTimes(hd.options.status); ok {
-		statusReentrantTimes++
-		props[statusReentrantTimesHeader] = strconv.Itoa(statusReentrantTimes)
-	}
 	producerMsg := pulsar.ProducerMessage{
 		Payload:     msg.Payload(),
 		Key:         msg.Key(),
@@ -117,20 +117,27 @@ func (hd *statusDecider) Decide(msg pulsar.ConsumerMessage, cheStatus checker.Ch
 		Properties:  props,
 		EventTime:   msg.EventTime(),
 	}
-	//log.Info("handle started .... %v", msg.PublishTime())
-	hd.router.Chan() <- &RerouteMessage{
-		consumerMsg: msg,
-		producerMsg: producerMsg,
+	callback := func(messageID pulsar.MessageID, producerMessage *pulsar.ProducerMessage, err error) {
+		if err != nil {
+			d.logger.WithError(err).WithField("msgID", msg.ID()).Errorf("Failed to send message to topic: %s", d.router.options.Topic)
+			msg.Consumer.Nack(msg)
+			msg.internalExtra.consumerMetrics.ConsumeMessageNacks.Inc()
+		} else {
+			d.logger.WithField("msgID", msg.ID()).Debugf("Succeed to send message to topic: %s", d.router.options.Topic)
+			msg.Consumer.Ack(msg)
+			msg.internalExtra.consumerMetrics.ConsumeMessageAcks.Inc()
+		}
 	}
-
-	//log.Info("handle ended .... %v", msg.PublishTime())
+	d.router.Chan() <- &RouteMessage{
+		producerMsg: &producerMsg,
+		callback:    callback,
+	}
 	return true
 }
 
-func (hd *statusDecider) tryDeadInternal(msg pulsar.ConsumerMessage) bool {
-	//log.Info("dead started .... %v", msg.PublishTime())
-	if hd.options.deaDecider != nil {
-		return hd.options.deaDecider.Decide(msg, checker.CheckStatusPassed)
+func (d *statusDecider) tryDeadInternal(msg consumerMessage) bool {
+	if d.options.deaDecider != nil {
+		return d.options.deaDecider.Decide(msg, checker.CheckStatusPassed)
 	}
 
 	if true {
@@ -138,10 +145,9 @@ func (hd *statusDecider) tryDeadInternal(msg pulsar.ConsumerMessage) bool {
 		return true
 	}
 
-	//log.Info("dead finished .... %v", msg.PublishTime())
 	return false
 }
 
-func (hd *statusDecider) close() {
-	hd.metrics.DecidersOpened.Dec()
+func (d *statusDecider) close() {
+	d.metricsProvider.GetListenerDecidersMetrics(d.options.groundTopic, d.options.subscription, d.options.msgGoto).DecidersOpened.Dec()
 }

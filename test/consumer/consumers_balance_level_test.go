@@ -11,15 +11,14 @@ import (
 	"github.com/shenqianjin/soften-client-go/soften"
 	"github.com/shenqianjin/soften-client-go/soften/admin"
 	"github.com/shenqianjin/soften-client-go/soften/config"
-	"github.com/shenqianjin/soften-client-go/soften/topic"
-	topiclevel "github.com/shenqianjin/soften-client-go/soften/topic"
+	"github.com/shenqianjin/soften-client-go/soften/message"
 	"github.com/shenqianjin/soften-client-go/test/internal"
 	"github.com/stretchr/testify/assert"
 )
 
 func TestConsumerBalanceLevel_L1_B1(t *testing.T) {
 	testCase := consumerBalanceCase{
-		consumeTypes: []string{topic.L1.String(), topic.B1.String()},
+		consumeTypes: []string{message.L1.String(), message.B1.String()},
 		weights:      []int{50, 50},
 		totals:       []int{500, 500},
 	}
@@ -28,7 +27,7 @@ func TestConsumerBalanceLevel_L1_B1(t *testing.T) {
 
 func TestConsumerBalanceLevel_L1_L2(t *testing.T) {
 	testCase := consumerBalanceCase{
-		consumeTypes: []string{topic.L1.String(), topic.B1.String()},
+		consumeTypes: []string{message.L1.String(), message.B1.String()},
 		weights:      []int{50, 80},
 		totals:       []int{500, 800},
 	}
@@ -37,7 +36,7 @@ func TestConsumerBalanceLevel_L1_L2(t *testing.T) {
 
 func TestConsumerBalanceLevel_L1_S1(t *testing.T) {
 	testCase := consumerBalanceCase{
-		consumeTypes: []string{topic.L1.String(), topic.B1.String()},
+		consumeTypes: []string{message.L1.String(), message.B1.String()},
 		weights:      []int{50, 100},
 		totals:       []int{500, 1000},
 	}
@@ -46,7 +45,7 @@ func TestConsumerBalanceLevel_L1_S1(t *testing.T) {
 
 func TestConsumerBalanceLevel_L1_B1_L2_S1(t *testing.T) {
 	testCase := consumerBalanceCase{
-		consumeTypes: []string{topic.L1.String(), topic.B1.String(), topic.L2.String(), topic.S1.String()},
+		consumeTypes: []string{message.L1.String(), message.B1.String(), message.L2.String(), message.S1.String()},
 		weights:      []int{50, 25, 60, 100},
 		totals:       []int{500, 250, 600, 1000},
 	}
@@ -55,9 +54,9 @@ func TestConsumerBalanceLevel_L1_B1_L2_S1(t *testing.T) {
 
 func TestConsumerBalanceLevel_All(t *testing.T) {
 	testCase := consumerBalanceCase{
-		consumeTypes: []string{topic.S2.String(), topic.S1.String(),
-			topic.L3.String(), topic.L2.String(), topic.L1.String(),
-			topic.B1.String(), topic.B2.String()},
+		consumeTypes: []string{message.S2.String(), message.S1.String(),
+			message.L3.String(), message.L2.String(), message.L1.String(),
+			message.B1.String(), message.B2.String()},
 		weights: []int{
 			200, 100,
 			70, 60, 50,
@@ -76,7 +75,7 @@ func testConsumerBalanceLevel(t *testing.T, testCase consumerBalanceCase) {
 	assert.True(t, len(testCase.consumeTypes) > 0)
 	assert.Equal(t, len(testCase.consumeTypes), len(testCase.weights))
 	assert.Equal(t, len(testCase.consumeTypes), len(testCase.totals))
-	tpc := internal.GenerateTestTopic()
+	tpc := internal.GenerateTestTopic(internal.PrefixTestConsume)
 	consumeTypes := testCase.consumeTypes
 	totals := testCase.totals
 	expectedTotal := 0
@@ -85,9 +84,9 @@ func testConsumerBalanceLevel(t *testing.T, testCase consumerBalanceCase) {
 		expectedWeights[lvl] = testCase.weights[index]
 	}
 	producedTopics := make([]string, len(consumeTypes))
-	levels := make(topiclevel.Levels, len(consumeTypes))
-	for index, status := range consumeTypes {
-		lvl, err := topiclevel.LevelOf(status)
+	levels := make(message.Levels, len(consumeTypes))
+	for index, lvlStr := range consumeTypes {
+		lvl, err := message.LevelOf(lvlStr)
 		assert.Nil(t, err)
 		producedTopics[index] = tpc + lvl.TopicSuffix()
 		expectedTotal += totals[index]
@@ -157,7 +156,7 @@ func testConsumerBalanceLevel(t *testing.T, testCase consumerBalanceCase) {
 	// create listener
 	consumerConf := config.ConsumerConfig{
 		Topic:                       tpc,
-		SubscriptionName:            internal.GenerateSubscribeNameByTopic(tpc),
+		SubscriptionName:            internal.TestSubscriptionName(),
 		SubscriptionInitialPosition: pulsar.SubscriptionPositionEarliest,
 		Concurrency: &config.ConcurrencyPolicy{
 			CorePoolSize: 4,
@@ -180,7 +179,7 @@ func testConsumerBalanceLevel(t *testing.T, testCase consumerBalanceCase) {
 	ctx, cancel := context.WithCancel(context.Background())
 	consumedCh := make(chan string, 100)
 	doneCh := make(chan struct{}, 1)
-	err = listener.Start(ctx, func(msg pulsar.Message) (bool, error) {
+	err = listener.Start(ctx, func(ctx context.Context, msg message.Message) (bool, error) {
 		time.Sleep(time.Millisecond * 20)
 		consumedCh <- msg.Properties()["ConsumeType"]
 		return true, nil

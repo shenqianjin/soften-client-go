@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"log"
-	"strings"
 	"testing"
 	"time"
 
@@ -12,6 +11,7 @@ import (
 	"github.com/shenqianjin/soften-client-go/soften/admin"
 	"github.com/shenqianjin/soften-client-go/soften/checker"
 	"github.com/shenqianjin/soften-client-go/soften/config"
+	"github.com/shenqianjin/soften-client-go/soften/decider"
 	"github.com/shenqianjin/soften-client-go/soften/message"
 	"github.com/shenqianjin/soften-client-go/test/internal"
 	"github.com/stretchr/testify/assert"
@@ -34,10 +34,12 @@ func TestListen_1Msg_Blocking(t *testing.T) {
 }
 
 func testListenBySingleStatus(t *testing.T, status string) {
-	topic := internal.GenerateTestTopic()
+	topic := internal.GenerateTestTopic(internal.PrefixTestListen)
 	storedTopic := topic
 	if status != string(message.StatusReady) {
-		storedTopic = topic + "-" + strings.ToUpper(status)
+		st, err := message.StatusOf(status)
+		assert.Nil(t, err)
+		storedTopic = internal.FormatStatusTopic(topic, internal.TestSubscriptionName(), "", st.TopicSuffix())
 	}
 	manager := admin.NewAdminManager(internal.DefaultPulsarHttpUrl)
 	// clean up topic
@@ -50,12 +52,12 @@ func testListenBySingleStatus(t *testing.T, status string) {
 	defer client.Close()
 	// create producer
 	producer, err := client.CreateProducer(config.ProducerConfig{
-		Topic:       topic,
-		RouteEnable: true,
-		Route:       &config.RoutePolicy{ConnectInSyncEnable: true},
-	}, checker.PrevSendRoute(func(msg *pulsar.ProducerMessage) checker.CheckStatus {
+		Topic:          topic,
+		TransferEnable: true,
+		Transfer:       &config.TransferPolicy{ConnectInSyncEnable: true},
+	}, checker.PrevSendTransfer(func(ctx context.Context, msg *pulsar.ProducerMessage) checker.CheckStatus {
 		if storedTopic, ok := msg.Properties["routeTopic"]; ok {
-			return checker.CheckStatusPassed.WithRerouteTopic(storedTopic)
+			return checker.CheckStatusPassed.WithGotoExtra(decider.GotoExtra{Topic: storedTopic})
 		}
 		return checker.CheckStatusRejected
 	}))
@@ -78,21 +80,23 @@ func testListenBySingleStatus(t *testing.T, status string) {
 	assert.Equal(t, 1, stats.MsgInCounter)
 
 	// ---------------
-
+	leveledPolicy := &config.LevelPolicy{
+		RetryingEnable: string(message.StatusRetrying) == status, // enable retrying if matches
+		PendingEnable:  string(message.StatusPending) == status,  // enable pending if matches
+		BlockingEnable: string(message.StatusBlocking) == status, // enable blocking if matches
+	}
 	// create listener
 	listener := internal.CreateListener(client, config.ConsumerConfig{
 		Topic:                       topic,
-		SubscriptionName:            internal.GenerateSubscribeNameByTopic(topic),
+		SubscriptionName:            internal.TestSubscriptionName(),
 		SubscriptionInitialPosition: pulsar.SubscriptionPositionEarliest,
-		RetryingEnable:              string(message.StatusRetrying) == status, // enable retrying if matches
-		PendingEnable:               string(message.StatusPending) == status,  // enable pending if matches
-		BlockingEnable:              string(message.StatusBlocking) == status, // enable blocking if matches
+		LevelPolicy:                 leveledPolicy,
 	})
 	defer listener.Close()
 	// listener starts
 	ctx, cancel := context.WithCancel(context.Background())
-	err = listener.Start(ctx, func(message pulsar.Message) (bool, error) {
-		fmt.Printf("consumed message size: %v, headers: %v\n", len(message.Payload()), message.Properties())
+	err = listener.Start(ctx, func(ctx context.Context, msg message.Message) (bool, error) {
+		fmt.Printf("consumed message size: %v, headers: %v\n", len(msg.Payload()), msg.Properties())
 		return true, nil
 	})
 	if err != nil {
@@ -110,14 +114,16 @@ func testListenBySingleStatus(t *testing.T, status string) {
 }
 
 func TestListen_4Msg_Ready_Retrying_Pending_Blocking(t *testing.T) {
-	topic := internal.GenerateTestTopic()
+	topic := internal.GenerateTestTopic(internal.PrefixTestListen)
 	// format topics
 	statuses := []string{string(message.StatusReady), string(message.StatusRetrying), string(message.StatusPending), string(message.StatusBlocking)}
 	storedTopics := make([]string, len(statuses))
 	for index, status := range statuses {
 		statusTopic := topic
 		if status != string(message.StatusReady) {
-			statusTopic = topic + "-" + strings.ToUpper(status)
+			st, err := message.StatusOf(status)
+			assert.Nil(t, err)
+			statusTopic = internal.FormatStatusTopic(topic, internal.TestSubscriptionName(), "", st.TopicSuffix())
 		}
 		storedTopics[index] = statusTopic
 	}
@@ -137,12 +143,12 @@ func TestListen_4Msg_Ready_Retrying_Pending_Blocking(t *testing.T) {
 	defer client.Close()
 	// create producer
 	producer, err := client.CreateProducer(config.ProducerConfig{
-		Topic:       topic,
-		RouteEnable: true,
-		Route:       &config.RoutePolicy{ConnectInSyncEnable: true},
-	}, checker.PrevSendRoute(func(msg *pulsar.ProducerMessage) checker.CheckStatus {
+		Topic:          topic,
+		TransferEnable: true,
+		Transfer:       &config.TransferPolicy{ConnectInSyncEnable: true},
+	}, checker.PrevSendTransfer(func(ctx context.Context, msg *pulsar.ProducerMessage) checker.CheckStatus {
 		if storedTopic, ok := msg.Properties["routeTopic"]; ok {
-			return checker.CheckStatusPassed.WithRerouteTopic(storedTopic)
+			return checker.CheckStatusPassed.WithGotoExtra(decider.GotoExtra{Topic: storedTopic})
 		}
 		return checker.CheckStatusRejected
 	}))
@@ -168,20 +174,23 @@ func TestListen_4Msg_Ready_Retrying_Pending_Blocking(t *testing.T) {
 
 	// ---------------
 
+	leveledPolicy := &config.LevelPolicy{
+		RetryingEnable: true, // enable retrying if matches
+		PendingEnable:  true, // enable pending if matches
+		BlockingEnable: true, // enable blocking if matches
+	}
 	// create listener
 	listener := internal.CreateListener(client, config.ConsumerConfig{
 		Topic:                       topic,
-		SubscriptionName:            internal.GenerateSubscribeNameByTopic(topic),
+		SubscriptionName:            internal.TestSubscriptionName(),
 		SubscriptionInitialPosition: pulsar.SubscriptionPositionEarliest,
-		RetryingEnable:              true, // enable retrying if matches
-		PendingEnable:               true, // enable pending if matches
-		BlockingEnable:              true, // enable blocking if matches
+		LevelPolicy:                 leveledPolicy,
 	})
 	defer listener.Close()
 	// listener starts
 	ctx, cancel := context.WithCancel(context.Background())
-	err = listener.Start(ctx, func(message pulsar.Message) (bool, error) {
-		fmt.Printf("consumed message size: %v, headers: %v\n", len(message.Payload()), message.Properties())
+	err = listener.Start(ctx, func(ctx context.Context, msg message.Message) (bool, error) {
+		fmt.Printf("consumed message size: %v, headers: %v\n", len(msg.Payload()), msg.Properties())
 		return true, nil
 	})
 	if err != nil {

@@ -7,5 +7,5 @@ import (
 )
 
 func TestHandlerResult(t *testing.T) {
-	assert.True(t, HandleStatusOk.handleGoto != HandleStatusAuto.handleGoto)
+	assert.True(t, StatusDone.decideGoto != StatusAuto.decideGoto)
 }

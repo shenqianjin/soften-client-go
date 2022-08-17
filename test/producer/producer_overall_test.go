@@ -12,33 +12,35 @@ import (
 	"github.com/shenqianjin/soften-client-go/soften/admin"
 	"github.com/shenqianjin/soften-client-go/soften/checker"
 	"github.com/shenqianjin/soften-client-go/soften/config"
+	"github.com/shenqianjin/soften-client-go/soften/decider"
+	"github.com/shenqianjin/soften-client-go/soften/message"
 	"github.com/shenqianjin/soften-client-go/test/internal"
 	"github.com/stretchr/testify/assert"
 )
 
-func TestProduceOverall_Send3Msg_Route1MsgToL1(t *testing.T) {
-	topic := internal.GenerateTestTopic()
-	routedTopic := topic + "-L2"
+func TestProduceOverall_Send3Msg_Transfer1MsgToL1(t *testing.T) {
+	topic := internal.GenerateTestTopic(internal.PrefixTestProduce)
+	transferredTopic := topic + "-L2"
 	manager := admin.NewAdminManager(internal.DefaultPulsarHttpUrl)
 
 	internal.CleanUpTopic(t, manager, topic)
-	internal.CleanUpTopic(t, manager, routedTopic)
+	internal.CleanUpTopic(t, manager, transferredTopic)
 	defer func() {
 		internal.CleanUpTopic(t, manager, topic)
-		internal.CleanUpTopic(t, manager, routedTopic)
+		internal.CleanUpTopic(t, manager, transferredTopic)
 	}()
 
 	client := internal.NewClient(internal.DefaultPulsarUrl)
 	defer client.Close()
 
 	producer, err := client.CreateProducer(config.ProducerConfig{
-		Topic:       topic,
-		RouteEnable: true,
-		Route:       &config.RoutePolicy{ConnectInSyncEnable: true},
+		Topic:          topic,
+		TransferEnable: true,
+		Transfer:       &config.TransferPolicy{ConnectInSyncEnable: true},
 	},
-		checker.PrevSendRoute(func(msg *pulsar.ProducerMessage) checker.CheckStatus {
+		checker.PrevSendTransfer(func(ctx context.Context, msg *message.ProducerMessage) checker.CheckStatus {
 			if index, ok := msg.Properties["Index"]; ok && index == "2" {
-				return checker.CheckStatusPassed.WithRerouteTopic(routedTopic)
+				return checker.CheckStatusPassed.WithGotoExtra(decider.GotoExtra{Topic: transferredTopic})
 			}
 			return checker.CheckStatusRejected
 		}))
@@ -59,34 +61,34 @@ func TestProduceOverall_Send3Msg_Route1MsgToL1(t *testing.T) {
 	assert.Nil(t, err)
 	assert.Equal(t, 2, stats.MsgInCounter)
 
-	stats, err = manager.Stats(routedTopic)
+	stats, err = manager.Stats(transferredTopic)
 	assert.Nil(t, err)
 	assert.Equal(t, 1, stats.MsgInCounter)
 }
 
-func TestProduceOverall_SendAsync3Msg_Route1MsgToL1(t *testing.T) {
-	topic := internal.GenerateTestTopic()
-	routedTopic := topic + "-L2"
+func TestProduceOverall_SendAsync3Msg_Transfer1MsgToL1(t *testing.T) {
+	topic := internal.GenerateTestTopic(internal.PrefixTestProduce)
+	transferredTopic := topic + "-L2"
 	manager := admin.NewAdminManager(internal.DefaultPulsarHttpUrl)
 
 	internal.CleanUpTopic(t, manager, topic)
-	internal.CleanUpTopic(t, manager, routedTopic)
+	internal.CleanUpTopic(t, manager, transferredTopic)
 	defer func() {
 		internal.CleanUpTopic(t, manager, topic)
-		internal.CleanUpTopic(t, manager, routedTopic)
+		internal.CleanUpTopic(t, manager, transferredTopic)
 	}()
 
 	client := internal.NewClient(internal.DefaultPulsarUrl)
 	defer client.Close()
 
 	producer, err := client.CreateProducer(config.ProducerConfig{
-		Topic:       topic,
-		RouteEnable: true,
-		Route:       &config.RoutePolicy{ConnectInSyncEnable: true},
+		Topic:          topic,
+		TransferEnable: true,
+		Transfer:       &config.TransferPolicy{ConnectInSyncEnable: true},
 	},
-		checker.PrevSendRoute(func(msg *pulsar.ProducerMessage) checker.CheckStatus {
+		checker.PrevSendTransfer(func(ctx context.Context, msg *message.ProducerMessage) checker.CheckStatus {
 			if index, ok := msg.Properties["Index"]; ok && index == "2" {
-				return checker.CheckStatusPassed.WithRerouteTopic(routedTopic)
+				return checker.CheckStatusPassed.WithGotoExtra(decider.GotoExtra{Topic: transferredTopic})
 			}
 			return checker.CheckStatusRejected
 		}))
@@ -112,7 +114,7 @@ func TestProduceOverall_SendAsync3Msg_Route1MsgToL1(t *testing.T) {
 	assert.Nil(t, err)
 	assert.Equal(t, 2, stats.MsgInCounter)
 
-	stats, err = manager.Stats(routedTopic)
+	stats, err = manager.Stats(transferredTopic)
 	assert.Nil(t, err)
 	assert.Equal(t, 1, stats.MsgInCounter)
 }

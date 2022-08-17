@@ -2,6 +2,8 @@ package admin
 
 import "time"
 
+// ------ topic stats ------
+
 type TopicStats struct {
 	MsgRateIn                        float64                      `json:"msgRateIn"`
 	MsgThroughputIn                  float64                      `json:"msgThroughputIn"`
@@ -26,6 +28,31 @@ type TopicStats struct {
 	NonContiguousDeletedMessagesRanges               int    `json:"nonContiguousDeletedMessagesRanges"`
 	NonContiguousDeletedMessagesRangesSerializedSize int    `json:"nonContiguousDeletedMessagesRangesSerializedSize"`
 }
+
+type PartitionedTopicStats struct {
+	TopicStats
+	PartitionedTopicStatsMetadata
+}
+
+type TopicStatsInternal struct {
+	EntriesAddedCounter                int                            `json:"entriesAddedCounter"`
+	NumberOfEntries                    int                            `json:"numberOfEntries"`
+	TotalSize                          int                            `json:"totalSize"`
+	CurrentLedgerEntries               int                            `json:"currentLedgerEntries"`
+	CurrentLedgerSize                  int                            `json:"currentLedgerSize"`
+	LastLedgerCreatedTimestamp         time.Time                      `json:"lastLedgerCreatedTimestamp"`
+	LastLedgerCreationFailureTimestamp interface{}                    `json:"lastLedgerCreationFailureTimestamp"`
+	WaitingCursorsCount                int                            `json:"waitingCursorsCount"`
+	PendingAddEntriesCount             int                            `json:"pendingAddEntriesCount"`
+	LastConfirmedEntry                 string                         `json:"lastConfirmedEntry"`
+	State                              string                         `json:"state"`
+	Ledgers                            []InternalStatsLedger          `json:"ledgers"`
+	Cursors                            map[string]InternalStatsCursor `json:"cursors"`
+	SchemaLedgers                      []InternalStatsSchemaLedger    `json:"schemaLedgers"`
+	CompactedLedger                    InternalStatsCompactedLedger   `json:"compactedLedger"`
+}
+
+// ------ helper ------
 
 type StatsPublisher struct {
 	AccessMode         string  `json:"accessMode"`
@@ -96,24 +123,6 @@ type StatsConsumer struct {
 	ClientVersion  string    `json:"clientVersion"`
 }
 
-type TopicInternalStats struct {
-	EntriesAddedCounter                int                            `json:"entriesAddedCounter"`
-	NumberOfEntries                    int                            `json:"numberOfEntries"`
-	TotalSize                          int                            `json:"totalSize"`
-	CurrentLedgerEntries               int                            `json:"currentLedgerEntries"`
-	CurrentLedgerSize                  int                            `json:"currentLedgerSize"`
-	LastLedgerCreatedTimestamp         time.Time                      `json:"lastLedgerCreatedTimestamp"`
-	LastLedgerCreationFailureTimestamp interface{}                    `json:"lastLedgerCreationFailureTimestamp"`
-	WaitingCursorsCount                int                            `json:"waitingCursorsCount"`
-	PendingAddEntriesCount             int                            `json:"pendingAddEntriesCount"`
-	LastConfirmedEntry                 string                         `json:"lastConfirmedEntry"`
-	State                              string                         `json:"state"`
-	Ledgers                            []InternalStatsLedger          `json:"ledgers"`
-	Cursors                            map[string]InternalStatsCursor `json:"cursors"`
-	SchemaLedgers                      []InternalStatsSchemaLedger    `json:"schemaLedgers"`
-	CompactedLedger                    InternalStatsCompactedLedger   `json:"compactedLedger"`
-}
-
 type InternalStatsLedger struct {
 	LedgerId  int         `json:"ledgerId"`
 	Entries   int         `json:"entries"`
@@ -153,4 +162,8 @@ type InternalStatsCompactedLedger struct {
 	Size      int         `json:"size"`
 	Offloaded bool        `json:"offloaded"`
 	Metadata  interface{} `json:"metadata"`
+}
+
+type PartitionedTopicStatsMetadata struct {
+	Partitions int `json:"partitions"`
 }

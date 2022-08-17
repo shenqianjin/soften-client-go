@@ -9,19 +9,21 @@ import (
 	"testing"
 	"time"
 
-	"github.com/shenqianjin/soften-client-go/soften/admin"
-	"github.com/stretchr/testify/assert"
-
 	"github.com/apache/pulsar-client-go/pulsar"
 	"github.com/shenqianjin/soften-client-go/soften"
+	"github.com/shenqianjin/soften-client-go/soften/admin"
 	"github.com/shenqianjin/soften-client-go/soften/config"
+	"github.com/stretchr/testify/assert"
 )
 
 var (
 	DefaultPulsarUrl     = "pulsar://localhost:6650"
 	DefaultPulsarHttpUrl = "http://localhost:8080"
 
-	DefaultTopic = "my-topic"
+	DefaultTopic      = "my-topic"
+	PrefixTestProduce = "test-produce"
+	PrefixTestConsume = "test-consume"
+	PrefixTestListen  = "test-listen"
 
 	Size64 = 64
 	Size1K = 1024
@@ -34,21 +36,22 @@ var (
 
 	TimeFormat = "20060102150405"
 
-	topicCount = int32(0)
+	topicIndex uint32 = 1
 )
 
-func GenerateTestTopic() string {
-	index := atomic.AddInt32(&topicCount, 1)
+func GenerateTestTopic(prefix string) string {
+	index := atomic.AddUint32(&topicIndex, 1)
 	now := time.Now().Format(TimeFormat)
-	return strings.Join([]string{DefaultTopic, now, strconv.Itoa(int(index))}, "-")
+	topic := strings.Join([]string{prefix, now, strconv.Itoa(int(index))}, "-")
+	return topic
 }
 
-func GenerateSubscribeName() string {
-	return GenerateSubscribeNameByTopic(GenerateTestTopic())
+func TestSubscriptionName() string {
+	return "testSub"
 }
 
-func GenerateSubscribeNameByTopic(topic string) string {
-	return topic + "-sub"
+func FormatStatusTopic(topic, subscription string, levelSuffix, statusSuffix string) string {
+	return topic + levelSuffix + "-" + subscription + statusSuffix
 }
 
 func NewClient(url string) soften.Client {
@@ -68,7 +71,7 @@ func NewClient(url string) soften.Client {
 
 func CreateProducer(client soften.Client, topic string) soften.Producer {
 	if topic == "" {
-		topic = GenerateTestTopic()
+		topic = GenerateTestTopic(DefaultTopic)
 	}
 	producer, err := client.CreateProducer(config.ProducerConfig{
 		Topic: topic,
@@ -81,10 +84,10 @@ func CreateProducer(client soften.Client, topic string) soften.Producer {
 
 func CreateListener(client soften.Client, conf config.ConsumerConfig) soften.Listener {
 	if conf.Topic == "" {
-		conf.Topic = GenerateTestTopic()
+		conf.Topic = GenerateTestTopic(DefaultTopic)
 	}
 	if conf.SubscriptionName == "" {
-		conf.SubscriptionName = GenerateSubscribeNameByTopic(conf.Topic)
+		conf.SubscriptionName = TestSubscriptionName()
 	}
 	listener, err := client.CreateListener(conf)
 	if err != nil {

@@ -1,0 +1,256 @@
+package soften
+
+import (
+	"context"
+	"errors"
+	"fmt"
+	"sync"
+	"sync/atomic"
+
+	"github.com/apache/pulsar-client-go/pulsar"
+	"github.com/apache/pulsar-client-go/pulsar/log"
+	"github.com/shenqianjin/soften-client-go/soften/checker"
+	"github.com/shenqianjin/soften-client-go/soften/config"
+	"github.com/shenqianjin/soften-client-go/soften/decider"
+	"github.com/shenqianjin/soften-client-go/soften/internal"
+	"github.com/shenqianjin/soften-client-go/soften/message"
+)
+
+type producerShiftDecider struct {
+	logger          log.Logger
+	client          pulsar.Client
+	options         *producerShiftDeciderOptions
+	routers         map[string]*router
+	routersLock     sync.RWMutex
+	routerMetrics   map[string]*internal.ProducerDeciderMetrics
+	metricsProvider *internal.MetricsProvider
+}
+
+type producerShiftDeciderOptions struct {
+	groundTopic string
+	level       internal.TopicLevel
+	msgGoto     internal.DecideGoto
+	shift       *config.ShiftPolicy
+}
+
+func newProducerShiftDecider(producer *producer, options *producerShiftDeciderOptions, metricsProvider *internal.MetricsProvider) (*producerShiftDecider, error) {
+	if options == nil {
+		return nil, errors.New("missing options for Transfer decider")
+	}
+	if options.groundTopic == "" {
+		return nil, errors.New("topic is blank")
+	}
+	if options.level == "" {
+		return nil, errors.New("level is blank")
+	}
+	if options.msgGoto != decider.GotoUpgrade && options.msgGoto != decider.GotoDegrade && options.msgGoto != decider.GotoShift {
+		return nil, errors.New(fmt.Sprintf("invalid goto decision for consumer shift decider: %v", options.msgGoto))
+	}
+	if options.shift == nil {
+		return nil, errors.New(fmt.Sprintf("missing shift policy for %v decider", options.msgGoto))
+	}
+	if options.msgGoto == decider.GotoUpgrade {
+		if options.shift.Level != "" && options.shift.Level.OrderOf() <= options.level.OrderOf() {
+			return nil, errors.New("the specified level is too lower for upgrade decider")
+		}
+	} else if options.msgGoto == decider.GotoDegrade {
+		if options.shift.Level != "" && options.shift.Level.OrderOf() >= options.level.OrderOf() {
+			return nil, errors.New("the specified level is too higher for degrade decider")
+		}
+	}
+
+	d := &producerShiftDecider{
+		logger:          producer.logger,
+		client:          producer.client.Client,
+		options:         options,
+		routers:         make(map[string]*router),
+		routerMetrics:   make(map[string]*internal.ProducerDeciderMetrics),
+		metricsProvider: metricsProvider,
+	}
+	return d, nil
+}
+
+func (d *producerShiftDecider) Decide(ctx context.Context, msg *pulsar.ProducerMessage,
+	checkStatus checker.CheckStatus) (mid pulsar.MessageID, err error, decided bool) {
+	// valid check status
+	if !checkStatus.IsPassed() {
+		err = errors.New(fmt.Sprintf("%v decider failed to execute as check status is not passed", d.options.msgGoto))
+		return nil, err, false
+	}
+	// format topic
+	routeTopic, err := d.internalFormatDestTopic(checkStatus, msg)
+	if err != nil {
+		d.logger.Error(err)
+	}
+
+	// consume time info
+	message.Helper.InjectConsumeTime(&msg.Properties, checkStatus.GetGotoExtra().ConsumeTime)
+
+	// get or create router
+	rtr, err := d.internalSafeGetRouter(routeTopic)
+	if err != nil {
+		err = errors.New(fmt.Sprintf("failed to create router for topic: %s", routeTopic))
+		return nil, err, false
+	}
+	if !rtr.ready {
+		// wait router until it's ready
+		if d.options.shift.ConnectInSyncEnable {
+			<-rtr.readyCh
+		} else {
+			// back to other router or main topic before the checked router is ready
+			d.logger.Warnf("skip to decide because router is still not ready for topic: %s", routeTopic)
+			return nil, nil, false
+		}
+	}
+	// use atomic bool to avoid race
+	isDone := uint32(0)
+	doneCh := make(chan struct{}, 1)
+	callback := func(ID pulsar.MessageID, message *pulsar.ProducerMessage, e error) {
+		if atomic.CompareAndSwapUint32(&isDone, 0, 1) {
+			err = e
+			mid = ID
+			close(doneCh)
+		}
+	}
+	// send
+	rtr.Chan() <- &RouteMessage{
+		producerMsg: msg,
+		callback:    callback,
+	}
+	// wait for send request to finish
+	<-doneCh
+	if err != nil {
+		d.logger.Warnf("failed to Transfer message, payload size: %v, properties: %v", len(msg.Payload), msg.Properties)
+		return mid, err, false
+	}
+	return mid, err, true
+}
+
+func (d *producerShiftDecider) DecideAsync(ctx context.Context, msg *pulsar.ProducerMessage, checkStatus checker.CheckStatus,
+	callback func(pulsar.MessageID, *pulsar.ProducerMessage, error)) (decided bool) {
+	// valid check status
+	if !checkStatus.IsPassed() {
+		err := errors.New(fmt.Sprintf("%v decider failed to execute as check status is not passed", d.options.msgGoto))
+		callback(nil, msg, err)
+		return false
+	}
+	// format topic
+	destTopic, err := d.internalFormatDestTopic(checkStatus, msg)
+	if err != nil {
+		d.logger.Error(err)
+	}
+
+	// consume time info
+	message.Helper.InjectConsumeTime(&msg.Properties, checkStatus.GetGotoExtra().ConsumeTime)
+	// get or create router
+	rtr, err := d.internalSafeGetRouter(destTopic)
+	if err != nil {
+		errors.New(fmt.Sprintf("failed to create router for topic: %s", destTopic))
+		callback(nil, msg, err)
+		return false
+	}
+	if !rtr.ready {
+		// wait router until it's ready
+		if d.options.shift.ConnectInSyncEnable {
+			<-rtr.readyCh
+		} else {
+			// back to other router or main topic before the checked router is ready
+			d.logger.Warnf("skip to decide because router is still not ready for topic: %s", destTopic)
+			return false
+		}
+	}
+	// send
+	rtr.Chan() <- &RouteMessage{
+		producerMsg: msg,
+		callback:    callback,
+	}
+
+	return true
+}
+
+func (d *producerShiftDecider) internalFormatDestTopic(cs checker.CheckStatus, msg *pulsar.ProducerMessage) (string, error) {
+	destLevel := cs.GetGotoExtra().Level
+	if destLevel == "" {
+		destLevel = d.options.shift.Level
+	}
+	if destLevel == "" {
+		return "", errors.New(fmt.Sprintf("failed to shift (%v) message "+
+			"because there is no level is specified. msg: %v", d.options.msgGoto, string(msg.Payload)))
+	}
+	if d.options.msgGoto == decider.GotoUpgrade {
+		if destLevel.OrderOf() <= d.options.level.OrderOf() {
+			return "", errors.New(fmt.Sprintf("failed to upgrade message "+
+				"because the specified level is too lower. msg: %v", string(msg.Payload)))
+		}
+	} else if d.options.msgGoto == decider.GotoDegrade {
+		if destLevel.OrderOf() >= d.options.level.OrderOf() {
+			return "", errors.New(fmt.Sprintf("failed to degrade message "+
+				"because the specified level is too higher. msg: %v", string(msg.Payload)))
+		}
+	} else if d.options.msgGoto == decider.GotoShift {
+		if destLevel == d.options.level {
+			return "", errors.New(fmt.Sprintf("failed to shift message "+
+				"because the specified level is equal to the produce level. msg: %v", string(msg.Payload)))
+		}
+	} else {
+		panic(fmt.Sprintf("invalid shift decision: %v", d.options.msgGoto))
+	}
+	return d.options.groundTopic + destLevel.TopicSuffix(), nil
+}
+
+func (d *producerShiftDecider) tryInitTransferTopic() string {
+	destTopic := ""
+	switch d.options.msgGoto {
+	case decider.GotoDead:
+		destTopic = d.options.groundTopic + message.StatusDead.TopicSuffix()
+	/*case decider.GotoUpgrade:
+		destTopic = d.options.groundTopic + d.options.upgradePolicy.WithLevel.TopicSuffix()
+	case decider.GotoDegrade:
+		destTopic = d.options.groundTopic + d.options.degradePolicy.WithLevel.TopicSuffix()*/
+	case decider.GotoBlocking:
+		destTopic = d.options.groundTopic + message.StatusBlocking.TopicSuffix()
+	case decider.GotoPending:
+		destTopic = d.options.groundTopic + message.StatusPending.TopicSuffix()
+	case decider.GotoRetrying:
+		destTopic = d.options.groundTopic + message.StatusRetrying.TopicSuffix()
+	}
+	return destTopic
+}
+
+func (d *producerShiftDecider) internalSafeGetRouter(topic string) (*router, error) {
+	d.routersLock.RLock()
+	rtr, ok := d.routers[topic]
+	d.routersLock.RUnlock()
+	if ok {
+		return rtr, nil
+	}
+	rtOption := routerOptions{
+		Topic:               topic,
+		connectInSyncEnable: d.options.shift.ConnectInSyncEnable,
+		BackoffMaxTimes:     d.options.shift.BackoffMaxTimes,
+		BackoffDelays:       d.options.shift.BackoffDelays,
+		BackoffPolicy:       d.options.shift.BackoffPolicy,
+	}
+	d.routersLock.Lock()
+	defer d.routersLock.Unlock()
+	rtr, ok = d.routers[topic]
+	if ok {
+		return rtr, nil
+	}
+	if newRtr, err := newRouter(d.logger, d.client, rtOption); err != nil {
+		return nil, err
+	} else {
+		rtr = newRtr
+		d.routers[topic] = newRtr
+		metric := d.metricsProvider.GetProducerDeciderMetrics(d.options.groundTopic, topic, d.options.msgGoto.String())
+		metric.DecidersOpened.Inc()
+		d.routerMetrics[topic] = metric
+		return rtr, nil
+	}
+}
+
+func (d *producerShiftDecider) close() {
+	for _, metric := range d.routerMetrics {
+		metric.DecidersOpened.Dec()
+	}
+}

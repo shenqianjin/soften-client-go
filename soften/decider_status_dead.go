@@ -1,58 +1,71 @@
 package soften
 
 import (
+	"errors"
+
 	"github.com/apache/pulsar-client-go/pulsar"
+	"github.com/apache/pulsar-client-go/pulsar/log"
 	"github.com/shenqianjin/soften-client-go/soften/checker"
-	"github.com/shenqianjin/soften-client-go/soften/handler"
+	"github.com/shenqianjin/soften-client-go/soften/decider"
 	"github.com/shenqianjin/soften-client-go/soften/internal"
 	"github.com/shenqianjin/soften-client-go/soften/message"
 )
 
 type deadDecideOptions struct {
-	topic string // default ${TOPIC}_RETRYING, 固定后缀，不允许定制
-	//enable bool   // 内部判断使用
+	groundTopic  string
+	subscription string
+	//level            internal.TopicLevel
+	//TransferLevel    internal.TopicLevel
 }
 
+// deadDecider route messages to ${TOPIC}-${subscription}-DLQ 主题, 固定后缀，不允许定制
 type deadDecider struct {
-	router  *reRouter
-	options deadDecideOptions
-	metrics *internal.ListenerDecideGotoMetrics
+	router          *router
+	logger          log.Logger
+	options         deadDecideOptions
+	metricsProvider *internal.MetricsProvider
 }
 
-func newDeadDecider(client *client, listener *consumeListener, options deadDecideOptions) (*deadDecider, error) {
-	rt, err := newReRouter(client.logger, client.Client, reRouterOptions{Topic: options.topic})
+func newDeadDecider(client *client, options deadDecideOptions, metricsProvider *internal.MetricsProvider) (*deadDecider, error) {
+	if options.groundTopic == "" {
+		return nil, errors.New("topic is blank")
+	}
+	if options.subscription == "" {
+		return nil, errors.New("subscription is blank")
+	}
+	subscriptionSuffix := "-" + options.subscription
+	rtOptions := routerOptions{
+		Topic:               options.groundTopic + message.L1.TopicSuffix() + subscriptionSuffix + message.StatusDead.TopicSuffix(),
+		connectInSyncEnable: true,
+	}
+	rt, err := newRouter(client.logger, client.Client, rtOptions)
 	if err != nil {
 		return nil, err
 	}
-	metrics := client.metricsProvider.GetListenerDecideGotoMetrics(listener.logTopics, listener.logLevels, handler.GotoDead)
-	decider := &deadDecider{router: rt, options: options, metrics: metrics}
-	metrics.DecidersOpened.Inc()
-	return decider, nil
+	d := &deadDecider{router: rt, logger: client.logger, options: options, metricsProvider: metricsProvider}
+	d.metricsProvider.GetListenerDecidersMetrics(d.options.groundTopic, d.options.subscription, decider.GotoDead).DecidersOpened.Inc()
+	return d, nil
 }
 
-func (d *deadDecider) Decide(msg pulsar.ConsumerMessage, cheStatus checker.CheckStatus) bool {
+func (d *deadDecider) Decide(msg consumerMessage, cheStatus checker.CheckStatus) bool {
 	if !cheStatus.IsPassed() {
 		return false
 	}
-	// prepare to re-route
+	// prepare to re-Transfer
 	props := make(map[string]string)
 	for k, v := range msg.Properties() {
 		props[k] = v
 	}
-	// first time to happen status switch
-	if previousMessageStatus := message.Parser.GetPreviousStatus(msg); previousMessageStatus != "" && previousMessageStatus != message.StatusDead {
-		props[message.XPropertyPreviousMessageStatus] = string(previousMessageStatus)
-	}
-	// record origin information when re-route first time
-	if _, ok := props[message.XPropertyOriginTopic]; !ok {
-		props[message.XPropertyOriginTopic] = msg.Message.Topic()
-	}
-	if _, ok := props[message.XPropertyOriginMessageID]; !ok {
-		props[message.XPropertyOriginMessageID] = message.Parser.GetMessageId(msg)
-	}
-	if _, ok := props[message.XPropertyOriginPublishTime]; !ok {
-		props[message.XPropertyOriginPublishTime] = msg.PublishTime().UTC().Format(internal.RFC3339TimeInSecondPattern)
-	}
+	// record origin information when re-Transfer first time
+	message.Helper.InjectOriginTopic(msg.Message, &props)
+	message.Helper.InjectOriginMessageId(msg.Message, &props)
+	message.Helper.InjectOriginPublishTime(msg.Message, &props)
+	message.Helper.InjectOriginLevel(msg.Message, &props)
+	message.Helper.InjectOriginStatus(msg.Message, &props)
+	// record previous level/status information
+	message.Helper.InjectPreviousLevel(msg.Message, &props)
+	message.Helper.InjectPreviousStatus(msg.Message, &props)
+
 	producerMsg := pulsar.ProducerMessage{
 		Payload:     msg.Payload(),
 		Key:         msg.Key(),
@@ -60,13 +73,24 @@ func (d *deadDecider) Decide(msg pulsar.ConsumerMessage, cheStatus checker.Check
 		Properties:  props,
 		EventTime:   msg.EventTime(),
 	}
-	d.router.Chan() <- &RerouteMessage{
-		consumerMsg: msg,
-		producerMsg: producerMsg,
+	callback := func(messageID pulsar.MessageID, producerMessage *pulsar.ProducerMessage, err error) {
+		if err != nil {
+			d.logger.WithError(err).WithField("msgID", msg.ID()).Errorf("Failed to send message to topic: %s", d.router.options.Topic)
+			msg.Consumer.Nack(msg)
+			msg.internalExtra.consumerMetrics.ConsumeMessageNacks.Inc()
+		} else {
+			d.logger.WithField("msgID", msg.ID()).Debugf("Succeed to send message to topic: %s", d.router.options.Topic)
+			msg.Consumer.Ack(msg)
+			msg.internalExtra.consumerMetrics.ConsumeMessageAcks.Inc()
+		}
+	}
+	d.router.Chan() <- &RouteMessage{
+		producerMsg: &producerMsg,
+		callback:    callback,
 	}
 	return true
 }
 
 func (d *deadDecider) close() {
-	d.metrics.DecidersOpened.Dec()
+	d.metricsProvider.GetListenerDecidersMetrics(d.options.groundTopic, d.options.subscription, decider.GotoDead).DecidersOpened.Dec()
 }

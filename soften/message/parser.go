@@ -16,18 +16,32 @@ var Parser = &messageParser{}
 type messageParser struct {
 }
 
-func (p *messageParser) GetCurrentStatus(msg pulsar.ConsumerMessage) internal.MessageStatus {
-	properties := msg.Message.Properties()
-	if status, ok := properties[XPropertyCurrentMessageStatus]; ok {
-		if messageStatus, err := StatusOf(status); err == nil {
-			return messageStatus
+func (p *messageParser) GetCurrentLevel(msg pulsar.Message) internal.TopicLevel {
+	if leveledMsg, ok := msg.(internal.LeveledMessage); ok {
+		return leveledMsg.Level()
+	}
+	return L1
+}
+
+func (p *messageParser) GetPreviousLevel(msg pulsar.Message) internal.TopicLevel {
+	properties := msg.Properties()
+	if level, ok := properties[XPropertyPreviousMessageLevel]; ok {
+		if messageLevel, err := LevelOf(level); err == nil {
+			return messageLevel
 		}
+	}
+	return L1
+}
+
+func (p *messageParser) GetCurrentStatus(msg pulsar.Message) internal.MessageStatus {
+	if statusMsg, ok := msg.(internal.StatusMessage); ok {
+		return statusMsg.Status()
 	}
 	return StatusReady
 }
 
-func (p *messageParser) GetPreviousStatus(msg pulsar.ConsumerMessage) internal.MessageStatus {
-	properties := msg.Message.Properties()
+func (p *messageParser) GetPreviousStatus(msg pulsar.Message) internal.MessageStatus {
+	properties := msg.Properties()
 	if status, ok := properties[XPropertyPreviousMessageStatus]; ok {
 		if messageStatus, err := StatusOf(status); err == nil {
 			return messageStatus
@@ -36,8 +50,8 @@ func (p *messageParser) GetPreviousStatus(msg pulsar.ConsumerMessage) internal.M
 	return ""
 }
 
-func (p *messageParser) GetXReconsumeTimes(msg pulsar.ConsumerMessage) int {
-	properties := msg.Message.Properties()
+func (p *messageParser) GetReconsumeTimes(msg pulsar.Message) int {
+	properties := msg.Properties()
 	if timesStr, ok := properties[XPropertyReconsumeTimes]; ok {
 		if times, err := strconv.Atoi(timesStr); err == nil {
 			return times
@@ -46,8 +60,8 @@ func (p *messageParser) GetXReconsumeTimes(msg pulsar.ConsumerMessage) int {
 	return 0
 }
 
-func (p *messageParser) GetReentrantStartRedeliveryCount(msg pulsar.ConsumerMessage) uint32 {
-	properties := msg.Message.Properties()
+func (p *messageParser) GetReentrantStartRedeliveryCount(msg pulsar.Message) uint32 {
+	properties := msg.Properties()
 	if timesStr, ok := properties[XPropertyReentrantStartRedeliveryCount]; ok {
 		if times, err := strconv.ParseUint(timesStr, 10, 32); err == nil {
 			return uint32(times)
@@ -56,12 +70,12 @@ func (p *messageParser) GetReentrantStartRedeliveryCount(msg pulsar.ConsumerMess
 	return 0
 }
 
-func (p *messageParser) GetStatusReconsumeTimes(status internal.MessageStatus, msg pulsar.ConsumerMessage) int {
+func (p *messageParser) GetStatusConsumeTimes(status internal.MessageStatus, msg pulsar.Message) int {
 	statusConsumeTimesHeader, ok := statusConsumeTimesMap[status]
 	if !ok {
-		panic("invalid status for statusConsumeTimes")
+		panic(fmt.Sprintf("invalid status for statusConsumeTimes: %s", status))
 	}
-	properties := msg.Message.Properties()
+	properties := msg.Properties()
 	if timesStr, ok := properties[statusConsumeTimesHeader]; ok {
 		if times, err := strconv.Atoi(timesStr); err == nil {
 			return times
@@ -70,13 +84,13 @@ func (p *messageParser) GetStatusReconsumeTimes(status internal.MessageStatus, m
 	return 0
 }
 
-func (p *messageParser) GetStatusReentrantTimes(status internal.MessageStatus, msg pulsar.ConsumerMessage) int {
-	reentrantTimesHeader, ok := statusReentrantTimesMap[status]
+func (p *messageParser) GetStatusReentrantTimes(status internal.MessageStatus, msg pulsar.Message) int {
+	statusReentrantTimesHeader, ok := statusReentrantTimesMap[status]
 	if !ok {
 		panic("invalid status for statusReentrantTimes")
 	}
-	properties := msg.Message.Properties()
-	if timesStr, ok := properties[reentrantTimesHeader]; ok {
+	properties := msg.Properties()
+	if timesStr, ok2 := properties[statusReentrantTimesHeader]; ok2 {
 		if times, err := strconv.Atoi(timesStr); err == nil {
 			return times
 		}
@@ -84,9 +98,9 @@ func (p *messageParser) GetStatusReentrantTimes(status internal.MessageStatus, m
 	return 0
 }
 
-func (p *messageParser) GetReconsumeTime(msg pulsar.ConsumerMessage) time.Time {
-	properties := msg.Message.Properties()
-	if timeStr, ok := properties[XPropertyReconsumeTime]; ok {
+func (p *messageParser) GetConsumeTime(msg pulsar.Message) time.Time {
+	properties := msg.Properties()
+	if timeStr, ok := properties[XPropertyConsumeTime]; ok {
 		if t, err := time.Parse(internal.RFC3339TimeInSecondPattern, timeStr); err == nil {
 			return t
 		}
@@ -94,8 +108,8 @@ func (p *messageParser) GetReconsumeTime(msg pulsar.ConsumerMessage) time.Time {
 	return time.Time{}
 }
 
-func (p *messageParser) GetReentrantTime(msg pulsar.ConsumerMessage) time.Time {
-	properties := msg.Message.Properties()
+func (p *messageParser) GetReentrantTime(msg pulsar.Message) time.Time {
+	properties := msg.Properties()
 	if timeStr, ok := properties[XPropertyReentrantTime]; ok {
 		if t, err := time.Parse(internal.RFC3339TimeInSecondPattern, timeStr); err == nil {
 			return t
@@ -104,7 +118,7 @@ func (p *messageParser) GetReentrantTime(msg pulsar.ConsumerMessage) time.Time {
 	return time.Time{}
 }
 
-func (p *messageParser) GetMessageId(msg pulsar.ConsumerMessage) string {
-	id := msg.Message.ID()
+func (p *messageParser) GetMessageId(msg pulsar.Message) string {
+	id := msg.ID()
 	return fmt.Sprintf("%d:%d:%d", id.LedgerID(), id.EntryID(), id.PartitionIdx())
 }

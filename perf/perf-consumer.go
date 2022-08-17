@@ -17,6 +17,7 @@ import (
 	"github.com/shenqianjin/soften-client-go/perf/internal"
 	"github.com/shenqianjin/soften-client-go/soften/checker"
 	"github.com/shenqianjin/soften-client-go/soften/config"
+	"github.com/shenqianjin/soften-client-go/soften/decider"
 	"github.com/shenqianjin/soften-client-go/soften/handler"
 	"github.com/shenqianjin/soften-client-go/soften/message"
 	log "github.com/sirupsen/logrus"
@@ -41,14 +42,14 @@ type consumeArgs struct {
 }
 
 var handleGotoIndexes = map[string]int{
-	handler.GotoDone.String():     0,
-	handler.GotoDiscard.String():  1,
-	handler.GotoDead.String():     2,
-	handler.GotoPending.String():  3,
-	handler.GotoBlocking.String(): 4,
-	handler.GotoRetrying.String(): 5,
-	handler.GotoUpgrade.String():  6,
-	handler.GotoDegrade.String():  7,
+	decider.GotoDone.String():     0,
+	decider.GotoDiscard.String():  1,
+	decider.GotoDead.String():     2,
+	decider.GotoPending.String():  3,
+	decider.GotoBlocking.String(): 4,
+	decider.GotoRetrying.String(): 5,
+	decider.GotoUpgrade.String():  6,
+	decider.GotoDegrade.String():  7,
 }
 
 type consumer struct {
@@ -76,22 +77,22 @@ type consumeStat struct {
 
 func newConsumer(clientArgs *clientArgs, consumerArgs *consumeArgs) *consumer {
 	gotoWeightMap := map[string]uint64{
-		handler.GotoDone.String(): consumerArgs.GotoWeights[handleGotoIndexes[handler.GotoDone.String()]],
+		decider.GotoDone.String(): consumerArgs.GotoWeights[handleGotoIndexes[decider.GotoDone.String()]],
 	}
-	if weight := consumerArgs.GotoWeights[handleGotoIndexes[handler.GotoRetrying.String()]]; weight > 0 {
-		gotoWeightMap[handler.GotoRetrying.String()] = weight
+	if weight := consumerArgs.GotoWeights[handleGotoIndexes[decider.GotoRetrying.String()]]; weight > 0 {
+		gotoWeightMap[decider.GotoRetrying.String()] = weight
 	}
-	if weight := consumerArgs.GotoWeights[handleGotoIndexes[handler.GotoPending.String()]]; weight > 0 {
-		gotoWeightMap[handler.GotoPending.String()] = weight
+	if weight := consumerArgs.GotoWeights[handleGotoIndexes[decider.GotoPending.String()]]; weight > 0 {
+		gotoWeightMap[decider.GotoPending.String()] = weight
 	}
-	if weight := consumerArgs.GotoWeights[handleGotoIndexes[handler.GotoBlocking.String()]]; weight > 0 {
-		gotoWeightMap[handler.GotoBlocking.String()] = weight
+	if weight := consumerArgs.GotoWeights[handleGotoIndexes[decider.GotoBlocking.String()]]; weight > 0 {
+		gotoWeightMap[decider.GotoBlocking.String()] = weight
 	}
-	if weight := consumerArgs.GotoWeights[handleGotoIndexes[handler.GotoDead.String()]]; weight > 0 {
-		gotoWeightMap[handler.GotoDead.String()] = weight
+	if weight := consumerArgs.GotoWeights[handleGotoIndexes[decider.GotoDead.String()]]; weight > 0 {
+		gotoWeightMap[decider.GotoDead.String()] = weight
 	}
-	if weight := consumerArgs.GotoWeights[handleGotoIndexes[handler.GotoDiscard.String()]]; weight > 0 {
-		gotoWeightMap[handler.GotoDiscard.String()] = weight
+	if weight := consumerArgs.GotoWeights[handleGotoIndexes[decider.GotoDiscard.String()]]; weight > 0 {
+		gotoWeightMap[decider.GotoDiscard.String()] = weight
 	}
 	handleGotoChoice := internal.NewRoundRandWeightGotoPolicy(gotoWeightMap)
 
@@ -159,13 +160,16 @@ func (c *consumer) perfConsume(stop <-chan struct{}) {
 	defer client.Close()
 
 	// create consumer
+	lvlPolicy := &config.LevelPolicy{
+		//PendingEnable:    true,
+		//BlockingEnable:   true,
+		RetryingEnable: true,
+	}
 	listener, err := client.CreateListener(config.ConsumerConfig{
 		Topic:            c.consumerArgs.Topic,
 		SubscriptionName: c.consumerArgs.SubscriptionName,
 		Concurrency:      &config.ConcurrencyPolicy{CorePoolSize: c.consumerArgs.Concurrency},
-		//PendingEnable:    true,
-		//BlockingEnable:   true,
-		RetryingEnable: true,
+		LevelPolicy:      lvlPolicy,
 	},
 		//checker.PrevHandlePending(c.concurrencyCheck),
 		//checker.PrevHandleBlocking(c.quotaCheck),
@@ -224,7 +228,7 @@ func (c *consumer) concurrencyCheck(msg pulsar.Message) checker.CheckStatus {
 }
 
 // 各类型超QPS限制时,去retrying队列
-func (c *consumer) rateCheck(msg pulsar.Message) checker.CheckStatus {
+func (c *consumer) rateCheck(ctx context.Context, msg message.Message) checker.CheckStatus {
 	if typeName, ok := msg.Properties()["Type"]; ok {
 		if limiter, ok2 := c.rateLimiters[typeName]; ok2 && limiter != nil {
 			if !limiter.Allow() { // non-blocking operation
@@ -237,46 +241,46 @@ func (c *consumer) rateCheck(msg pulsar.Message) checker.CheckStatus {
 
 var RFC3339TimeInSecondPattern = "20060102150405.999"
 
-func (c *consumer) internalHandle(cm pulsar.Message) handler.HandleStatus {
-	originPublishTime := cm.PublishTime()
-	if originalPublishTime, ok := cm.Properties()[message.XPropertyOriginPublishTime]; ok {
+func (c *consumer) internalHandle(ctx context.Context, msg message.Message) handler.HandleStatus {
+	originPublishTime := msg.PublishTime()
+	if originalPublishTime, ok := msg.Properties()[message.XPropertyOriginPublishTime]; ok {
 		if parsedTime, err := time.Parse(RFC3339TimeInSecondPattern, originalPublishTime); err == nil {
 			originPublishTime = parsedTime
 		}
 	}
 	start := time.Now()
 	stat := &consumeStat{
-		bytes:           int64(len(cm.Payload())),
-		receivedLatency: time.Since(cm.PublishTime()).Seconds(),
+		bytes:           int64(len(msg.Payload())),
+		receivedLatency: time.Since(msg.PublishTime()).Seconds(),
 	}
 
 	if c.consumerArgs.costAverageInMs > 0 {
 		time.Sleep(c.costPolicy.Next()) // 模拟业务处理
 	}
-	result := handler.HandleStatusOk
+	var result handler.HandleStatus
 	n := c.handleGotoChoice.Next()
 	switch n {
-	case string(handler.GotoRetrying):
-		result = handler.HandleStatusBuilder().Goto(handler.GotoRetrying).Build()
-	case string(handler.GotoPending):
-		result = handler.HandleStatusBuilder().Goto(handler.GotoPending).Build()
-	case string(handler.GotoBlocking):
-		result = handler.HandleStatusBuilder().Goto(handler.GotoBlocking).Build()
-	case string(handler.GotoDead):
-		result = handler.HandleStatusBuilder().Goto(handler.GotoDead).Build()
-	case string(handler.GotoDiscard):
-		result = handler.HandleStatusBuilder().Goto(handler.GotoDiscard).Build()
+	case string(decider.GotoRetrying):
+		result = handler.StatusRetrying
+	case string(decider.GotoPending):
+		result = handler.StatusPending
+	case string(decider.GotoBlocking):
+		result = handler.StatusBlocking
+	case string(decider.GotoDead):
+		result = handler.StatusDead
+	case string(decider.GotoDiscard):
+		result = handler.StatusDiscard
 	default:
-		result = handler.HandleStatusOk
+		result = handler.StatusDone
 		stat.finishedLatency = time.Since(originPublishTime).Seconds() // 从消息产生到处理完成的时间(中间状态不是完成状态)
-		if radicalKey, ok := cm.Properties()["Type"]; ok {
+		if radicalKey, ok := msg.Properties()["Type"]; ok {
 			stat.typeName = radicalKey
 			//stat.radicalFinishedLatencies[typeName] = stat.finishedLatency
 		}
 	}
 
 	stat.handledLatency = time.Since(start).Seconds()
-	if radicalKey, ok := cm.Properties()["Type"]; ok {
+	if radicalKey, ok := msg.Properties()["Type"]; ok {
 		stat.typeName = radicalKey
 		//stat.radicalHandledLatencies[typeName] = stat.handledLatency
 	}

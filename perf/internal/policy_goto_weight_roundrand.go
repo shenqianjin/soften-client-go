@@ -3,7 +3,7 @@ package internal
 import (
 	"math/rand"
 
-	"github.com/shenqianjin/soften-client-go/soften/handler"
+	"github.com/shenqianjin/soften-client-go/soften/decider"
 )
 
 type GotoPolicy interface {
@@ -55,5 +55,5 @@ func (p *roundRandWeightGotoPolicy) Next() interface{} {
 	if len(p.indexesMap) > 1 {
 		return <-p.choiceCh
 	}
-	return handler.GotoDone
+	return decider.GotoDone
 }

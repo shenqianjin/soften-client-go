@@ -9,41 +9,41 @@ import (
 )
 
 type multiLeveledConsumer struct {
-	logger         log.Logger
-	messageCh      chan ConsumerMessage                        // channel used to deliver message to application
-	levelStrategy  internal.BalanceStrategy                    // 消费策略
-	levelPolicies  map[internal.TopicLevel]*config.LevelPolicy // 级别消费策略
-	levelConsumers map[internal.TopicLevel]*leveledConsumer
+	logger           log.Logger
+	messageCh        chan consumerMessage                        // channel used to deliver message to application
+	leveledStrategy  internal.BalanceStrategy                    // 消费策略
+	leveledPolicies  map[internal.TopicLevel]*config.LevelPolicy // 级别消费策略
+	leveledConsumers map[internal.TopicLevel]*singleLeveledConsumer
 }
 
-func newMultiLeveledConsumer(parentLogger log.Logger, client *client, conf *config.ConsumerConfig, messageCh chan ConsumerMessage, levelHandlers map[internal.TopicLevel]*leveledConsumeDeciders) (*multiLeveledConsumer, error) {
-	consumer := &multiLeveledConsumer{
-		logger:        parentLogger.SubLogger(log.Fields{"level": internal.TopicLevelParser.FormatList(conf.Levels)}),
-		levelStrategy: conf.LevelBalanceStrategy,
-		levelPolicies: conf.LevelPolicies,
-		messageCh:     messageCh,
+func newMultiLeveledConsumer(parentLogger log.Logger, client *client, conf *config.ConsumerConfig, messageCh chan consumerMessage, levelHandlers map[internal.TopicLevel]*leveledConsumeDeciders) (*multiLeveledConsumer, error) {
+	mlc := &multiLeveledConsumer{
+		logger:          parentLogger.SubLogger(log.Fields{"levels": internal.TopicLevelParser.FormatList(conf.Levels)}),
+		leveledStrategy: conf.LevelBalanceStrategy,
+		leveledPolicies: conf.LevelPolicies,
+		messageCh:       messageCh,
 	}
-	consumer.levelConsumers = make(map[internal.TopicLevel]*leveledConsumer, len(conf.Levels))
+	mlc.leveledConsumers = make(map[internal.TopicLevel]*singleLeveledConsumer, len(conf.Levels))
 	for _, level := range conf.Levels {
-		levelConsumer, err := newSingleLeveledConsumer(parentLogger, client, level, conf, make(chan ConsumerMessage, 10), levelHandlers[level])
+		levelConsumer, err := newSingleLeveledConsumer(mlc.logger, client, level, conf, make(chan consumerMessage, 10), levelHandlers[level])
 		if err != nil {
 			return nil, fmt.Errorf("failed to new multi-status comsumer -> %v", err)
 		}
-		consumer.levelConsumers[level] = levelConsumer
+		mlc.leveledConsumers[level] = levelConsumer
 	}
-	// start to listen message from all status leveledConsumer
-	go consumer.retrieveLeveledMessages()
-	return consumer, nil
+	// start to listen message from all status singleLeveledConsumer
+	go mlc.retrieveLeveledMessages()
+	return mlc, nil
 }
 
 func (c *multiLeveledConsumer) retrieveLeveledMessages() {
-	chs := make([]<-chan ConsumerMessage, len(c.levelConsumers))
-	weights := make([]uint, len(c.levelConsumers))
-	for level, consumer := range c.levelConsumers {
+	chs := make([]<-chan consumerMessage, len(c.leveledConsumers))
+	weights := make([]uint, len(c.leveledConsumers))
+	for level, consumer := range c.leveledConsumers {
 		chs = append(chs, consumer.Chan())
-		weights = append(weights, c.levelPolicies[level].ConsumeWeight)
+		weights = append(weights, c.leveledPolicies[level].ConsumeWeight)
 	}
-	balanceStrategy, err := config.BuildStrategy(c.levelStrategy, weights)
+	balanceStrategy, err := config.BuildStrategy(c.leveledStrategy, weights)
 	if err != nil {
 		panic(fmt.Errorf("failed to start retrieve: %v", err))
 	}

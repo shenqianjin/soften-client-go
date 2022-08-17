@@ -1,7 +1,9 @@
 package soften
 
 import (
+	"errors"
 	"fmt"
+	"sync"
 
 	"github.com/apache/pulsar-client-go/pulsar"
 	"github.com/apache/pulsar-client-go/pulsar/log"
@@ -10,121 +12,160 @@ import (
 	"github.com/shenqianjin/soften-client-go/soften/message"
 )
 
-type leveledConsumer struct {
+type singleLeveledConsumer struct {
 	logger           log.Logger
-	messageCh        chan ConsumerMessage // channel used to deliver message to application
+	messageCh        chan consumerMessage // channel used to deliver message to application
 	level            internal.TopicLevel
 	statusStrategy   internal.BalanceStrategy // 消费策略
 	mainConsumer     *statusConsumer
 	pendingConsumer  *statusConsumer
 	blockingConsumer *statusConsumer
 	retryingConsumer *statusConsumer
+	closeOnce        sync.Once
+	closeCh          chan struct{}
+	metricsProvider  *internal.MetricsProvider
+	metricsTopics    string
+	metricsLevels    string
 }
 
 func newSingleLeveledConsumer(parentLogger log.Logger, client *client, level internal.TopicLevel, conf *config.ConsumerConfig,
-	messageCh chan ConsumerMessage, deciders *leveledConsumeDeciders) (*leveledConsumer, error) {
-	cs := &leveledConsumer{logger: parentLogger.SubLogger(log.Fields{"level": level}),
-		level: level, messageCh: messageCh, statusStrategy: conf.BalanceStrategy}
-	// create status leveledConsumer
-	if mainConsumer, err := cs.internalSubscribe(client, conf, level, message.StatusReady); err != nil {
+	messageCh chan consumerMessage, deciders *leveledConsumeDeciders) (*singleLeveledConsumer, error) {
+	groundTopic := conf.Topic
+	subscription := conf.SubscriptionName
+	metricsTopics := internal.TopicParser.FormatListAsAbbr(conf.Topics)
+	metricsLevels := internal.TopicLevelParser.FormatList(conf.Levels)
+	slc := &singleLeveledConsumer{logger: parentLogger.SubLogger(log.Fields{"level": level}),
+		level: level, messageCh: messageCh, statusStrategy: conf.BalanceStrategy,
+		closeCh:       make(chan struct{}),
+		metricsTopics: metricsTopics, metricsLevels: metricsLevels,
+		metricsProvider: client.metricsProvider}
+	// create status singleLeveledConsumer
+	if mainConsumer, mainTopic, err := slc.internalSubscribe(client, conf, level, message.StatusReady); err != nil {
 		return nil, err
 	} else {
-		cs.mainConsumer = newStatusConsumer(cs.logger, mainConsumer, message.StatusReady, conf.Ready, nil)
+		metrics := client.metricsProvider.GetListenerConsumerMetrics(groundTopic, level, message.StatusReady,
+			subscription, mainTopic)
+		options := statusConsumerOptions{level: level, status: message.StatusReady, policy: conf.Ready, metrics: metrics}
+		slc.mainConsumer = newStatusConsumer(slc.logger, mainConsumer, options, nil)
 	}
 	if conf.PendingEnable {
-		if pendingConsumer, err := cs.internalSubscribe(client, conf, level, message.StatusPending); err != nil {
+		if pendingConsumer, pendingTopic, err := slc.internalSubscribe(client, conf, level, message.StatusPending); err != nil {
 			return nil, err
 		} else {
-			cs.pendingConsumer = newStatusConsumer(cs.logger, pendingConsumer, message.StatusPending, conf.Pending, deciders.pendingDecider)
+			metrics := client.metricsProvider.GetListenerConsumerMetrics(groundTopic, level, message.StatusPending,
+				subscription, pendingTopic)
+			options := statusConsumerOptions{level: level, status: message.StatusPending, policy: conf.Pending, metrics: metrics}
+			slc.pendingConsumer = newStatusConsumer(slc.logger, pendingConsumer, options, deciders.pendingDecider)
 		}
 	}
 	if conf.BlockingEnable {
-		if blockingConsumer, err := cs.internalSubscribe(client, conf, level, message.StatusBlocking); err != nil {
+		if blockingConsumer, blockingTopic, err := slc.internalSubscribe(client, conf, level, message.StatusBlocking); err != nil {
 			return nil, err
 		} else {
-			cs.blockingConsumer = newStatusConsumer(cs.logger, blockingConsumer, message.StatusBlocking, conf.Blocking, deciders.blockingDecider)
+			metrics := client.metricsProvider.GetListenerConsumerMetrics(groundTopic, level, message.StatusBlocking,
+				subscription, blockingTopic)
+			options := statusConsumerOptions{level: level, status: message.StatusBlocking, policy: conf.Blocking, metrics: metrics}
+			slc.blockingConsumer = newStatusConsumer(slc.logger, blockingConsumer, options, deciders.blockingDecider)
 		}
 	}
 	if conf.RetryingEnable {
-		if retryingConsumer, err := cs.internalSubscribe(client, conf, level, message.StatusRetrying); err != nil {
+		if retryingConsumer, retryingTopic, err := slc.internalSubscribe(client, conf, level, message.StatusRetrying); err != nil {
 			return nil, err
 		} else {
-			cs.retryingConsumer = newStatusConsumer(cs.logger, retryingConsumer, message.StatusRetrying, conf.Retrying, deciders.retryingDecider)
+			metrics := client.metricsProvider.GetListenerConsumerMetrics(groundTopic, level, message.StatusRetrying,
+				subscription, retryingTopic)
+			options := statusConsumerOptions{level: level, status: message.StatusRetrying, policy: conf.Retrying, metrics: metrics}
+			slc.retryingConsumer = newStatusConsumer(slc.logger, retryingConsumer, options, deciders.retryingDecider)
 		}
 	}
-	// start to listen message from all status leveledConsumer
-	go cs.retrieveStatusMessages()
-	cs.logger.Info("subscribed leveled consumer")
-	return cs, nil
+	// start to listen message from all status singleLeveledConsumer
+	go slc.retrieveStatusMessages()
+	slc.logger.Info("subscribed leveled consumer")
+	return slc, nil
 }
 
-func (msc *leveledConsumer) retrieveStatusMessages() {
-	chs := make([]<-chan ConsumerMessage, 1)
+func (slc *singleLeveledConsumer) retrieveStatusMessages() {
+	chs := make([]<-chan consumerMessage, 1)
 	weights := make([]uint, 1)
-	chs[0] = msc.mainConsumer.StatusChan()
-	weights[0] = msc.mainConsumer.policy.ConsumeWeight
-	if msc.retryingConsumer != nil {
-		chs = append(chs, msc.retryingConsumer.StatusChan())
-		weights = append(weights, msc.retryingConsumer.policy.ConsumeWeight)
+	chs[0] = slc.mainConsumer.StatusChan()
+	weights[0] = slc.mainConsumer.policy.ConsumeWeight
+	if slc.retryingConsumer != nil {
+		chs = append(chs, slc.retryingConsumer.StatusChan())
+		weights = append(weights, slc.retryingConsumer.policy.ConsumeWeight)
 	}
-	if msc.pendingConsumer != nil {
-		chs = append(chs, msc.pendingConsumer.StatusChan())
-		weights = append(weights, msc.pendingConsumer.policy.ConsumeWeight)
+	if slc.pendingConsumer != nil {
+		chs = append(chs, slc.pendingConsumer.StatusChan())
+		weights = append(weights, slc.pendingConsumer.policy.ConsumeWeight)
 	}
-	if msc.blockingConsumer != nil {
-		chs = append(chs, msc.blockingConsumer.StatusChan())
-		weights = append(weights, msc.blockingConsumer.policy.ConsumeWeight)
+	if slc.blockingConsumer != nil {
+		chs = append(chs, slc.blockingConsumer.StatusChan())
+		weights = append(weights, slc.blockingConsumer.policy.ConsumeWeight)
 	}
-	balanceStrategy, err := config.BuildStrategy(msc.statusStrategy, weights)
+	balanceStrategy, err := config.BuildStrategy(slc.statusStrategy, weights)
 	if err != nil {
 		panic(fmt.Errorf("failed to start retrieve: %v", err))
 	}
 	for {
 		msg, ok := messageChSelector.receiveOneByWeight(chs, balanceStrategy, &[]int{})
 		if !ok {
-			msc.logger.Warnf("status chan closed")
+			slc.logger.Warnf("status chan closed")
 			break
 		}
 
 		// 获取到消息
-		if msg.Message != nil && msg.Consumer != nil {
-			//fmt.Printf("received msg  msgId: %v -- content: '%s'\n", msg.ID(), string(msg.Payload()))
-			msg.LeveledMessage = &leveledMessage{level: msc.level}
-			msc.messageCh <- msg
-		} else {
-			panic(fmt.Sprintf("consumed an invalid msg: %v", msg))
+		select {
+		case <-slc.closeCh:
+			slc.logger.Errorf("received message failed because consumer closed. mid: %v", msg.ID())
+			return
+		default:
+			slc.messageCh <- msg
 		}
 	}
 }
 
 // Chan returns a channel to consume messages from
-func (msc *leveledConsumer) Chan() <-chan ConsumerMessage {
-	return msc.messageCh
+func (slc *singleLeveledConsumer) Chan() <-chan consumerMessage {
+	return slc.messageCh
 }
 
-func (msc *leveledConsumer) Close() {
-	msc.mainConsumer.Close()
-	if msc.blockingConsumer != nil {
-		msc.blockingConsumer.Close()
-	}
-	if msc.pendingConsumer != nil {
-		msc.pendingConsumer.Close()
-	}
-	if msc.retryingConsumer != nil {
-		msc.retryingConsumer.Close()
-	}
-	close(msc.messageCh)
-	msc.logger.Info("closed leveled consumer")
+func (slc *singleLeveledConsumer) Close() {
+	slc.closeOnce.Do(func() {
+		close(slc.closeCh)
+		slc.mainConsumer.Close()
+		if slc.blockingConsumer != nil {
+			slc.blockingConsumer.Close()
+		}
+		if slc.pendingConsumer != nil {
+			slc.pendingConsumer.Close()
+		}
+		if slc.retryingConsumer != nil {
+			slc.retryingConsumer.Close()
+		}
+	})
+	slc.logger.Info("closed leveled consumer")
 }
 
-func (msc *leveledConsumer) internalSubscribe(cli *client, conf *config.ConsumerConfig, lvl internal.TopicLevel, status internal.MessageStatus) (pulsar.Consumer, error) {
+func (slc *singleLeveledConsumer) internalSubscribe(cli *client, conf *config.ConsumerConfig, lvl internal.TopicLevel, status internal.MessageStatus) (pulsar.Consumer, string, error) {
+	groundTopic := conf.Topic
+	subscriptionSuffix := "-" + conf.SubscriptionName
 	levelSuffix := lvl.TopicSuffix()
 	statusSuffix := status.TopicSuffix()
-	topic := conf.Topics[0] + levelSuffix + statusSuffix
-	subscriptionName := conf.SubscriptionName + levelSuffix + statusSuffix
+	var topic string
+	switch status {
+	case message.StatusReady:
+		topic = groundTopic + levelSuffix + statusSuffix
+	case message.StatusRetrying:
+		topic = groundTopic + levelSuffix + subscriptionSuffix + statusSuffix
+	case message.StatusPending:
+		topic = groundTopic + levelSuffix + subscriptionSuffix + statusSuffix
+	case message.StatusBlocking:
+		topic = groundTopic + levelSuffix + subscriptionSuffix + statusSuffix
+	default:
+		return nil, "", errors.New(fmt.Sprintf("subsribe on invalid status: %v", status))
+	}
 	consumerOption := pulsar.ConsumerOptions{
 		Topic:                       topic,
-		SubscriptionName:            subscriptionName,
+		SubscriptionName:            conf.SubscriptionName,
 		Type:                        conf.Type,
 		SubscriptionInitialPosition: conf.SubscriptionInitialPosition,
 		NackRedeliveryDelay:         conf.NackRedeliveryDelay,
@@ -139,7 +180,7 @@ func (msc *leveledConsumer) internalSubscribe(cli *client, conf *config.Consumer
 		}
 	}
 	// only main status need compatible with pulsar retry enable and multi-topics
-	if status == message.StatusReady {
+	if status == message.StatusReady && lvl == conf.Level {
 		consumerOption.Topics = conf.Topics
 		consumerOption.RetryEnable = conf.RetryEnable
 	} else {
@@ -147,5 +188,5 @@ func (msc *leveledConsumer) internalSubscribe(cli *client, conf *config.Consumer
 		consumerOption.RetryEnable = false
 	}
 	pulsarConsumer, err := cli.Client.Subscribe(consumerOption)
-	return pulsarConsumer, err
+	return pulsarConsumer, topic, err
 }

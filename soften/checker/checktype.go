@@ -1,6 +1,6 @@
 package checker
 
-// ------ check type ------
+// ------ check type definition ------
 
 type CheckType string
 
@@ -8,7 +8,7 @@ func (e *CheckType) String() string {
 	return string(*e)
 }
 
-// ------ produce check type ------
+// ------ produce check type enums ------
 
 const (
 	ProduceCheckTypeDiscard  = CheckType("Discard")
@@ -18,17 +18,19 @@ const (
 	ProduceCheckTypeDead     = CheckType("Dead")
 	ProduceCheckTypeUpgrade  = CheckType("Upgrade")
 	ProduceCheckTypeDegrade  = CheckType("Degrade")
-	ProduceCheckTypeRoute    = CheckType("Route")
+	ProduceCheckTypeShift    = CheckType("Shift")
+	ProduceCheckTypeTransfer = CheckType("Transfer")
 )
 
 func DefaultPrevSendCheckOrders() []CheckType {
 	values := []CheckType{ProduceCheckTypeDiscard, ProduceCheckTypeDead,
-		ProduceCheckTypeRoute, ProduceCheckTypeUpgrade, ProduceCheckTypeDegrade,
+		ProduceCheckTypeTransfer,
+		ProduceCheckTypeUpgrade, ProduceCheckTypeDegrade, ProduceCheckTypeShift,
 		ProduceCheckTypeBlocking, ProduceCheckTypePending, ProduceCheckTypeRetrying}
 	return values
 }
 
-// ------ consume check type ------
+// ------ consume check type enums ------
 
 const (
 	CheckTypePrevDiscard  = CheckType("PrevDiscard")
@@ -38,7 +40,8 @@ const (
 	CheckTypePrevRetrying = CheckType("PrevRetrying")
 	CheckTypePrevUpgrade  = CheckType("PrevUpgrade")
 	CheckTypePrevDegrade  = CheckType("PrevDegrade")
-	CheckTypePrevReroute  = CheckType("PrevReroute")
+	CheckTypePrevShift    = CheckType("PrevShift")
+	CheckTypePrevTransfer = CheckType("PrevTransfer")
 
 	CheckTypePostDiscard  = CheckType("PostHandleDiscard")
 	CheckTypePostDead     = CheckType("PostHandleDead")
@@ -47,19 +50,22 @@ const (
 	CheckTypePostRetrying = CheckType("PostHandleRetrying")
 	CheckTypePostUpgrade  = CheckType("PostHandleUpgrade")
 	CheckTypePostDegrade  = CheckType("PostHandleDegrade")
-	CheckTypePostReroute  = CheckType("PostHandleReroute")
+	CheckTypePostShift    = CheckType("PostHandleShift")
+	CheckTypePostTransfer = CheckType("PostHandleTransfer")
 )
 
 func DefaultPrevHandleCheckOrders() []CheckType {
 	values := []CheckType{CheckTypePrevDiscard, CheckTypePrevDead,
-		CheckTypePrevReroute, CheckTypePrevUpgrade, CheckTypePrevDegrade,
+		CheckTypePrevTransfer,
+		CheckTypePrevUpgrade, CheckTypePrevDegrade, CheckTypePrevShift,
 		CheckTypePrevBlocking, CheckTypePrevPending, CheckTypePrevRetrying}
 	return values
 }
 
 func DefaultPostHandleCheckOrders() []CheckType {
 	values := []CheckType{CheckTypePostDiscard, CheckTypePostDead,
-		CheckTypePostReroute, CheckTypePostUpgrade, CheckTypePostDegrade,
+		CheckTypePostTransfer,
+		CheckTypePostUpgrade, CheckTypePostDegrade, CheckTypePostShift,
 		CheckTypePostBlocking, CheckTypePostPending, CheckTypePostRetrying}
 	return values
 }

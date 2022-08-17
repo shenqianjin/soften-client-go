@@ -1,6 +1,6 @@
 package checker
 
-// ------ consume checkpoint ------
+// ------ consume checkpoint type ------
 
 type ConsumeCheckpoint struct {
 	CheckType CheckType
@@ -8,14 +8,14 @@ type ConsumeCheckpoint struct {
 	Post      PostHandleCheckFunc
 }
 
-// ------ produce checkpoint ------
+// ------ produce checkpoint type ------
 
 type ProduceCheckpoint struct {
 	CheckType CheckType
 	CheckFunc PrevSendCheckFunc
 }
 
-// ------ consume checkpoint ------
+// ------ consume checkpoints ------
 
 func PrevHandleDiscard(checker PrevHandleCheckFunc) ConsumeCheckpoint {
 	return ConsumeCheckpoint{CheckType: CheckTypePrevDiscard, Prev: checker}
@@ -73,17 +73,23 @@ func PostHandleDegrade(checker PostHandleCheckFunc) ConsumeCheckpoint {
 	return ConsumeCheckpoint{CheckType: CheckTypePostDegrade, Post: checker}
 }
 
-// ------ reroute checkers ------
-
-func PrevHandleReroute(checker PrevHandleCheckFunc) ConsumeCheckpoint {
-	return ConsumeCheckpoint{CheckType: CheckTypePrevReroute, Prev: checker}
+func PrevHandleShift(checker PrevHandleCheckFunc) ConsumeCheckpoint {
+	return ConsumeCheckpoint{CheckType: CheckTypePrevShift, Prev: checker}
 }
 
-func PostHandleReroute(checker PostHandleCheckFunc) ConsumeCheckpoint {
-	return ConsumeCheckpoint{CheckType: CheckTypePostReroute, Post: checker}
+func PostHandleShift(checker PostHandleCheckFunc) ConsumeCheckpoint {
+	return ConsumeCheckpoint{CheckType: CheckTypePostShift, Post: checker}
 }
 
-// ------ produce checkpoint ------
+func PrevHandleTransfer(checker PrevHandleCheckFunc) ConsumeCheckpoint {
+	return ConsumeCheckpoint{CheckType: CheckTypePrevTransfer, Prev: checker}
+}
+
+func PostHandleTransfer(checker PostHandleCheckFunc) ConsumeCheckpoint {
+	return ConsumeCheckpoint{CheckType: CheckTypePostTransfer, Post: checker}
+}
+
+// ------ produce checkpoints ------
 
 func PrevSendDiscard(checker PrevSendCheckFunc) ProduceCheckpoint {
 	return ProduceCheckpoint{CheckType: ProduceCheckTypeDiscard, CheckFunc: checker}
@@ -113,8 +119,10 @@ func PrevSendDegrade(checker PrevSendCheckFunc) ProduceCheckpoint {
 	return ProduceCheckpoint{CheckType: ProduceCheckTypeDegrade, CheckFunc: checker}
 }
 
-// ------ route checker ------
+func PrevSendShift(checker PrevSendCheckFunc) ProduceCheckpoint {
+	return ProduceCheckpoint{CheckType: ProduceCheckTypeShift, CheckFunc: checker}
+}
 
-func PrevSendRoute(checker PrevSendCheckFunc) ProduceCheckpoint {
-	return ProduceCheckpoint{CheckType: ProduceCheckTypeRoute, CheckFunc: checker}
+func PrevSendTransfer(checker PrevSendCheckFunc) ProduceCheckpoint {
+	return ProduceCheckpoint{CheckType: ProduceCheckTypeTransfer, CheckFunc: checker}
 }

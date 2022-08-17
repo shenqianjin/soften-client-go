@@ -8,7 +8,8 @@ import (
 	"os/signal"
 	"strconv"
 
-	"github.com/prometheus/client_golang/prometheus/promhttp"
+	"github.com/shenqianjin/soften-client-go/soften/promhttp"
+	//"github.com/prometheus/client_golang/prometheus/promhttp"
 	log "github.com/sirupsen/logrus"
 )
 
@@ -41,8 +42,8 @@ func (p *performer) initStopCh() <-chan struct{} {
 }
 
 func (p *performer) Start() {
-	p.RunProfiling()
 	p.RunMetrics()
+	p.RunProfiling()
 }
 
 func (p *performer) RunMetrics() {

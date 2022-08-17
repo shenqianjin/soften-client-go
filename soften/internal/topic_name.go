@@ -118,3 +118,21 @@ func (tn *TopicName) IsV2TopicName() bool {
 func (tn *TopicName) GetTopicRestPath() string {
 	return fmt.Sprintf("%s/%s/%s", tn.Domain, tn.Namespace, url.QueryEscape(tn.Topic))
 }
+
+// ------ topic parser ------
+
+var TopicParser = topicParser{}
+
+type topicParser struct {
+}
+
+func (p topicParser) FormatListAsAbbr(topics []string) string {
+	if len(topics) <= 0 {
+		return ""
+	}
+	abbr := topics[0]
+	if len(topics) > 1 {
+		abbr = abbr + "+" + strconv.Itoa(len(topics)-1)
+	}
+	return abbr
+}

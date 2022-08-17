@@ -9,160 +9,163 @@ import (
 	"time"
 
 	"github.com/apache/pulsar-client-go/pulsar"
-	"github.com/shenqianjin/soften-client-go/soften"
 	"github.com/shenqianjin/soften-client-go/soften/admin"
 	"github.com/shenqianjin/soften-client-go/soften/checker"
 	"github.com/shenqianjin/soften-client-go/soften/config"
+	"github.com/shenqianjin/soften-client-go/soften/decider"
 	"github.com/shenqianjin/soften-client-go/soften/message"
-	topiclevel "github.com/shenqianjin/soften-client-go/soften/topic"
 	"github.com/shenqianjin/soften-client-go/test/internal"
 	"github.com/stretchr/testify/assert"
 )
 
-type testListenCheckCase struct {
-	topic                  string
-	storedTopic            string // produce to / consume from
-	routedTopic            string // check to
-	checkpoint             checker.ConsumeCheckpoint
-	expectedStoredOutCount int // should always 1
-	expectedRoutedOutCount int // 1 for pending, blocking, retrying; 0 for upgrade, degrade, reroute
-
-	// extra for upgrade/degrade
-	upgradeLevel string
-	degradeLevel string
-}
-
-func TestListenCheck_Prev_Discard(t *testing.T) {
-	topic := internal.GenerateTestTopic()
+func TestListenCheck_Post_Discard(t *testing.T) {
+	topic := internal.GenerateTestTopic(internal.PrefixTestListen)
 	checkCase := testListenCheckCase{
-		topic:       topic,
+		groundTopic: topic,
 		storedTopic: topic,
-		checkpoint: checker.PrevHandleDiscard(func(msg pulsar.Message) checker.CheckStatus {
+		checkpoint: checker.PostHandleDiscard(func(ctx context.Context, msg message.Message, err error) checker.CheckStatus {
 			return checker.CheckStatusPassed
 		}),
 	}
-	testListenPrevCheckHandle(t, checkCase)
+	testListenCheckPostHandle(t, checkCase)
 }
 
-func TestListenCheck_Prev_Dead(t *testing.T) {
-	topic := internal.GenerateTestTopic()
+func TestListenCheck_Post_Dead(t *testing.T) {
+	topic := internal.GenerateTestTopic(internal.PrefixTestListen)
 	checkCase := testListenCheckCase{
-		topic:       topic,
-		storedTopic: topic,
-		routedTopic: topic + message.StatusDead.TopicSuffix(),
-		checkpoint: checker.PrevHandleDead(func(msg pulsar.Message) checker.CheckStatus {
-			return checker.CheckStatusPassed
-		}),
-	}
-	testListenPrevCheckHandle(t, checkCase)
-}
-
-func TestListenCheck_Prev_Pending(t *testing.T) {
-	topic := internal.GenerateTestTopic()
-	checkCase := testListenCheckCase{
-		topic:       topic,
-		storedTopic: topic,
-		routedTopic: topic + message.StatusPending.TopicSuffix(),
-		checkpoint: checker.PrevHandlePending(func(msg pulsar.Message) checker.CheckStatus {
-			return checker.CheckStatusPassed
-		}),
-		expectedRoutedOutCount: 1, // reroute the msg to pending queue, and then reconsume it
-	}
-	testListenPrevCheckHandle(t, checkCase)
-}
-
-func TestListenCheck_Prev_Blocking(t *testing.T) {
-	topic := internal.GenerateTestTopic()
-	checkCase := testListenCheckCase{
-		topic:       topic,
-		storedTopic: topic,
-		routedTopic: topic + message.StatusBlocking.TopicSuffix(),
-		checkpoint: checker.PrevHandleBlocking(func(msg pulsar.Message) checker.CheckStatus {
-			return checker.CheckStatusPassed
-		}),
-		expectedRoutedOutCount: 1,
-	}
-	testListenPrevCheckHandle(t, checkCase)
-}
-
-func TestListenCheck_Prev_Retrying(t *testing.T) {
-	topic := internal.GenerateTestTopic()
-	checkCase := testListenCheckCase{
-		topic:       topic,
-		storedTopic: topic,
-		routedTopic: topic + message.StatusRetrying.TopicSuffix(),
-		checkpoint: checker.PrevHandleRetrying(func(msg pulsar.Message) checker.CheckStatus {
-			return checker.CheckStatusPassed
-		}),
-		expectedRoutedOutCount: 1,
-	}
-	testListenPrevCheckHandle(t, checkCase)
-}
-
-func TestListenCheck_Prev_Upgrade(t *testing.T) {
-	upgradeLevel := topiclevel.L2
-	topic := internal.GenerateTestTopic()
-	checkCase := testListenCheckCase{
-		topic:        topic,
+		groundTopic:  topic,
 		storedTopic:  topic,
-		routedTopic:  topic + upgradeLevel.TopicSuffix(),
-		upgradeLevel: upgradeLevel.String(),
-		checkpoint: checker.PrevHandleUpgrade(func(msg pulsar.Message) checker.CheckStatus {
-			if statusMsg, ok := msg.(soften.StatusMessage); ok && statusMsg.Status() == message.StatusReady {
-				return checker.CheckStatusPassed
-			}
-			return checker.CheckStatusRejected
+		decidedTopic: internal.FormatStatusTopic(topic, internal.TestSubscriptionName(), "", message.StatusDead.TopicSuffix()),
+		checkpoint: checker.PostHandleDead(func(ctx context.Context, msg message.Message, err error) checker.CheckStatus {
+			return checker.CheckStatusPassed
 		}),
 	}
-	testListenPrevCheckHandle(t, checkCase)
+	testListenCheckPostHandle(t, checkCase)
 }
 
-func TestListenCheck_Prev_Degrade(t *testing.T) {
-	degradeLevel := topiclevel.B2
-	topic := internal.GenerateTestTopic()
+func TestListenCheck_Post_Pending(t *testing.T) {
+	topic := internal.GenerateTestTopic(internal.PrefixTestListen)
 	checkCase := testListenCheckCase{
-		topic:        topic,
+		groundTopic:  topic,
 		storedTopic:  topic,
-		routedTopic:  topic + degradeLevel.TopicSuffix(),
+		decidedTopic: internal.FormatStatusTopic(topic, internal.TestSubscriptionName(), "", message.StatusPending.TopicSuffix()),
+		checkpoint: checker.PostHandlePending(func(ctx context.Context, msg message.Message, err error) checker.CheckStatus {
+			return checker.CheckStatusPassed
+		}),
+		expectedTransferdOutCount: 1, // transfer the msg to pending queue, and then reconsume it
+	}
+	testListenCheckPostHandle(t, checkCase)
+}
+
+func TestListenCheck_Post_Blocking(t *testing.T) {
+	topic := internal.GenerateTestTopic(internal.PrefixTestListen)
+	checkCase := testListenCheckCase{
+		groundTopic:  topic,
+		storedTopic:  topic,
+		decidedTopic: internal.FormatStatusTopic(topic, internal.TestSubscriptionName(), "", message.StatusBlocking.TopicSuffix()),
+		checkpoint: checker.PostHandleBlocking(func(ctx context.Context, msg message.Message, err error) checker.CheckStatus {
+			return checker.CheckStatusPassed
+		}),
+		expectedTransferdOutCount: 1,
+	}
+	testListenCheckPostHandle(t, checkCase)
+}
+
+func TestListenCheck_Post_Retrying(t *testing.T) {
+	topic := internal.GenerateTestTopic(internal.PrefixTestListen)
+	checkCase := testListenCheckCase{
+		groundTopic:  topic,
+		storedTopic:  topic,
+		decidedTopic: internal.FormatStatusTopic(topic, internal.TestSubscriptionName(), "", message.StatusRetrying.TopicSuffix()),
+		checkpoint: checker.PostHandleRetrying(func(ctx context.Context, msg message.Message, err error) checker.CheckStatus {
+			return checker.CheckStatusPassed
+		}),
+		expectedTransferdOutCount: 1,
+	}
+	testListenCheckPostHandle(t, checkCase)
+}
+
+func TestListenCheck_Post_Degrade(t *testing.T) {
+	degradeLevel := message.B2
+	topic := internal.GenerateTestTopic(internal.PrefixTestListen)
+	checkCase := testListenCheckCase{
+		groundTopic:  topic,
+		storedTopic:  topic,
+		decidedTopic: topic + degradeLevel.TopicSuffix(),
 		degradeLevel: degradeLevel.String(),
-		checkpoint: checker.PrevHandleDegrade(func(msg pulsar.Message) checker.CheckStatus {
-			if statusMsg, ok := msg.(soften.StatusMessage); ok && statusMsg.Status() == message.StatusReady {
+		checkpoint: checker.PostHandleDegrade(func(ctx context.Context, msg message.Message, err error) checker.CheckStatus {
+			if msg.Status() == message.StatusReady {
 				return checker.CheckStatusPassed
 			}
 			return checker.CheckStatusRejected
 		}),
 	}
-	testListenPrevCheckHandle(t, checkCase)
+	testListenCheckPostHandle(t, checkCase)
 }
 
-func TestListenCheck_Prev_Reroute(t *testing.T) {
-	topic := internal.GenerateTestTopic()
-	reroutedTopic := topic + topiclevel.L2.TopicSuffix()
+func TestListenCheck_Post_Upgrade(t *testing.T) {
+	upgradeLevel := message.L2
+	topic := internal.GenerateTestTopic(internal.PrefixTestListen)
 	checkCase := testListenCheckCase{
-		topic:       topic,
-		storedTopic: topic,
-		routedTopic: reroutedTopic,
-		checkpoint: checker.PrevHandleReroute(func(msg pulsar.Message) checker.CheckStatus {
-			if statusMsg, ok := msg.(soften.StatusMessage); ok && statusMsg.Status() == message.StatusReady {
-				return checker.CheckStatusPassed.WithRerouteTopic(reroutedTopic)
+		groundTopic:  topic,
+		storedTopic:  topic,
+		decidedTopic: topic + upgradeLevel.TopicSuffix(),
+		upgradeLevel: upgradeLevel.String(),
+		checkpoint: checker.PostHandleUpgrade(func(ctx context.Context, msg message.Message, err error) checker.CheckStatus {
+			if msg.Status() == message.StatusReady {
+				return checker.CheckStatusPassed
 			}
 			return checker.CheckStatusRejected
 		}),
 	}
-	testListenPrevCheckHandle(t, checkCase)
+	testListenCheckPostHandle(t, checkCase)
 }
 
-func testListenPrevCheckHandle(t *testing.T, checkCase testListenCheckCase) {
-	topic := checkCase.topic
+func TestListenCheck_Post_Shift(t *testing.T) {
+	shiftLevel := message.L2
+	topic := internal.GenerateTestTopic(internal.PrefixTestListen)
+	checkCase := testListenCheckCase{
+		groundTopic:  topic,
+		storedTopic:  topic,
+		decidedTopic: topic + shiftLevel.TopicSuffix(),
+		checkpoint: checker.PostHandleShift(func(ctx context.Context, msg message.Message, err error) checker.CheckStatus {
+			if msg.Status() == message.StatusReady {
+				return checker.CheckStatusPassed.WithGotoExtra(decider.GotoExtra{Level: shiftLevel})
+			}
+			return checker.CheckStatusRejected
+		}),
+	}
+	testListenCheckPostHandle(t, checkCase)
+}
+
+func TestListenCheck_Post_Transfer(t *testing.T) {
+	topic := internal.GenerateTestTopic(internal.PrefixTestListen)
+	transferredTopic := topic + message.L2.TopicSuffix()
+	checkCase := testListenCheckCase{
+		groundTopic:  topic,
+		storedTopic:  topic,
+		decidedTopic: transferredTopic,
+		checkpoint: checker.PostHandleTransfer(func(ctx context.Context, msg message.Message, err error) checker.CheckStatus {
+			if msg.Status() == message.StatusReady {
+				return checker.CheckStatusPassed.WithGotoExtra(decider.GotoExtra{Topic: transferredTopic})
+			}
+			return checker.CheckStatusRejected
+		}),
+	}
+	testListenCheckPostHandle(t, checkCase)
+}
+
+func testListenCheckPostHandle(t *testing.T, checkCase testListenCheckCase) {
+	topic := checkCase.groundTopic
 	storedTopic := checkCase.storedTopic
-	routedTopic := checkCase.routedTopic
+	decidedTopic := checkCase.decidedTopic
 	manager := admin.NewAdminManager(internal.DefaultPulsarHttpUrl)
-	// clean up topic
+	// clean up groundTopic
 	internal.CleanUpTopic(t, manager, storedTopic)
-	internal.CleanUpTopic(t, manager, routedTopic)
+	internal.CleanUpTopic(t, manager, decidedTopic)
 	defer func() {
 		internal.CleanUpTopic(t, manager, storedTopic)
-		internal.CleanUpTopic(t, manager, routedTopic)
+		internal.CleanUpTopic(t, manager, decidedTopic)
 	}()
 	// create client
 	client := internal.NewClient(internal.DefaultPulsarUrl)
@@ -186,25 +189,36 @@ func testListenPrevCheckHandle(t *testing.T, checkCase testListenCheckCase) {
 
 	// ---------------
 
+	testPolicy := &config.StatusPolicy{
+		BackoffDelays:  []string{"1s"},
+		ReentrantDelay: 1,
+	}
 	// create listener
-	upgradeLevel, _ := topiclevel.LevelOf(checkCase.upgradeLevel)
-	degradeLevel, _ := topiclevel.LevelOf(checkCase.degradeLevel)
+	upgradeLevel, _ := message.LevelOf(checkCase.upgradeLevel)
+	degradeLevel, _ := message.LevelOf(checkCase.degradeLevel)
+	leveledPolicy := &config.LevelPolicy{
+		DiscardEnable:  checkCase.checkpoint.CheckType == checker.CheckTypePostDiscard,
+		DeadEnable:     checkCase.checkpoint.CheckType == checker.CheckTypePostDead,
+		PendingEnable:  checkCase.checkpoint.CheckType == checker.CheckTypePostPending,
+		Pending:        testPolicy,
+		BlockingEnable: checkCase.checkpoint.CheckType == checker.CheckTypePostBlocking,
+		Blocking:       testPolicy,
+		RetryingEnable: checkCase.checkpoint.CheckType == checker.CheckTypePostRetrying,
+		Retrying:       testPolicy,
+		UpgradeEnable:  checkCase.checkpoint.CheckType == checker.CheckTypePostUpgrade,
+		Upgrade:        &config.ShiftPolicy{Level: upgradeLevel, ConnectInSyncEnable: true},
+		DegradeEnable:  checkCase.checkpoint.CheckType == checker.CheckTypePostDegrade,
+		Degrade:        &config.ShiftPolicy{Level: degradeLevel, ConnectInSyncEnable: true},
+		ShiftEnable:    checkCase.checkpoint.CheckType == checker.CheckTypePostShift,
+		Shift:          &config.ShiftPolicy{ConnectInSyncEnable: true},
+		TransferEnable: checkCase.checkpoint.CheckType == checker.CheckTypePostTransfer,
+		Transfer:       &config.TransferPolicy{ConnectInSyncEnable: true},
+	}
 	listener, err := client.CreateListener(config.ConsumerConfig{
 		Topic:                       topic,
-		SubscriptionName:            internal.GenerateSubscribeNameByTopic(topic),
+		SubscriptionName:            internal.TestSubscriptionName(),
 		SubscriptionInitialPosition: pulsar.SubscriptionPositionEarliest,
-		DiscardEnable:               checkCase.checkpoint.CheckType == checker.CheckTypePrevDiscard,
-		DeadEnable:                  checkCase.checkpoint.CheckType == checker.CheckTypePrevDead,
-		PendingEnable:               checkCase.checkpoint.CheckType == checker.CheckTypePrevPending,
-		BlockingEnable:              checkCase.checkpoint.CheckType == checker.CheckTypePrevBlocking,
-		RetryingEnable:              checkCase.checkpoint.CheckType == checker.CheckTypePrevRetrying,
-		UpgradeEnable:               checkCase.checkpoint.CheckType == checker.CheckTypePrevUpgrade,
-		DegradeEnable:               checkCase.checkpoint.CheckType == checker.CheckTypePrevDegrade,
-		RerouteEnable:               checkCase.checkpoint.CheckType == checker.CheckTypePrevReroute,
-		UpgradeTopicLevel:           upgradeLevel,
-		DegradeTopicLevel:           degradeLevel,
-		Reroute: &config.ReroutePolicy{
-			ConnectInSyncEnable: checkCase.checkpoint.CheckType == checker.CheckTypePrevReroute},
+		LevelPolicy:                 leveledPolicy,
 	}, checkCase.checkpoint)
 	if err != nil {
 		log.Fatal(err)
@@ -212,9 +226,9 @@ func testListenPrevCheckHandle(t *testing.T, checkCase testListenCheckCase) {
 	defer listener.Close()
 	// listener starts
 	ctx, cancel := context.WithCancel(context.Background())
-	err = listener.Start(ctx, func(message pulsar.Message) (bool, error) {
-		fmt.Printf("consumed message size: %v, headers: %v\n", len(message.Payload()), message.Properties())
-		return true, nil
+	err = listener.Start(ctx, func(ctx context.Context, msg message.Message) (bool, error) {
+		fmt.Printf("consumed message size: %v, headers: %v\n", len(msg.Payload()), msg.Properties())
+		return false, nil
 	})
 	if err != nil {
 		log.Fatal(err)
@@ -226,17 +240,17 @@ func testListenPrevCheckHandle(t *testing.T, checkCase testListenCheckCase) {
 	assert.Nil(t, err)
 	assert.Equal(t, 1, stats.MsgOutCounter)
 	assert.Equal(t, stats.MsgOutCounter, stats.MsgInCounter)
-	// check rerouted stats
-	if routedTopic != "" {
+	// check transferred stats
+	if decidedTopic != "" {
 		// wait for decide the message
 		time.Sleep(100 * time.Millisecond)
-		stats, err = manager.Stats(routedTopic)
+		stats, err = manager.Stats(decidedTopic)
 		assert.Nil(t, err)
 		assert.Equal(t, 1, stats.MsgInCounter)
-		assert.Equal(t, checkCase.expectedRoutedOutCount, stats.MsgOutCounter)
-		if checkCase.checkpoint.CheckType == checker.CheckTypePrevPending ||
-			checkCase.checkpoint.CheckType == checker.CheckTypePrevBlocking ||
-			checkCase.checkpoint.CheckType == checker.CheckTypePrevRetrying {
+		assert.Equal(t, checkCase.expectedTransferdOutCount, stats.MsgOutCounter)
+		if checkCase.checkpoint.CheckType == checker.CheckTypePostPending ||
+			checkCase.checkpoint.CheckType == checker.CheckTypePostBlocking ||
+			checkCase.checkpoint.CheckType == checker.CheckTypePostRetrying {
 			for _, v := range stats.Subscriptions {
 				assert.Equal(t, 1, v.MsgBacklog)
 				break
@@ -247,21 +261,24 @@ func testListenPrevCheckHandle(t *testing.T, checkCase testListenCheckCase) {
 	cancel()
 }
 
-func TestListenCheck_Prev_All(t *testing.T) {
-	upgradeLevel := topiclevel.L2
-	degradeLevel := topiclevel.B2
-	topic := internal.GenerateTestTopic()
-	reroutedTopic := topic + "-S1"
+func TestListenCheck_Post_All(t *testing.T) {
+	upgradeLevel := message.L2
+	degradeLevel := message.B2
+	shiftLevel := message.S1
+	groundTopic := internal.GenerateTestTopic(internal.PrefixTestListen)
+	statusTopicPrefix := internal.FormatStatusTopic(groundTopic, internal.TestSubscriptionName(), "", "")
+	transferredTopic := groundTopic + "-S2"
 	decidedTopics := []string{
-		"",                                       // done
-		"",                                       // discard
-		topic + message.StatusDead.TopicSuffix(), // dead
-		topic + message.StatusPending.TopicSuffix(),  // pending
-		topic + message.StatusBlocking.TopicSuffix(), // blocking
-		topic + message.StatusRetrying.TopicSuffix(), // retrying
-		topic + upgradeLevel.TopicSuffix(),           // degrade
-		topic + degradeLevel.TopicSuffix(),           // upgrade
-		reroutedTopic,                                // reroute
+		"", // done
+		"", // discard
+		statusTopicPrefix + message.StatusDead.TopicSuffix(),     // dead
+		statusTopicPrefix + message.StatusPending.TopicSuffix(),  // pending
+		statusTopicPrefix + message.StatusBlocking.TopicSuffix(), // blocking
+		statusTopicPrefix + message.StatusRetrying.TopicSuffix(), // retrying
+		groundTopic + upgradeLevel.TopicSuffix(),                 // degrade
+		groundTopic + degradeLevel.TopicSuffix(),                 // upgrade
+		groundTopic + shiftLevel.TopicSuffix(),                   // shift
+		transferredTopic,                                         // transfer
 	}
 	midConsumedTopics := []string{
 		decidedTopics[3],
@@ -269,15 +286,15 @@ func TestListenCheck_Prev_All(t *testing.T) {
 		decidedTopics[5],
 	}
 	manager := admin.NewAdminManager(internal.DefaultPulsarHttpUrl)
-	// clean up topic
-	internal.CleanUpTopic(t, manager, topic)
+	// clean up groundTopic
+	internal.CleanUpTopic(t, manager, groundTopic)
 	for _, decidedTopic := range decidedTopics {
 		if decidedTopic != "" {
 			internal.CleanUpTopic(t, manager, decidedTopic)
 		}
 	}
 	defer func() {
-		internal.CleanUpTopic(t, manager, topic)
+		internal.CleanUpTopic(t, manager, groundTopic)
 		for _, decidedTopic := range decidedTopics {
 			if decidedTopic != "" {
 				internal.CleanUpTopic(t, manager, decidedTopic)
@@ -289,7 +306,7 @@ func TestListenCheck_Prev_All(t *testing.T) {
 	defer client.Close()
 	// create producer
 	producer, err := client.CreateProducer(config.ProducerConfig{
-		Topic: topic,
+		Topic: groundTopic,
 	})
 	if err != nil {
 		log.Fatal(err)
@@ -303,73 +320,91 @@ func TestListenCheck_Prev_All(t *testing.T) {
 		fmt.Println("sent message: ", mid)
 	}
 	// check send stats
-	stats, err := manager.Stats(topic)
+	stats, err := manager.Stats(groundTopic)
 	assert.Nil(t, err)
 	assert.Equal(t, len(decidedTopics), stats.MsgInCounter)
 	assert.Equal(t, 0, stats.MsgOutCounter)
 
 	// ---------------
 
+	testPolicy := &config.StatusPolicy{
+		BackoffDelays:  []string{"1s"},
+		ReentrantDelay: 1,
+	}
+	leveledPolicy := &config.LevelPolicy{
+		DiscardEnable:  true,
+		DeadEnable:     true,
+		PendingEnable:  true,
+		Pending:        testPolicy,
+		BlockingEnable: true,
+		Blocking:       testPolicy,
+		RetryingEnable: true,
+		Retrying:       testPolicy,
+		UpgradeEnable:  true,
+		Upgrade:        &config.ShiftPolicy{Level: upgradeLevel, ConnectInSyncEnable: true},
+		DegradeEnable:  true,
+		Degrade:        &config.ShiftPolicy{Level: degradeLevel, ConnectInSyncEnable: true},
+		ShiftEnable:    true,
+		Shift:          &config.ShiftPolicy{Level: shiftLevel, ConnectInSyncEnable: true},
+		TransferEnable: true,
+		Transfer:       &config.TransferPolicy{ConnectInSyncEnable: true},
+	}
 	// create listener
 	listener, err := client.CreateListener(config.ConsumerConfig{
-		Topic:                       topic,
-		SubscriptionName:            internal.GenerateSubscribeNameByTopic(topic),
+		Topic:                       groundTopic,
+		SubscriptionName:            internal.TestSubscriptionName(),
 		SubscriptionInitialPosition: pulsar.SubscriptionPositionEarliest,
-		DiscardEnable:               true,
-		DeadEnable:                  true,
-		PendingEnable:               true,
-		BlockingEnable:              true,
-		RetryingEnable:              true,
-		UpgradeEnable:               true,
-		DegradeEnable:               true,
-		RerouteEnable:               true,
-		UpgradeTopicLevel:           upgradeLevel,
-		DegradeTopicLevel:           degradeLevel,
-		Reroute: &config.ReroutePolicy{
-			ConnectInSyncEnable: true},
-	}, checker.PrevHandleDiscard(func(msg pulsar.Message) checker.CheckStatus {
+		LevelPolicy:                 leveledPolicy,
+	}, checker.PostHandleDiscard(func(ctx context.Context, msg message.Message, err error) checker.CheckStatus {
 		if index, ok := msg.Properties()["Index"]; ok && index == "1" {
 			return checker.CheckStatusPassed
 		}
 		return checker.CheckStatusRejected
-	}), checker.PrevHandleDead(func(msg pulsar.Message) checker.CheckStatus {
+	}), checker.PostHandleDead(func(ctx context.Context, msg message.Message, err error) checker.CheckStatus {
 		if index, ok := msg.Properties()["Index"]; ok && index == "2" {
 			return checker.CheckStatusPassed
 		}
 		return checker.CheckStatusRejected
-	}), checker.PrevHandlePending(func(msg pulsar.Message) checker.CheckStatus {
+	}), checker.PostHandlePending(func(ctx context.Context, msg message.Message, err error) checker.CheckStatus {
 		if index, ok := msg.Properties()["Index"]; ok && index == "3" {
 			return checker.CheckStatusPassed
 		}
 		return checker.CheckStatusRejected
-	}), checker.PrevHandleBlocking(func(msg pulsar.Message) checker.CheckStatus {
+	}), checker.PostHandleBlocking(func(ctx context.Context, msg message.Message, err error) checker.CheckStatus {
 		if index, ok := msg.Properties()["Index"]; ok && index == "4" {
 			return checker.CheckStatusPassed
 		}
 		return checker.CheckStatusRejected
-	}), checker.PrevHandleRetrying(func(msg pulsar.Message) checker.CheckStatus {
+	}), checker.PostHandleRetrying(func(ctx context.Context, msg message.Message, err error) checker.CheckStatus {
 		if index, ok := msg.Properties()["Index"]; ok && index == "5" {
 			return checker.CheckStatusPassed
 		}
 		return checker.CheckStatusRejected
-	}), checker.PrevHandleUpgrade(func(msg pulsar.Message) checker.CheckStatus {
+	}), checker.PostHandleUpgrade(func(ctx context.Context, msg message.Message, err error) checker.CheckStatus {
 		if index, ok := msg.Properties()["Index"]; ok && index == "6" {
-			if statusMsg, ok := msg.(soften.StatusMessage); ok && statusMsg.Status() == message.StatusReady {
+			if msg.Status() == message.StatusReady {
 				return checker.CheckStatusPassed
 			}
 		}
 		return checker.CheckStatusRejected
-	}), checker.PrevHandleDegrade(func(msg pulsar.Message) checker.CheckStatus {
+	}), checker.PostHandleDegrade(func(ctx context.Context, msg message.Message, err error) checker.CheckStatus {
 		if index, ok := msg.Properties()["Index"]; ok && index == "7" {
-			if statusMsg, ok := msg.(soften.StatusMessage); ok && statusMsg.Status() == message.StatusReady {
+			if msg.Status() == message.StatusReady {
 				return checker.CheckStatusPassed
 			}
 		}
 		return checker.CheckStatusRejected
-	}), checker.PrevHandleReroute(func(msg pulsar.Message) checker.CheckStatus {
+	}), checker.PostHandleShift(func(ctx context.Context, msg message.Message, err error) checker.CheckStatus {
 		if index, ok := msg.Properties()["Index"]; ok && index == "8" {
-			if statusMsg, ok := msg.(soften.StatusMessage); ok && statusMsg.Status() == message.StatusReady {
-				return checker.CheckStatusPassed.WithRerouteTopic(reroutedTopic)
+			if msg.Status() == message.StatusReady {
+				return checker.CheckStatusPassed
+			}
+		}
+		return checker.CheckStatusRejected
+	}), checker.PostHandleTransfer(func(ctx context.Context, msg message.Message, err error) checker.CheckStatus {
+		if index, ok := msg.Properties()["Index"]; ok && index == "9" {
+			if msg.Status() == message.StatusReady {
+				return checker.CheckStatusPassed.WithGotoExtra(decider.GotoExtra{Topic: transferredTopic})
 			}
 		}
 		return checker.CheckStatusRejected
@@ -380,8 +415,11 @@ func TestListenCheck_Prev_All(t *testing.T) {
 	defer listener.Close()
 	// listener starts
 	ctx, cancel := context.WithCancel(context.Background())
-	err = listener.Start(ctx, func(message pulsar.Message) (bool, error) {
-		fmt.Printf("consumed message size: %v, headers: %v\n", len(message.Payload()), message.Properties())
+	err = listener.Start(ctx, func(ctx context.Context, msg message.Message) (bool, error) {
+		fmt.Printf("consumed message size: %v, headers: %v\n", len(msg.Payload()), msg.Properties())
+		if index, ok := msg.Properties()["Index"]; ok && index != "0" {
+			return false, nil
+		}
 		return true, nil
 	})
 	if err != nil {
@@ -390,7 +428,7 @@ func TestListenCheck_Prev_All(t *testing.T) {
 	// wait for consuming the message and wait for decide the message
 	time.Sleep(500 * time.Millisecond)
 	// check stats
-	stats, err = manager.Stats(topic)
+	stats, err = manager.Stats(groundTopic)
 	assert.Nil(t, err)
 	assert.Equal(t, len(decidedTopics), stats.MsgOutCounter)
 	assert.Equal(t, stats.MsgOutCounter, stats.MsgInCounter)
@@ -400,8 +438,8 @@ func TestListenCheck_Prev_All(t *testing.T) {
 			continue
 		}
 		stats, err = manager.Stats(decidedTopic)
-		assert.Nil(t, err, "decided topic: ", decidedTopic)
-		assert.Equal(t, 1, stats.MsgInCounter, "decided topic: ", decidedTopic)
+		assert.Nil(t, err, "decided groundTopic: ", decidedTopic)
+		assert.Equal(t, 1, stats.MsgInCounter, "decided groundTopic: ", decidedTopic)
 		isMidConsumeTopic := false
 		for _, midConsumedTopic := range midConsumedTopics {
 			if decidedTopic == midConsumedTopic {
@@ -412,7 +450,7 @@ func TestListenCheck_Prev_All(t *testing.T) {
 		if isMidConsumeTopic {
 			assert.Equal(t, 1, stats.MsgOutCounter)
 			for _, v := range stats.Subscriptions {
-				assert.Equal(t, 1, v.MsgBacklog, "decided topic: ", decidedTopic)
+				assert.Equal(t, 1, v.MsgBacklog, "decided groundTopic: ", decidedTopic)
 				break
 			}
 		} else {

@@ -9,6 +9,7 @@ import (
 	"github.com/apache/pulsar-client-go/pulsar"
 	"github.com/shenqianjin/soften-client-go/soften"
 	"github.com/shenqianjin/soften-client-go/soften/config"
+	"github.com/shenqianjin/soften-client-go/soften/message"
 )
 
 func main() {
@@ -29,7 +30,7 @@ func main() {
 	}
 	defer listener.Close()
 
-	messageHandle := func(msg pulsar.Message) (bool, error) {
+	messageHandle := func(ctx context.Context, msg message.Message) (bool, error) {
 		fmt.Printf("Received message  msgId: %v -- content: '%s'\n", msg.ID(), string(msg.Payload()))
 		return true, nil
 	}

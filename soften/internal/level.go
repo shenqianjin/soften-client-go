@@ -20,10 +20,18 @@ func (lvl TopicLevel) String() string {
 }
 
 // OrderOf calculate order of the TopicLevel.
-// Prefixes L and S should be positive integer, B, DLQ should be negative integer.
+// Prefixes L and S define as positive integer values, Prefixes B and DLQ defines negative integer values.
+//
 // order = base + factor * suffix-no.
-// base constants are L: 0, S: 100, B: 0, DLQ: -100
-// factor constants are is L: 1, S: 1, B: -1; DLQ: -1
+// base constants are -> L: 0, S: 100, B: 0, DLQ: -100
+// factor constants are -> L: 1, S: 1, B: -1; DLQ: -1
+//
+// Examples:
+// S1 ~ Sn     <=> 101 ~ 100+n
+// L1 ~ Ln     <=> 1 ~ n
+// B1 ~ Bn     <=> -1 ~ -n
+// DLQ         <=> -100
+// DLQ1 ~ DLQn <=> -101 ~ -(100+n)
 func (lvl TopicLevel) OrderOf() int {
 	if lvl == DefaultDeadTopicLevelDLQ {
 		return -100
@@ -54,6 +62,9 @@ func (lvl TopicLevel) OrderOf() int {
 }
 
 func (lvl TopicLevel) TopicSuffix() string {
+	if lvl == "" {
+		panic("invalid blank topic level")
+	}
 	if lvl == DefaultGroundTopicLevelL1 {
 		return ""
 	} else {

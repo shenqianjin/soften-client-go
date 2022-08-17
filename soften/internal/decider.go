@@ -2,8 +2,8 @@ package internal
 
 // ------ handle goto ------
 
-type HandleGoto string
+type DecideGoto string
 
-func (e HandleGoto) String() string {
+func (e DecideGoto) String() string {
 	return string(e)
 }
