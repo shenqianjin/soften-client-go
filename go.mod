@@ -4,7 +4,6 @@ go 1.17
 
 require (
 	github.com/apache/pulsar-client-go v0.8.1
-	github.com/beefsack/go-rate v0.0.0-20220214233405-116f4ca011a0
 	github.com/bmizerany/perks v0.0.0-20141205001514-d9a9656a3a4b
 	github.com/panjf2000/ants/v2 v2.5.0
 	github.com/pkg/errors v0.9.1
@@ -58,4 +57,4 @@ require (
 	gopkg.in/yaml.v3 v3.0.0-20210107192922-496545a6307b // indirect
 )
 
-replace github.com/apache/pulsar-client-go v0.8.1 => github.com/shenqianjin/pulsar-client-go v0.8.2-0.20220527085409-bd7025011b20
+replace github.com/apache/pulsar-client-go v0.8.1 => github.com/shenqianjin/pulsar-client-go v0.8.2-0.20220817101440-58496f79735a
