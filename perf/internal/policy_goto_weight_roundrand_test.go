@@ -6,12 +6,11 @@ import (
 	"testing"
 
 	"github.com/shenqianjin/soften-client-go/soften/handler"
-
 	"github.com/stretchr/testify/assert"
 )
 
 func TestRoundRandWeightGotoPolicy(t *testing.T) {
-	weightMap := make(map[string]uint)
+	weightMap := make(map[string]uint64)
 	weightMap[string(handler.GotoDone)] = 19
 	weightMap[string(handler.GotoRetrying)] = 5
 	weightMap[string(handler.GotoPending)] = 5

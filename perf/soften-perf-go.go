@@ -6,7 +6,6 @@ import (
 	"os"
 
 	"github.com/shenqianjin/soften-client-go/soften/log"
-
 	"github.com/sirupsen/logrus"
 )
 
