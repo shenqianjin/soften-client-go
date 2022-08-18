@@ -6,9 +6,9 @@ import (
 
 // ------ check func (for consumer handle message) ------
 
-type PrevHandleCheckFunc func(pulsar.Message) CheckStatus
+type PrevHandleCheckFunc func(msg pulsar.Message) CheckStatus
 
-type PostHandleCheckFunc func(pulsar.Message, error) CheckStatus
+type PostHandleCheckFunc func(msg pulsar.Message, err error) CheckStatus
 
 // ------ intercept func (for producer send message) ------
 
