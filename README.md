@@ -16,7 +16,7 @@ of async business messages, especially a same business shared by hundreds of bil
 #### Installation
 Download the library of Go client to local environment:
 ```go
-go get -u "github.com/qiniu/soften-client-go"
+go get -u "github.com/shenqianjin/soften-client-go"
 ```
 #### Create Client
 In order to interact with Pulsar, you'll first need a Client object. You can create a client object using the NewClient
