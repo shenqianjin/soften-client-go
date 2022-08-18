@@ -47,28 +47,18 @@ type ProducerConfig struct {
 	BatchingMaxSize           uint  `json:"batching_max_size"`
 	BatcherBuilderType        int   `json:"batcher_builder_type"`
 
-	MessageRouter func(*pulsar.ProducerMessage, pulsar.TopicMetadata) int
-
-	RouteEnable       bool         // Optional: 自定义路由开关
-	Route             *RoutePolicy //
-	HandleTimeout     uint         `json:"handle_timeout"` // Optional: 发送消息超时时间 (default: 30 seconds)
-	UpgradeEnable     bool
-	DegradeEnable     bool
+	HandleTimeout     uint                `json:"handle_timeout"` // Optional: 发送消息超时时间 (default: 30 seconds)
+	DeadEnable        bool                `json:"dead_enable"`
+	DiscardEnable     bool                `json:"discard_enable"`
+	BlockingEnable    bool                `json:"blocking_enable"`
+	PendingEnable     bool                `json:"pending_enable"`
+	RetryingEnable    bool                `json:"retrying_enable"`
+	RouteEnable       bool                `json:"route_enable"` // Optional: 自定义路由开关
+	Route             *RoutePolicy        `json:"route"`        //
+	UpgradeEnable     bool                `json:"upgrade_enable"`
 	UpgradeTopicLevel internal.TopicLevel `json:"upgrade_topic_level"` // Optional: 主动升级队列级别
+	DegradeEnable     bool                `json:"degrade_enable"`
 	DegradeTopicLevel internal.TopicLevel `json:"degrade_topic_level"`
-
-	//TopicRouter        func(*pulsar.ProducerMessage) internal.TopicLevel // 自定义Topic路由器
-	//UidTopicRouters    map[uint32]internal.TopicLevel                    // Uid级别路由静态配置; 优先级低于Bucket级别路由;
-	//BucketTopicRouters map[string]internal.TopicLevel                    // Bucket级别路由静态配置; 优先级高于Uid级别路由;
-
-	DeadEnable     bool
-	DiscardEnable  bool
-	BlockingEnable bool
-	PendingEnable  bool
-	RetryingEnable bool
-	//RouteEnable    bool
-	//UpgradeEnable  bool
-	//DegradeEnable  bool
 }
 
 // ------ consumer configuration (multi-status) ------
@@ -108,9 +98,10 @@ type ConsumerConfig struct {
 	HandleTimeout               uint                               `json:"handle_timeout"`                // Optional: 处理消息超时时间 (default: 30 seconds)
 
 	// ------ consumer configuration (multi-level) ------
-	Levels               topic.Levels             // Required: 默认L1, 且消费的Topic Level级别, len(Topics) == 1 or Topic存在的时候才生效
-	LevelBalanceStrategy internal.BalanceStrategy // Optional: Topic级别消费策略
-	LevelPolicies        LevelPolicies            // Optional: 级别消费策略
+
+	Levels               topic.Levels             `json:"levels"`                 // Required: 默认L1, 且消费的Topic Level级别, len(Topics) == 1 or Topic存在的时候才生效
+	LevelBalanceStrategy internal.BalanceStrategy `json:"level_balance_strategy"` // Optional: Topic级别消费策略
+	LevelPolicies        LevelPolicies            `json:"level_policies"`         // Optional: 级别消费策略
 }
 
 type LevelPolicies map[internal.TopicLevel]*LevelPolicy
@@ -124,13 +115,13 @@ type LevelPolicies map[internal.TopicLevel]*LevelPolicy
 // (2) 借助于 Reentrant 进行补偿, 每次重入代表额外增加一个 ReentrantDelay 延迟;
 // (3) 如果 补偿延迟 - ReentrantDelay 仍然大于 NackBackoffMaxDelay, 那么会发生多次重入。
 type StatusPolicy struct {
-	ConsumeWeight     uint                // 消费权重
-	ConsumeMaxTimes   int                 // 最大消费次数
-	BackoffDelays     []string            // 补偿延迟 e.g: [5s, 2m, 1h], 如果值大于 ReentrantDelay 时，自动取整为 ReentrantDelay 的整数倍 (默认向下取整)
+	ConsumeWeight     uint                `json:"consume_weight"`    // 消费权重
+	ConsumeMaxTimes   int                 `json:"consume_max_times"` // 最大消费次数
+	BackoffDelays     []string            `json:"backoff_delays"`    // 补偿延迟 e.g: [5s, 2m, 1h], 如果值大于 ReentrantDelay 时，自动取整为 ReentrantDelay 的整数倍 (默认向下取整)
 	BackoffPolicy     StatusBackoffPolicy // 补偿策略, 优先级高于 BackoffDelays
-	ReentrantDelay    uint                // 重入 补偿延迟, 单状态固定时间
-	ReentrantMaxTimes int                 // 重入 补偿延迟最大次数
-	CheckerMandatory  bool                // Checker 存在性检查标识
+	ReentrantDelay    uint                `json:"reentrant_delay"`     // 重入 补偿延迟, 单状态固定时间
+	ReentrantMaxTimes int                 `json:"reentrant_max_times"` // 重入 补偿延迟最大次数
+	CheckerMandatory  bool                `json:"checker_mandatory"`   // Checker 存在性检查标识
 	//ConnectInSyncEnable bool                // Optional: 是否同步建立连接, 首次发送消息需阻塞等待客户端与服务端连接完成
 	//NackMaxDelay      int      // Nack 补偿策略最大延迟粒度
 	//NackMaxTimes      int      // Nack 补偿延迟最大次数
@@ -138,44 +129,41 @@ type StatusPolicy struct {
 }
 
 type LevelPolicy struct {
-	ConsumeWeight uint                // 消费权重
-	UpgradeLevel  internal.TopicLevel // 升级级别
-	DegradeLevel  internal.TopicLevel // 降级级别
+	ConsumeWeight uint                `json:"consume_weight"` // consume weight
+	UpgradeLevel  internal.TopicLevel `json:"upgrade_level"`  // upgrade level
+	DegradeLevel  internal.TopicLevel `json:"degrade_level"`  // degrade level
+
+	Ready    *StatusPolicy `json:"ready"`    // Optional: Ready status policy
+	Blocking *StatusPolicy `json:"blocking"` // Optional: Blocking status policy
+	Pending  *StatusPolicy `json:"pending"`  // Optional: Pending status policy
+	Retrying *StatusPolicy `json:"retrying"` // Optional: Retrying status policy
 }
 
 type RoutePolicy struct {
-	ConnectInSyncEnable bool // Optional: 是否同步建立连接, 首次发送消息需阻塞等待客户端与服务端连接完成
+	ConnectInSyncEnable bool `json:"connect_in_sync_enable"` // Optional: 是否同步建立连接, 首次发送消息需阻塞等待客户端与服务端连接完成
 }
 
 type ReroutePolicy struct {
-	ConnectInSyncEnable bool // Optional: 是否同步建立连接, 首次发送消息需阻塞等待客户端与服务端连接完成
+	ConnectInSyncEnable bool `json:"connect_in_sync_enable"` // Optional: 是否同步建立连接, 首次发送消息需阻塞等待客户端与服务端连接完成
 }
-
-/*type ReroutePolicy struct {
-	//ReRouteMode      ReRouteMode       // 重路由模式: local; config
-	UidPreRouters    map[uint32]string // Uid级别打散路由静态配置; 优先级低于Bucket级别路由;
-	UidParseFunc     func(message pulsar.Message) uint
-	BucketPreRouters map[string]string // Bucket级别打散路由静态配置; 优先级高于Uid级别路由;
-	BucketParseFunc  func(message pulsar.Message) string
-}*/
 
 // DLQPolicy represents the configuration for the Dead Letter Queue multiStatusConsumeFacade policy.
 type DLQPolicy struct {
 	// MaxDeliveries specifies the maximum number of times that a message will be delivered before being
 	// sent to the dead letter queue.
-	MaxDeliveries uint32
+	MaxDeliveries uint32 `json:"max_deliveries"`
 
 	// DeadLetterTopic specifies the name of the topic where the failing messages will be sent.
-	DeadLetterTopic string
+	DeadLetterTopic string `json:"dead_letter_topic"`
 
 	// RetryLetterTopic specifies the name of the topic where the retry messages will be sent.
-	RetryLetterTopic string
+	RetryLetterTopic string `json:"retry_letter_topic"`
 }
 
 type ConcurrencyPolicy struct {
-	CorePoolSize    uint // Optional: default 1
-	MaximumPoolSize uint // Optional: default 1
-	KeepAliveTime   uint // Optional: default 1 min
+	CorePoolSize    uint `json:"core_pool_size"`    // Optional: default 1
+	MaximumPoolSize uint `json:"maximum_pool_size"` // Optional: default 1
+	KeepAliveTime   uint `json:"keep_alive_time"`   // Optional: default 1 min
 
 	PanicHandler func(interface{}) // Optional, handle panics comes from executing message handler
 }
