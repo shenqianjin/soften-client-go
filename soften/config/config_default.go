@@ -42,7 +42,6 @@ var (
 		BackoffPolicy:     nil,
 		ReentrantDelay:    0, // 不需要
 		ReentrantMaxTimes: 0, // 不需要
-		CheckerMandatory:  false,
 	}
 
 	// defaultStatusPolicyRetrying 默认pending状态的校验策略。CheckToTopic default ${TOPIC}_PENDING, 固定后缀，不允许定制;
@@ -56,7 +55,6 @@ var (
 		BackoffPolicy:     nil,
 		ReentrantDelay:    120,
 		ReentrantMaxTimes: 15,
-		CheckerMandatory:  false,
 	}
 
 	// defaultStatusPolicyPending 同 defaultStatusPolicyRetrying。
@@ -67,7 +65,6 @@ var (
 		BackoffPolicy:     nil,
 		ReentrantDelay:    20,
 		ReentrantMaxTimes: 150,
-		CheckerMandatory:  false,
 	}
 
 	// defaultStatusPolicyBlocking 默认pending状态的校验策略。CheckToTopic default ${TOPIC}_PENDING, 固定后缀，不允许定制;
@@ -81,7 +78,6 @@ var (
 		BackoffPolicy:     nil,
 		ReentrantDelay:    1800,
 		ReentrantMaxTimes: 12,
-		CheckerMandatory:  false,
 	}
 )
 

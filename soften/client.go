@@ -4,10 +4,9 @@ import (
 	"errors"
 	"time"
 
-	"github.com/shenqianjin/soften-client-go/soften/checker"
-
 	"github.com/apache/pulsar-client-go/pulsar"
 	"github.com/apache/pulsar-client-go/pulsar/log"
+	"github.com/shenqianjin/soften-client-go/soften/checker"
 	"github.com/shenqianjin/soften-client-go/soften/config"
 	"github.com/shenqianjin/soften-client-go/soften/internal"
 )
@@ -16,7 +15,7 @@ type Client interface {
 	RawClient() pulsar.Client
 	CreateProducer(conf config.ProducerConfig, checkpoints ...checker.ProduceCheckpoint) (*producer, error)
 	CreateListener(conf config.ConsumerConfig, checkpoints ...checker.ConsumeCheckpoint) (*consumeListener, error)
-	Close() // close the Client and free associated resources
+	Close() // close the Client and free correlative resources
 }
 
 type client struct {

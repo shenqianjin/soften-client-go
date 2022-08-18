@@ -1,6 +1,6 @@
 package checker
 
-// ------ check type ------
+// ------ check type definition ------
 
 type CheckType string
 
@@ -8,7 +8,7 @@ func (e *CheckType) String() string {
 	return string(*e)
 }
 
-// ------ produce check type ------
+// ------ produce check type enums ------
 
 const (
 	ProduceCheckTypeDiscard  = CheckType("Discard")
@@ -28,7 +28,7 @@ func DefaultPrevSendCheckOrders() []CheckType {
 	return values
 }
 
-// ------ consume check type ------
+// ------ consume check type enums ------
 
 const (
 	CheckTypePrevDiscard  = CheckType("PrevDiscard")

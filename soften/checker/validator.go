@@ -53,22 +53,6 @@ func (v *validator) ValidateConsumeCheckpoint(checkpoints []ConsumeCheckpoint) (
 		}
 		checkpointMap[checkOpt.CheckType] = &checkpoints[index]
 	}
-	// 一致性校验
-	/*if conf.PendingEnable {
-		if conf.Pending.CheckerMandatory && v.findCheckpointByType(checkpointMap, CheckTypePrevPending, CheckTypePostPending) == nil {
-			return nil, errors.New(fmt.Sprintf("[%s] checkOption is missing. please add one or disable the mandatory if necessary", message.StatusPending))
-		}
-	}
-	if conf.BlockingEnable {
-		if conf.Pending.CheckerMandatory && v.findCheckpointByType(checkpointMap, CheckTypePrevBlocking, CheckTypePostBlocking) == nil {
-			return nil, errors.New(fmt.Sprintf("[%s] checkOption is missing. please add one or disable the mandatory if necessary", message.StatusBlocking))
-		}
-	}
-	if conf.RetryingEnable {
-		if conf.Pending.CheckerMandatory && v.findCheckpointByType(checkpointMap, CheckTypePrevRetrying, CheckTypePostRetrying) == nil {
-			return nil, errors.New(fmt.Sprintf("[%s] checkOption is missing. please add one or disable the mandatory if necessary", message.StatusRetrying))
-		}
-	}*/
 	return checkpointMap, nil
 }
 

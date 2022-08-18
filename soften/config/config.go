@@ -121,11 +121,8 @@ type StatusPolicy struct {
 	BackoffPolicy     StatusBackoffPolicy // 补偿策略, 优先级高于 BackoffDelays
 	ReentrantDelay    uint                `json:"reentrant_delay"`     // 重入 补偿延迟, 单状态固定时间
 	ReentrantMaxTimes int                 `json:"reentrant_max_times"` // 重入 补偿延迟最大次数
-	CheckerMandatory  bool                `json:"checker_mandatory"`   // Checker 存在性检查标识
-	//ConnectInSyncEnable bool                // Optional: 是否同步建立连接, 首次发送消息需阻塞等待客户端与服务端连接完成
 	//NackMaxDelay      int      // Nack 补偿策略最大延迟粒度
 	//NackMaxTimes      int      // Nack 补偿延迟最大次数
-	//BackoffPolicy     StatusBackoffPolicy // 补偿策略, 优先级高于 BackoffDelays
 }
 
 type LevelPolicy struct {

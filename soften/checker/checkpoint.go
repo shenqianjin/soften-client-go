@@ -1,6 +1,6 @@
 package checker
 
-// ------ consume checkpoint ------
+// ------ consume checkpoint type ------
 
 type ConsumeCheckpoint struct {
 	CheckType CheckType
@@ -8,14 +8,14 @@ type ConsumeCheckpoint struct {
 	Post      PostHandleCheckFunc
 }
 
-// ------ produce checkpoint ------
+// ------ produce checkpoint type ------
 
 type ProduceCheckpoint struct {
 	CheckType CheckType
 	CheckFunc PrevSendCheckFunc
 }
 
-// ------ consume checkpoint ------
+// ------ consume checkpoints ------
 
 func PrevHandleDiscard(checker PrevHandleCheckFunc) ConsumeCheckpoint {
 	return ConsumeCheckpoint{CheckType: CheckTypePrevDiscard, Prev: checker}
@@ -73,8 +73,6 @@ func PostHandleDegrade(checker PostHandleCheckFunc) ConsumeCheckpoint {
 	return ConsumeCheckpoint{CheckType: CheckTypePostDegrade, Post: checker}
 }
 
-// ------ reroute checkers ------
-
 func PrevHandleReroute(checker PrevHandleCheckFunc) ConsumeCheckpoint {
 	return ConsumeCheckpoint{CheckType: CheckTypePrevReroute, Prev: checker}
 }
@@ -83,7 +81,7 @@ func PostHandleReroute(checker PostHandleCheckFunc) ConsumeCheckpoint {
 	return ConsumeCheckpoint{CheckType: CheckTypePostReroute, Post: checker}
 }
 
-// ------ produce checkpoint ------
+// ------ produce checkpoints ------
 
 func PrevSendDiscard(checker PrevSendCheckFunc) ProduceCheckpoint {
 	return ProduceCheckpoint{CheckType: ProduceCheckTypeDiscard, CheckFunc: checker}
@@ -112,8 +110,6 @@ func PrevSendUpgrade(checker PrevSendCheckFunc) ProduceCheckpoint {
 func PrevSendDegrade(checker PrevSendCheckFunc) ProduceCheckpoint {
 	return ProduceCheckpoint{CheckType: ProduceCheckTypeDegrade, CheckFunc: checker}
 }
-
-// ------ route checker ------
 
 func PrevSendRoute(checker PrevSendCheckFunc) ProduceCheckpoint {
 	return ProduceCheckpoint{CheckType: ProduceCheckTypeRoute, CheckFunc: checker}
