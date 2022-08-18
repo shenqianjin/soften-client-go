@@ -112,8 +112,8 @@ listener as well. Learn more about consume checkpoints in [manual] and goto stat
 Here is an example of mixed consume checkpoints and goto actions to satisfy the following requirements:
 - previous handle checkpoint: schedule Junior users' messages to a low level topic - B1
 - post handle checkpoint: send these messages which is handled with "Bad Request" error to dead letter topic
-- goto decision: backoff these messages which is handled with "Internal Server Error" error to retrying topic, they will
-- be re-consumed in a few seconds (depended on your RetryingPolicy configuration)
+- goto decision: backoff these messages which is handled with "Internal Server Error" error to retrying topic,
+  they will be re-consumed in a few seconds (depended on your RetryingPolicy configuration)
 ```go
 listener, err := client.CreateListener(config.ConsumerConfig{
     Topic:                       "topic-1",
