@@ -5,7 +5,7 @@ of async business messages, especially a same business shared by hundreds of bil
 
 ### Goal
 - Isolate messages by statuses
-- Tune flexibility such status/level weights, consume-concurrency, status/leveled retries, etc.
+- Flexibly tune weights, concurrency, retries, etc.
 - Nurse equality for different users
 - Hierarchy on performance for different user group
 - Adaptively adjust rate or concurrency, weights, etc (TBD).
@@ -57,7 +57,7 @@ for i := 0; i < 10; i++ {
 Soften provides checkpoints as optional choices before you send messages to your messaging middleware. 
 Learn more about send checkpoints in [manual].
 
-The following show you a case of send checkpoints:
+Here is an example of send checkpoints to satisfy the following requirements:
 - schedule VIP users' messages to a high level topic
 - send Disable users' messages to dead letter topic
 ```go
@@ -109,7 +109,7 @@ you can also specify goto status directly as the return of your handle function 
 listener as well. Learn more about consume checkpoints in [manual] and goto status actions in [manual].
 
 
-Here is an example of mixed consume checkpoints and goto actions to implement the following:
+Here is an example of mixed consume checkpoints and goto actions to satisfy the following requirements:
 - previous handle checkpoint: schedule Junior users' messages to a low level topic - B1
 - post handle checkpoint: send these messages which is handled with "Bad Request" error to dead letter topic
 - goto decision: backoff these messages which is handled with "Internal Server Error" error to retrying topic, they will
