@@ -5,8 +5,9 @@ import (
 	"github.com/shenqianjin/soften-client-go/soften/checker"
 )
 
-// message consume stages: published -> received -> listened -> prev_checked -> handled -> post_checked -> decided
-
+// MetricsProvider is a helper to track metrics for topic/message in one of message lifecycle:
+// producer: prev check -> send / sendAsync
+// listener: receive -> listen -> prev check -> handle -> post check -> decide
 type MetricsProvider struct {
 	metricsLevel int
 
@@ -650,7 +651,7 @@ type ConsumerMetrics struct {
 type ConsumerHandleGotoMetrics struct {
 	*DecideGotoMetrics
 	HandleGoto             prometheus.Counter  // labels: topics, levels, topic, level, status, goto
-	HandleGotoLatency      prometheus.Observer // labels: topics, levels, topic, level, statu
+	HandleGotoLatency      prometheus.Observer // labels: topics, levels, topic, level, status
 	HandleGotoConsumeTimes prometheus.Observer
 }
 

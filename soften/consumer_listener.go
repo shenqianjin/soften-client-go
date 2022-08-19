@@ -18,8 +18,14 @@ import (
 )
 
 type Listener interface {
+	// Start starts to listen
 	Start(ctx context.Context, handler handler.HandleFunc) error
+
+	// StartPremium starts to listen in premium mode.
+	// Currently, handle func signature different with regular mode, it returns handler.HandleStatus
 	StartPremium(ctx context.Context, handler handler.PremiumHandleFunc) error
+
+	// Close the producer and releases resources allocated
 	Close()
 }
 

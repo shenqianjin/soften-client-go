@@ -3,10 +3,10 @@ package message
 import "github.com/shenqianjin/soften-client-go/soften/internal"
 
 const (
-	XPropertyOriginMessageID   = "X-ORIGIN-MESSAGE-ID"
-	XPropertyOriginTopic       = "X-ORIGIN-TOPIC"
-	XPropertyOriginPublishTime = "X-ORIGIN-PUBLISH-TIME"
-	//XPropertyOriginLevel       = "X-ORIGIN-LEVEL"
+	XPropertyOriginMessageID   = "X-ORIGIN-MESSAGE-ID"   // 源消息ID
+	XPropertyOriginTopic       = "X-ORIGIN-TOPIC"        // 源消息Topic
+	XPropertyOriginPublishTime = "X-ORIGIN-PUBLISH-TIME" // 消费发布时间
+	XPropertyOriginLevel       = "X-ORIGIN-LEVEL"        // 源消息级别
 
 	XPropertyPreviousMessageStatus         = "X-Previous-Status"                  // 前一次消息状态
 	XPropertyCurrentMessageStatus          = "X-Current-Status"                   // 当前消息的状态
@@ -27,16 +27,16 @@ const (
 	XPropertyDegradeTime  = "X-Degrade-Time"  // 降级时间
 	XPropertyDegradeTimes = "X-Degrade-Times" // 降级次数
 
-	XPropertyPendingReconsumeTimes  = "X-Pending-Reconsume-Times" // 状态消费次数
-	XPropertyPendingReentrantTimes  = "X-Pending-Reentrant-Times" // 状态重入次数
-	XPropertyBlockingReconsumeTimes = "X-Blocking-Reconsume-Times"
-	XPropertyBlockingReentrantTimes = "X-Blocking-Reentrant-Times"
-	XPropertyRetryingReconsumeTimes = "X-Retrying-Reconsume-Times"
-	XPropertyRetryingReentrantTimes = "X-Retrying-Reentrant-Times"
-	XPropertyReadyReconsumeTimes    = "X-Ready-Reconsume-Times"
-	XPropertyReadyReentrantTimes    = "X-Ready-Reentrant-Times"
-	XPropertyDeadReconsumeTimes     = "X-Dead-Reconsume-Times"
-	XPropertyDeadReentrantTimes     = "X-Dead-Reentrant-Times"
+	XPropertyPendingReconsumeTimes  = "X-Pending-Reconsume-Times"  // Pending 状态消费次数
+	XPropertyPendingReentrantTimes  = "X-Pending-Reentrant-Times"  // Pending 状态重入次数
+	XPropertyBlockingReconsumeTimes = "X-Blocking-Reconsume-Times" // Blocking 状态消费次数
+	XPropertyBlockingReentrantTimes = "X-Blocking-Reentrant-Times" // Blocking 状态重入次数
+	XPropertyRetryingReconsumeTimes = "X-Retrying-Reconsume-Times" // Retrying 状态消费次数
+	XPropertyRetryingReentrantTimes = "X-Retrying-Reentrant-Times" // Retrying 状态重入次数
+	XPropertyReadyReconsumeTimes    = "X-Ready-Reconsume-Times"    // Ready 状态消费次数
+	XPropertyReadyReentrantTimes    = "X-Ready-Reentrant-Times"    // Ready 状态重入次数
+	XPropertyDeadReconsumeTimes     = "X-Dead-Reconsume-Times"     // Dead 状态消费次数
+	XPropertyDeadReentrantTimes     = "X-Dead-Reentrant-Times"     // Dead 状态重入次数
 )
 
 func XPropertyConsumeTimes(status internal.MessageStatus) (string, bool) {

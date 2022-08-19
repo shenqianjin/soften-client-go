@@ -2,10 +2,10 @@ package soften
 
 import (
 	"errors"
-	"github.com/shenqianjin/soften-client-go/soften/checker"
 
 	"github.com/apache/pulsar-client-go/pulsar"
 	"github.com/apache/pulsar-client-go/pulsar/log"
+	"github.com/shenqianjin/soften-client-go/soften/checker"
 	"github.com/shenqianjin/soften-client-go/soften/internal"
 	"github.com/shenqianjin/soften-client-go/soften/message"
 )
@@ -18,9 +18,9 @@ type gradeOptions struct {
 }
 
 type gradeDecider struct {
-	router *reRouter
-	logger log.Logger
-	//level   internal.TopicLevel
+	router  *reRouter
+	logger  log.Logger
+	options gradeOptions
 	metrics *internal.ListenerDecideGotoMetrics
 }
 
@@ -38,7 +38,7 @@ func newGradeDecider(client *client, listener *consumeListener, options gradeOpt
 		return nil, err
 	}
 	metrics := client.metricsProvider.GetListenerLeveledDecideGotoMetrics(listener.logTopics, listener.logLevels, options.level, options.msgGoto)
-	hd := &gradeDecider{router: rt, logger: client.logger, metrics: metrics}
+	hd := &gradeDecider{router: rt, logger: client.logger, options: options, metrics: metrics}
 	metrics.DecidersOpened.Inc()
 	return hd, nil
 }

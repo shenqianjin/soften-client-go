@@ -9,12 +9,11 @@ import (
 	"testing"
 	"time"
 
-	"github.com/shenqianjin/soften-client-go/soften/admin"
-	"github.com/stretchr/testify/assert"
-
 	"github.com/apache/pulsar-client-go/pulsar"
 	"github.com/shenqianjin/soften-client-go/soften"
+	"github.com/shenqianjin/soften-client-go/soften/admin"
 	"github.com/shenqianjin/soften-client-go/soften/config"
+	"github.com/stretchr/testify/assert"
 )
 
 var (

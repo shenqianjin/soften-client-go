@@ -4,13 +4,11 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/shenqianjin/soften-client-go/soften/checker"
-
-	"github.com/shenqianjin/soften-client-go/soften/config"
-	"github.com/shenqianjin/soften-client-go/soften/message"
-
 	"github.com/apache/pulsar-client-go/pulsar"
+	"github.com/shenqianjin/soften-client-go/soften/checker"
+	"github.com/shenqianjin/soften-client-go/soften/config"
 	"github.com/shenqianjin/soften-client-go/soften/internal"
+	"github.com/shenqianjin/soften-client-go/soften/message"
 )
 
 type statusDeciderOptions struct {
@@ -19,8 +17,6 @@ type statusDeciderOptions struct {
 	msgGoto    internal.HandleGoto    // MessageStatus
 	deaDecider internalDecider        //
 	level      internal.TopicLevel
-	//levels      []TopicLevel    //
-	//enable      bool                   // 内部判断使用
 }
 
 type statusDecider struct {
@@ -71,7 +67,6 @@ func (hd *statusDecider) Decide(msg pulsar.ConsumerMessage, cheStatus checker.Ch
 	for k, v := range msg.Properties() {
 		props[k] = v
 	}
-	//fmt.Println("----", props)
 	if currentStatus != hd.options.status {
 		// first time to happen status switch
 		previousMessageStatus := message.Parser.GetPreviousStatus(msg)
@@ -100,7 +95,6 @@ func (hd *statusDecider) Decide(msg pulsar.ConsumerMessage, cheStatus checker.Ch
 
 	props[message.XPropertyReconsumeTime] = now.Add(time.Duration(delay) * time.Second).UTC().Format(internal.RFC3339TimeInSecondPattern)
 	props[message.XPropertyReentrantTime] = now.Add(time.Duration(hd.policy.ReentrantDelay) * time.Second).UTC().Format(internal.RFC3339TimeInSecondPattern)
-	//logrus.Infof("-----now: %v, reconsumeTime: %v, reentrantTime: %v\n", now, props[message.XPropertyReconsumeTime], props[message.XPropertyReentrantTime])
 
 	if statusReconsumeTimesHeader, ok := message.XPropertyConsumeTimes(hd.options.status); ok {
 		statusReconsumeTimes += int(msg.RedeliveryCount() - reentrantStartRedeliveryCount) // the subtraction is the nack times in current status
@@ -117,18 +111,14 @@ func (hd *statusDecider) Decide(msg pulsar.ConsumerMessage, cheStatus checker.Ch
 		Properties:  props,
 		EventTime:   msg.EventTime(),
 	}
-	//log.Info("handle started .... %v", msg.PublishTime())
 	hd.router.Chan() <- &RerouteMessage{
 		consumerMsg: msg,
 		producerMsg: producerMsg,
 	}
-
-	//log.Info("handle ended .... %v", msg.PublishTime())
 	return true
 }
 
 func (hd *statusDecider) tryDeadInternal(msg pulsar.ConsumerMessage) bool {
-	//log.Info("dead started .... %v", msg.PublishTime())
 	if hd.options.deaDecider != nil {
 		return hd.options.deaDecider.Decide(msg, checker.CheckStatusPassed)
 	}
@@ -138,7 +128,6 @@ func (hd *statusDecider) tryDeadInternal(msg pulsar.ConsumerMessage) bool {
 		return true
 	}
 
-	//log.Info("dead finished .... %v", msg.PublishTime())
 	return false
 }
 

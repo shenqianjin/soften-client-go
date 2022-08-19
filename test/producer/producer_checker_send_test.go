@@ -199,7 +199,6 @@ func TestProduceCheck_All_BySend(t *testing.T) {
 	checkpoints := []checker.ProduceCheckpoint{
 		// 0 为 ready
 		checker.PrevSendDiscard(func(msg *pulsar.ProducerMessage) checker.CheckStatus {
-			fmt.Println("discard ..checking ..................")
 			if index, ok := msg.Properties["Index"]; ok && index == "1" {
 				return checker.CheckStatusPassed
 			}

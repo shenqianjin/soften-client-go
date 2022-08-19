@@ -173,9 +173,8 @@ func testListenHandleGoto(t *testing.T, handleCase testListenHandleCase) {
 		RetryingEnable:              handleCase.handleGoto == handler.GotoRetrying.String(),
 		UpgradeEnable:               handleCase.handleGoto == handler.GotoUpgrade.String(),
 		DegradeEnable:               handleCase.handleGoto == handler.GotoDegrade.String(),
-		//RerouteEnable:               handleCase.handleGoto == message.GotoReroute.String(),
-		UpgradeTopicLevel: upgradeLevel,
-		DegradeTopicLevel: degradeLevel,
+		UpgradeTopicLevel:           upgradeLevel,
+		DegradeTopicLevel:           degradeLevel,
 	})
 	if err != nil {
 		log.Fatal(err)
@@ -226,7 +225,6 @@ func TestListenHandle_All(t *testing.T) {
 	upgradeLevel := topiclevel.L2
 	degradeLevel := topiclevel.B2
 	topic := internal.GenerateTestTopic()
-	//reroutedTopic := topic + "-S1"
 	decidedTopics := []string{
 		"",                                       // done
 		"",                                       // discard

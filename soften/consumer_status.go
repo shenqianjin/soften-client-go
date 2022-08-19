@@ -11,6 +11,7 @@ import (
 	"github.com/shenqianjin/soften-client-go/soften/message"
 )
 
+// statusConsumer received messages from a specified status topic.
 // It referred to pulsar.Consumer.
 type statusConsumer struct {
 	pulsar.Consumer

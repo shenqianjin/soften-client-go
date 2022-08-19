@@ -2,11 +2,11 @@ package soften
 
 import (
 	"context"
-	"github.com/shenqianjin/soften-client-go/soften/checker"
-	"github.com/shenqianjin/soften-client-go/soften/handler"
 
 	"github.com/apache/pulsar-client-go/pulsar"
+	"github.com/shenqianjin/soften-client-go/soften/checker"
 	"github.com/shenqianjin/soften-client-go/soften/config"
+	"github.com/shenqianjin/soften-client-go/soften/handler"
 	"github.com/shenqianjin/soften-client-go/soften/internal"
 	"github.com/shenqianjin/soften-client-go/soften/message"
 )
@@ -195,13 +195,8 @@ type leveledConsumeDeciderOptions struct {
 }
 
 // newLeveledConsumeDeciders create handlers based on different levels.
-// the topics[0], xxxEnable, xxxStatusPolicy and (topics[0] + Upgrade/DegradeLevel) parameters is used in this construction.
 func newLeveledConsumeDeciders(client *client, listener *consumeListener, options leveledConsumeDeciderOptions, deadHandler internalDecider) (*leveledConsumeDeciders, error) {
-	deciders := &leveledConsumeDeciders{
-		//multiStatusConsumeFacade: multiStatusConsumeFacade,
-		//options:   options,
-		//logger:      multiStatusConsumeFacade.logger,
-	}
+	deciders := &leveledConsumeDeciders{}
 	if options.PendingEnable {
 		suffix := message.StatusPending.TopicSuffix()
 		hdOptions := statusDeciderOptions{status: message.StatusPending, msgGoto: handler.GotoPending,

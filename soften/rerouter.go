@@ -16,8 +16,6 @@ import (
 type reRouterOptions struct {
 	Topic               string
 	connectInSyncEnable bool
-	//connectMaxRetries   uint
-	//MaxDeliveries uint
 }
 
 type reRouter struct {
@@ -39,10 +37,6 @@ func newReRouter(logger log.Logger, client pulsar.Client, options reRouterOption
 		logger:  logger.SubLogger(log.Fields{"reroute-topic": options.Topic}),
 		readyCh: make(chan struct{}, 1),
 	}
-
-	/*if options.connectMaxRetries <= 0 {
-		return nil, errors.New("reRouterOptions.connectMaxRetries needs to be > 0")
-	}*/
 
 	if options.Topic == "" {
 		return nil, errors.New("reRouterOptions.Topic needs to be set to a valid topic name")
@@ -72,8 +66,6 @@ func (r *reRouter) run() {
 	for {
 		select {
 		case rm := <-r.messageCh:
-			//r.logger.Infof("reroute ********************************* %d", count)
-			//count++
 			r.logger.WithField("msgID", rm.consumerMsg.ID()).Debugf("Got message for topic: %s", r.option.Topic)
 
 			msgID := rm.consumerMsg.ID()

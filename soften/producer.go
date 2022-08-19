@@ -6,19 +6,22 @@ import (
 	"sync"
 	"time"
 
-	"github.com/pkg/errors"
-
-	"github.com/shenqianjin/soften-client-go/soften/checker"
-
 	"github.com/apache/pulsar-client-go/pulsar"
 	"github.com/apache/pulsar-client-go/pulsar/log"
+	"github.com/pkg/errors"
+	"github.com/shenqianjin/soften-client-go/soften/checker"
 	"github.com/shenqianjin/soften-client-go/soften/config"
 	"github.com/shenqianjin/soften-client-go/soften/internal"
 )
 
 type Producer interface {
+	// Send sends a message
 	Send(ctx context.Context, msg *pulsar.ProducerMessage) (pulsar.MessageID, error)
+
+	// SendAsync sends a message in asynchronous mode
 	SendAsync(ctx context.Context, msg *pulsar.ProducerMessage, callback func(pulsar.MessageID, *pulsar.ProducerMessage, error))
+
+	// Close the producer and releases resources allocated
 	Close()
 }
 
@@ -34,7 +37,7 @@ type producer struct {
 	checkers       map[checker.CheckType]*wrappedProduceCheckpoint
 	deciders       produceDeciders
 	metrics        *internal.ProducerMetrics
-	deciderMetrics sync.Map // map[internal.HandleGoto]*internal.DecideGotoMetrics
+	deciderMetrics sync.Map // it stores data like map[internal.HandleGoto]*internal.DecideGotoMetrics
 }
 
 func newProducer(client *client, conf *config.ProducerConfig, checkpoints map[checker.CheckType]*checker.ProduceCheckpoint) (*producer, error) {
@@ -137,7 +140,7 @@ func (p *producer) formatDecidersOptions(conf *config.ProducerConfig) produceDec
 	return options
 }
 
-// Send aim to send message synchronously
+// Send sends a message
 func (p *producer) Send(ctx context.Context, msg *pulsar.ProducerMessage) (pulsar.MessageID, error) {
 	// do checkers
 	for _, checkType := range checker.DefaultPrevSendCheckOrders() {
@@ -162,7 +165,7 @@ func (p *producer) Send(ctx context.Context, msg *pulsar.ProducerMessage) (pulsa
 	return msgId, err
 }
 
-// SendAsync send message asynchronously
+// SendAsync sends a message in asynchronous
 func (p *producer) SendAsync(ctx context.Context, msg *pulsar.ProducerMessage,
 	callback func(pulsar.MessageID, *pulsar.ProducerMessage, error)) {
 	start := time.Now()

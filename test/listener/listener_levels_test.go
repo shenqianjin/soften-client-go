@@ -117,10 +117,7 @@ func testListenByMultiLevels(t *testing.T, levels topic.Levels) {
 		Topic:                       testTopic,
 		SubscriptionName:            internal.GenerateSubscribeNameByTopic(testTopic),
 		SubscriptionInitialPosition: pulsar.SubscriptionPositionEarliest,
-		//RetryingEnable:              true, // enable retrying if matches
-		//PendingEnable:               true, // enable pending if matches
-		//BlockingEnable:              true, // enable blocking if matches
-		Levels: levels,
+		Levels:                      levels,
 	})
 	defer listener.Close()
 	// listener starts

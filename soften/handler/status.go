@@ -23,7 +23,7 @@ var (
 type handleStatus struct {
 	handleGoto internal.HandleGoto // 状态转移至新状态: 默认为空; 与当前状态一致时，参数无效。优先级比 checkTypes 高。
 	checkTypes []checker.CheckType // 事后检查类型列表: 默认 DefaultPostCheckTypesInTurn; 指定时，使用指定类型列表。优先级比 handleGoto 低。
-	err        error               // 后置校验器如果需要依赖处理错误，通过该参数传递。框架在处理的过程不会更新err内容，client自己在传递的过程有更新除外。
+	err        error               // 后置校验器如果需要依赖处理错误，通过该参数传递。框架层在处理的过程不会更新err内容。
 }
 
 func (h handleStatus) GetGoto() internal.HandleGoto {
