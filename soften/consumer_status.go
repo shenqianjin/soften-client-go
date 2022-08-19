@@ -11,6 +11,7 @@ import (
 	"github.com/shenqianjin/soften-client-go/soften/message"
 )
 
+// It referred to pulsar.Consumer.
 type statusConsumer struct {
 	pulsar.Consumer
 	logger          log.Logger

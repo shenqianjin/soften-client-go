@@ -29,10 +29,10 @@ func newRerouteDecider(client *client, listener *consumeListener, policy *config
 }
 
 func (d *rerouteDecider) Decide(msg pulsar.ConsumerMessage, cheStatus checker.CheckStatus) bool {
-	if !cheStatus.IsPassed() || cheStatus.GetRerouteTopic() == "" {
+	if !cheStatus.IsPassed() || cheStatus.GetRouteTopic() == "" {
 		return false
 	}
-	rtr, err := d.internalSafeGetReRouterInAsync(cheStatus.GetRerouteTopic())
+	rtr, err := d.internalSafeGetReRouterInAsync(cheStatus.GetRouteTopic())
 	if err != nil {
 		return false
 	}

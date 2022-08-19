@@ -22,5 +22,5 @@ type CheckStatus interface {
 
 	// extra for reroute checker
 
-	GetRerouteTopic() string
+	GetRouteTopic() string
 }

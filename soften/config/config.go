@@ -3,11 +3,10 @@ package config
 import (
 	"time"
 
-	"github.com/shenqianjin/soften-client-go/soften/topic"
-
 	"github.com/apache/pulsar-client-go/pulsar"
 	"github.com/apache/pulsar-client-go/pulsar/log"
 	"github.com/shenqianjin/soften-client-go/soften/internal"
+	"github.com/shenqianjin/soften-client-go/soften/topic"
 )
 
 // ------ library configuration ------
@@ -16,8 +15,8 @@ var DebugMode = false
 
 // ------ client configuration ------
 
+// ClientConfig define client configuration with json formatter. It referred to pulsar.ClientOptions
 type ClientConfig struct {
-	// extract out from pulsar.ClientOptions
 	URL                     string `json:"url"`
 	ConnectionTimeout       uint   `json:"connection_timeout"`         // Optional: default 5s
 	OperationTimeout        uint   `json:"operation_timeout"`          // Optional: default 30s
@@ -30,48 +29,48 @@ type ClientConfig struct {
 
 // ------ producer configuration ------
 
+// ProducerConfig define producer configuration with json formatter. It referred to pulsar.ProducerOptions
 type ProducerConfig struct {
-	// extract out from pulsar.ProducerOptions
-	Topic              string `json:"topic"` // Required:
-	Name               string `json:"name"`
-	SendTimeoutMs      int64  `json:"send_timeout_ms"`
-	SendTimeout        uint   `json:"send_timeout"` // time.Duration // Optional:
-	MaxPendingMessages int    `json:"max_pending_messages"`
-	HashingScheme      int    `json:"hashing_scheme"`
-	CompressionType    int    `json:"compression_type"`
-	CompressionLevel   int    `json:"compression_level"`
+	Topic              string `json:"topic"`                // Required:
+	Name               string `json:"name"`                 // Optional:
+	SendTimeoutMs      int64  `json:"send_timeout_ms"`      // Optional:
+	SendTimeout        uint   `json:"send_timeout"`         // Optional:
+	MaxPendingMessages int    `json:"max_pending_messages"` // Optional:
+	HashingScheme      int    `json:"hashing_scheme"`       // Optional:
+	CompressionType    int    `json:"compression_type"`     // Optional:
+	CompressionLevel   int    `json:"compression_level"`    // Optional:
 
-	DisableBatching           bool  `json:"disable_batching"`
-	BatchingMaxPublishDelayMs int64 `json:"batching_max_publish_delay_ms"`
-	BatchingMaxMessages       uint  `json:"batching_max_messages"`
-	BatchingMaxSize           uint  `json:"batching_max_size"`
-	BatcherBuilderType        int   `json:"batcher_builder_type"`
+	DisableBatching           bool  `json:"disable_batching"`              // Optional:
+	BatchingMaxPublishDelayMs int64 `json:"batching_max_publish_delay_ms"` // Optional:
+	BatchingMaxMessages       uint  `json:"batching_max_messages"`         // Optional:
+	BatchingMaxSize           uint  `json:"batching_max_size"`             // Optional:
+	BatcherBuilderType        int   `json:"batcher_builder_type"`          // Optional:
 
-	HandleTimeout     uint                `json:"handle_timeout"` // Optional: 发送消息超时时间 (default: 30 seconds)
-	DeadEnable        bool                `json:"dead_enable"`
-	DiscardEnable     bool                `json:"discard_enable"`
-	BlockingEnable    bool                `json:"blocking_enable"`
-	PendingEnable     bool                `json:"pending_enable"`
-	RetryingEnable    bool                `json:"retrying_enable"`
-	RouteEnable       bool                `json:"route_enable"` // Optional: 自定义路由开关
-	Route             *RoutePolicy        `json:"route"`        //
-	UpgradeEnable     bool                `json:"upgrade_enable"`
+	HandleTimeout     uint                `json:"handle_timeout"`      // Optional: 发送消息超时时间, Default: 30 seconds
+	DeadEnable        bool                `json:"dead_enable"`         // Optional:
+	DiscardEnable     bool                `json:"discard_enable"`      // Optional:
+	BlockingEnable    bool                `json:"blocking_enable"`     // Optional:
+	PendingEnable     bool                `json:"pending_enable"`      // Optional:
+	RetryingEnable    bool                `json:"retrying_enable"`     // Optional:
+	RouteEnable       bool                `json:"route_enable"`        // Optional: 自定义路由开关
+	Route             *RoutePolicy        `json:"route"`               // Optional:
+	UpgradeEnable     bool                `json:"upgrade_enable"`      // Optional:
 	UpgradeTopicLevel internal.TopicLevel `json:"upgrade_topic_level"` // Optional: 主动升级队列级别
-	DegradeEnable     bool                `json:"degrade_enable"`
-	DegradeTopicLevel internal.TopicLevel `json:"degrade_topic_level"`
+	DegradeEnable     bool                `json:"degrade_enable"`      // Optional:
+	DegradeTopicLevel internal.TopicLevel `json:"degrade_topic_level"` // Optional:
 }
 
 // ------ consumer configuration (multi-status) ------
 
+// ConsumerConfig define producer configuration with json formatter. It referred to pulsar.ConsumerOptions
 type ConsumerConfig struct {
-	// extract from pulsar.ConsumerOptions
 	Concurrency                 *ConcurrencyPolicy                 `json:"concurrency"`                   // Optional: 并发控制
 	Topics                      []string                           `json:"topics"`                        // Alternative with Topic: 如果有值, Topic 配置将被忽略; 第一个为核心主题
 	Topic                       string                             `json:"topic"`                         // Alternative with Topics: Topics缺失的情况下，该值生效
-	SubscriptionName            string                             `json:"subscription_name"`             //
+	SubscriptionName            string                             `json:"subscription_name"`             // Required:
 	Level                       internal.TopicLevel                `json:"level"`                         // Optional:
-	Type                        pulsar.SubscriptionType            `json:"type"`                          //
-	SubscriptionInitialPosition pulsar.SubscriptionInitialPosition `json:"subscription_initial_position"` //
+	Type                        pulsar.SubscriptionType            `json:"type"`                          // Optional:
+	SubscriptionInitialPosition pulsar.SubscriptionInitialPosition `json:"subscription_initial_position"` // Optional:
 	NackBackoffPolicy           pulsar.NackBackoffPolicy           `json:"-"`                             // Optional: Unrecommended, compatible with origin pulsar client
 	NackRedeliveryDelay         time.Duration                      `json:"nack_redelivery_delay"`         // Optional: Unrecommended, compatible with origin pulsar client
 	RetryEnable                 bool                               `json:"retry_enable"`                  // Optional: Unrecommended, compatible with origin pulsar client
@@ -115,20 +114,20 @@ type LevelPolicies map[internal.TopicLevel]*LevelPolicy
 // (2) 借助于 Reentrant 进行补偿, 每次重入代表额外增加一个 ReentrantDelay 延迟;
 // (3) 如果 补偿延迟 - ReentrantDelay 仍然大于 NackBackoffMaxDelay, 那么会发生多次重入。
 type StatusPolicy struct {
-	ConsumeWeight     uint                `json:"consume_weight"`    // 消费权重
-	ConsumeMaxTimes   int                 `json:"consume_max_times"` // 最大消费次数
-	BackoffDelays     []string            `json:"backoff_delays"`    // 补偿延迟 e.g: [5s, 2m, 1h], 如果值大于 ReentrantDelay 时，自动取整为 ReentrantDelay 的整数倍 (默认向下取整)
-	BackoffPolicy     StatusBackoffPolicy // 补偿策略, 优先级高于 BackoffDelays
-	ReentrantDelay    uint                `json:"reentrant_delay"`     // 重入 补偿延迟, 单状态固定时间
-	ReentrantMaxTimes int                 `json:"reentrant_max_times"` // 重入 补偿延迟最大次数
-	//NackMaxDelay      int      // Nack 补偿策略最大延迟粒度
-	//NackMaxTimes      int      // Nack 补偿延迟最大次数
+	ConsumeWeight     uint                `json:"consume_weight"`      // Optional: 消费权重
+	ConsumeMaxTimes   int                 `json:"consume_max_times"`   // Optional: 消费次数上限
+	BackoffDelays     []string            `json:"backoff_delays"`      // Optional: 补偿延迟策略 e.g: [5s, 2m, 1h], 如果值大于 ReentrantDelay 时，自动取整为 ReentrantDelay 的整数倍 (默认向下取整)
+	BackoffPolicy     StatusBackoffPolicy `json:"-"`                   // Optional: 补偿策略, 优先级高于 BackoffDelays
+	ReentrantDelay    uint                `json:"reentrant_delay"`     // Optional: 重入延迟
+	ReentrantMaxTimes int                 `json:"reentrant_max_times"` // Optional: 重入次数上限
+	NackMaxDelay      int                 `json:"nack_max_delay"`      // Optional: Nack延迟上限
+	NackMaxTimes      int                 `json:"nack_max_times"`      // Optional: Nack次数上限
 }
 
 type LevelPolicy struct {
-	ConsumeWeight uint                `json:"consume_weight"` // consume weight
-	UpgradeLevel  internal.TopicLevel `json:"upgrade_level"`  // upgrade level
-	DegradeLevel  internal.TopicLevel `json:"degrade_level"`  // degrade level
+	ConsumeWeight uint                `json:"consume_weight"` // Optional: consume weight
+	UpgradeLevel  internal.TopicLevel `json:"upgrade_level"`  // Optional: upgrade level
+	DegradeLevel  internal.TopicLevel `json:"degrade_level"`  // Optional: degrade level
 
 	Ready    *StatusPolicy `json:"ready"`    // Optional: Ready status policy
 	Blocking *StatusPolicy `json:"blocking"` // Optional: Blocking status policy
@@ -144,7 +143,7 @@ type ReroutePolicy struct {
 	ConnectInSyncEnable bool `json:"connect_in_sync_enable"` // Optional: 是否同步建立连接, 首次发送消息需阻塞等待客户端与服务端连接完成
 }
 
-// DLQPolicy represents the configuration for the Dead Letter Queue multiStatusConsumeFacade policy.
+// DLQPolicy represents the configuration for the Dead Letter Queue multiStatusConsumeFacade policy. It referred to pulsar.DLQPolicy
 type DLQPolicy struct {
 	// MaxDeliveries specifies the maximum number of times that a message will be delivered before being
 	// sent to the dead letter queue.
@@ -160,7 +159,7 @@ type DLQPolicy struct {
 type ConcurrencyPolicy struct {
 	CorePoolSize    uint `json:"core_pool_size"`    // Optional: default 1
 	MaximumPoolSize uint `json:"maximum_pool_size"` // Optional: default 1
-	KeepAliveTime   uint `json:"keep_alive_time"`   // Optional: default 1 min
+	KeepAliveTime   uint `json:"keep_alive_time"`   // Optional: default 60(s)
 
-	PanicHandler func(interface{}) // Optional, handle panics comes from executing message handler
+	PanicHandler func(interface{}) `json:"-"` // Optional, handle panics comes from executing message handler
 }

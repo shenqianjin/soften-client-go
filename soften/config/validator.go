@@ -4,11 +4,10 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/shenqianjin/soften-client-go/soften/topic"
-
 	"github.com/apache/pulsar-client-go/pulsar/log"
 	"github.com/shenqianjin/soften-client-go/soften/internal"
 	"github.com/shenqianjin/soften-client-go/soften/internal/backoff"
+	"github.com/shenqianjin/soften-client-go/soften/topic"
 	"github.com/sirupsen/logrus"
 )
 
@@ -20,10 +19,12 @@ type validator struct {
 }
 
 func (v *validator) ValidateAndDefaultClientConfig(conf *ClientConfig) error {
+	if conf.URL == "" {
+		return errors.New("URL is blank")
+	}
+	// default logger
 	if conf.Logger == nil {
-		//conf.Logger = sogrus.NewLoggerWithLogrus(logrus.StandardLogger())
 		conf.Logger = log.NewLoggerWithLogrus(logrus.StandardLogger())
-
 	}
 	return nil
 }
@@ -149,6 +150,9 @@ func (v *validator) ValidateAndDefaultConsumerConfig(conf *ConsumerConfig) error
 }
 
 func (v *validator) ValidateAndDefaultProducerConfig(conf *ProducerConfig) error {
+	if conf.Topic == "" {
+		return errors.New("topic is blank")
+	}
 	// default route policy
 	if conf.RouteEnable {
 		if conf.Route == nil {

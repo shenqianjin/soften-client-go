@@ -148,7 +148,7 @@ func (d *routeDecider) parseRouteTopic(checkStatus checker.CheckStatus) string {
 	case handler.GotoRetrying:
 		routeTopic = d.topic + message.StatusRetrying.TopicSuffix()
 	case internalGotoRoute:
-		routeTopic = checkStatus.GetRerouteTopic()
+		routeTopic = checkStatus.GetRouteTopic()
 	}
 	return routeTopic
 }

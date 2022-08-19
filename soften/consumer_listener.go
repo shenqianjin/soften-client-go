@@ -23,8 +23,8 @@ type Listener interface {
 	Close()
 }
 
+// consumeListener listens to consume all messages of one or more than one status/levels consumers.
 type consumeListener struct {
-	// pulsar.Consumer
 	client               *client
 	logger               log.Logger
 	messageCh            chan ConsumerMessage // channel used to deliver message to application

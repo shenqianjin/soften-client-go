@@ -5,24 +5,24 @@ package checker
 type checkStatus struct {
 	passed       bool
 	handledDefer func()
-	//CheckTo      MessageGoto
-	rerouteTopic string
+
+	// extra for route/reroute
+
+	routeTopic string
 }
 
 func (s *checkStatus) WithPassed(passed bool) *checkStatus {
-	s.passed = passed
-	return s
+	r := &checkStatus{passed: passed, handledDefer: s.handledDefer, routeTopic: s.routeTopic}
+	return r
 }
 
 func (s *checkStatus) WithHandledDefer(handledDefer func()) *checkStatus {
-	r := &checkStatus{passed: s.passed, handledDefer: s.handledDefer, rerouteTopic: s.rerouteTopic}
-	r.handledDefer = handledDefer
+	r := &checkStatus{passed: s.passed, handledDefer: handledDefer, routeTopic: s.routeTopic}
 	return r
 }
 
 func (s *checkStatus) WithRerouteTopic(topic string) *checkStatus {
-	r := &checkStatus{passed: s.passed, handledDefer: s.handledDefer, rerouteTopic: s.rerouteTopic}
-	r.rerouteTopic = topic
+	r := &checkStatus{passed: s.passed, handledDefer: s.handledDefer, routeTopic: topic}
 	return r
 }
 
@@ -34,8 +34,8 @@ func (s *checkStatus) GetHandledDefer() func() {
 	return s.handledDefer
 }
 
-func (s *checkStatus) GetRerouteTopic() string {
-	return s.rerouteTopic
+func (s *checkStatus) GetRouteTopic() string {
+	return s.routeTopic
 }
 
 // ------ check status enums ------
