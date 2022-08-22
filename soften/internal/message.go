@@ -26,3 +26,15 @@ func (status MessageStatus) TopicSuffix() string {
 		return "-" + strings.ToUpper(string(status))
 	}
 }
+
+// ------ status message interface ------
+
+type StatusMessage interface {
+	Status() MessageStatus
+}
+
+// ------ leveled message interface ------
+
+type LeveledMessage interface {
+	Level() TopicLevel
+}

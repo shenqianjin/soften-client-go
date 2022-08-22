@@ -49,15 +49,14 @@ func (d *rerouteDecider) Decide(msg pulsar.ConsumerMessage, cheStatus checker.Ch
 		props[k] = v
 	}
 	// record origin information when re-route first time
-	if _, ok := props[message.XPropertyOriginTopic]; !ok {
-		props[message.XPropertyOriginTopic] = msg.Message.Topic()
-	}
-	if _, ok := props[message.XPropertyOriginMessageID]; !ok {
-		props[message.XPropertyOriginMessageID] = message.Parser.GetMessageId(msg)
-	}
-	if _, ok := props[message.XPropertyOriginPublishTime]; !ok {
-		props[message.XPropertyOriginPublishTime] = msg.PublishTime().UTC().Format(internal.RFC3339TimeInSecondPattern)
-	}
+	message.Helper.InjectOriginTopic(msg, &props)
+	message.Helper.InjectOriginMessageId(msg, &props)
+	message.Helper.InjectOriginPublishTime(msg, &props)
+	message.Helper.InjectOriginLevel(msg, &props)
+	message.Helper.InjectOriginStatus(msg, &props)
+	// record previous level/status information
+	message.Helper.InjectPreviousLevel(msg, &props)
+	message.Helper.InjectPreviousStatus(msg, &props)
 
 	producerMsg := pulsar.ProducerMessage{
 		Payload:     msg.Payload(),

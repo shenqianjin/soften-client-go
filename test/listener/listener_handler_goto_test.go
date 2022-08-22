@@ -9,7 +9,6 @@ import (
 	"time"
 
 	"github.com/apache/pulsar-client-go/pulsar"
-	"github.com/shenqianjin/soften-client-go/soften"
 	"github.com/shenqianjin/soften-client-go/soften/admin"
 	"github.com/shenqianjin/soften-client-go/soften/config"
 	"github.com/shenqianjin/soften-client-go/soften/handler"
@@ -324,11 +323,11 @@ func TestListenHandle_All(t *testing.T) {
 			case "5":
 				return handler.HandleStatusBuilder().Goto(handler.GotoRetrying).Build()
 			case "6":
-				if statusMsg, ok := msg.(soften.StatusMessage); ok && statusMsg.Status() == message.StatusReady {
+				if consumerMsg, ok := msg.(pulsar.ConsumerMessage); ok && message.Parser.GetCurrentStatus(consumerMsg) == message.StatusReady {
 					return handler.HandleStatusBuilder().Goto(handler.GotoUpgrade).Build()
 				}
 			case "7":
-				if statusMsg, ok := msg.(soften.StatusMessage); ok && statusMsg.Status() == message.StatusReady {
+				if consumerMsg, ok := msg.(pulsar.ConsumerMessage); ok && message.Parser.GetCurrentStatus(consumerMsg) == message.StatusReady {
 					return handler.HandleStatusBuilder().Goto(handler.GotoDegrade).Build()
 				}
 			case "8": // no reroute decider for handle goto

@@ -5,6 +5,8 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/shenqianjin/soften-client-go/soften/topic"
+
 	"github.com/apache/pulsar-client-go/pulsar"
 	"github.com/shenqianjin/soften-client-go/soften/internal"
 )
@@ -16,12 +18,26 @@ var Parser = &messageParser{}
 type messageParser struct {
 }
 
-func (p *messageParser) GetCurrentStatus(msg pulsar.ConsumerMessage) internal.MessageStatus {
+func (p *messageParser) GetCurrentLevel(msg pulsar.ConsumerMessage) internal.TopicLevel {
+	if leveledMsg, ok := msg.Message.(internal.LeveledMessage); ok {
+		return leveledMsg.Level()
+	}
+	return topic.L1
+}
+
+func (p *messageParser) GetPreviousLevel(msg pulsar.ConsumerMessage) internal.TopicLevel {
 	properties := msg.Message.Properties()
-	if status, ok := properties[XPropertyCurrentMessageStatus]; ok {
-		if messageStatus, err := StatusOf(status); err == nil {
-			return messageStatus
+	if level, ok := properties[XPropertyPreviousMessageLevel]; ok {
+		if messageLevel, err := topic.LevelOf(level); err == nil {
+			return messageLevel
 		}
+	}
+	return topic.L1
+}
+
+func (p *messageParser) GetCurrentStatus(msg pulsar.ConsumerMessage) internal.MessageStatus {
+	if statusMsg, ok := msg.Message.(internal.StatusMessage); ok {
+		return statusMsg.Status()
 	}
 	return StatusReady
 }
@@ -56,10 +72,10 @@ func (p *messageParser) GetReentrantStartRedeliveryCount(msg pulsar.ConsumerMess
 	return 0
 }
 
-func (p *messageParser) GetStatusReconsumeTimes(status internal.MessageStatus, msg pulsar.ConsumerMessage) int {
+func (p *messageParser) GetStatusConsumeTimes(status internal.MessageStatus, msg pulsar.ConsumerMessage) int {
 	statusConsumeTimesHeader, ok := statusConsumeTimesMap[status]
 	if !ok {
-		panic("invalid status for statusConsumeTimes")
+		panic(fmt.Sprintf("invalid status for statusConsumeTimes: %s", status))
 	}
 	properties := msg.Message.Properties()
 	if timesStr, ok := properties[statusConsumeTimesHeader]; ok {
@@ -71,12 +87,12 @@ func (p *messageParser) GetStatusReconsumeTimes(status internal.MessageStatus, m
 }
 
 func (p *messageParser) GetStatusReentrantTimes(status internal.MessageStatus, msg pulsar.ConsumerMessage) int {
-	reentrantTimesHeader, ok := statusReentrantTimesMap[status]
+	statusReentrantTimesHeader, ok := statusReentrantTimesMap[status]
 	if !ok {
 		panic("invalid status for statusReentrantTimes")
 	}
 	properties := msg.Message.Properties()
-	if timesStr, ok := properties[reentrantTimesHeader]; ok {
+	if timesStr, ok2 := properties[statusReentrantTimesHeader]; ok2 {
 		if times, err := strconv.Atoi(timesStr); err == nil {
 			return times
 		}

@@ -41,7 +41,7 @@ func (hd *statusDecider) Decide(msg pulsar.ConsumerMessage, cheStatus checker.Ch
 	if !cheStatus.IsPassed() {
 		return false
 	}
-	statusReconsumeTimes := message.Parser.GetStatusReconsumeTimes(hd.options.status, msg)
+	statusReconsumeTimes := message.Parser.GetStatusConsumeTimes(hd.options.status, msg)
 	// check to dead if exceed max status reconsume times
 	if statusReconsumeTimes >= hd.policy.ConsumeMaxTimes {
 		return hd.tryDeadInternal(msg)
@@ -51,15 +51,13 @@ func (hd *statusDecider) Decide(msg pulsar.ConsumerMessage, cheStatus checker.Ch
 	if statusReentrantTimes >= hd.policy.ReentrantMaxTimes {
 		return hd.tryDeadInternal(msg)
 	}
-	currentStatus := message.Parser.GetCurrentStatus(msg)
-	delay := uint(0)
 	// check Nack for equal status
-	if currentStatus == hd.options.status {
-		delay = hd.policy.BackoffPolicy.Next(0, statusReconsumeTimes)
-		if delay < hd.policy.ReentrantDelay { // delay equals or larger than reentrant delay is the essential condition to switch status
-			msg.Consumer.Nack(msg.Message)
-			return true
-		}
+	delay := hd.policy.BackoffPolicy.Next(0, statusReconsumeTimes)
+	if delay < hd.policy.ReentrantDelay { // delay equals or larger than reentrant delay is the essential condition to switch status
+		msg.Consumer.Nack(msg.Message)
+		return true
+	} else if delay == 0 {
+		delay = hd.policy.ReentrantDelay // default a newStatus.reentrantDelay
 	}
 
 	// prepare to re-route
@@ -67,43 +65,35 @@ func (hd *statusDecider) Decide(msg pulsar.ConsumerMessage, cheStatus checker.Ch
 	for k, v := range msg.Properties() {
 		props[k] = v
 	}
+	// record origin information when re-route first time
+	message.Helper.InjectOriginTopic(msg, &props)
+	message.Helper.InjectOriginMessageId(msg, &props)
+	message.Helper.InjectOriginPublishTime(msg, &props)
+	message.Helper.InjectOriginLevel(msg, &props)
+	message.Helper.InjectOriginStatus(msg, &props)
+	// status switch
+	currentStatus := message.Parser.GetCurrentStatus(msg)
 	if currentStatus != hd.options.status {
-		// first time to happen status switch
-		previousMessageStatus := message.Parser.GetPreviousStatus(msg)
-		if (previousMessageStatus == "" || previousMessageStatus == message.StatusReady) && hd.options.status != message.StatusReady {
-			// record origin information when re-route first time
-			if _, ok := props[message.XPropertyOriginTopic]; !ok {
-				props[message.XPropertyOriginTopic] = msg.Message.Topic()
-			}
-			if _, ok := props[message.XPropertyOriginMessageID]; !ok {
-				props[message.XPropertyOriginMessageID] = message.Parser.GetMessageId(msg)
-			}
-			if _, ok := props[message.XPropertyOriginPublishTime]; !ok {
-				props[message.XPropertyOriginPublishTime] = msg.PublishTime().UTC().Format(internal.RFC3339TimeInSecondPattern)
-			}
-		}
-		props[message.XPropertyPreviousMessageStatus] = string(currentStatus)
-		delay = hd.policy.ReentrantDelay // default a newStatus.reentrantDelay if status switch happens
+		message.Helper.InjectPreviousLevel(msg, &props)
+		message.Helper.InjectPreviousStatus(msg, &props)
 	}
-	now := time.Now()
-	reentrantStartRedeliveryCount := message.Parser.GetReentrantStartRedeliveryCount(msg)
-	props[message.XPropertyReentrantStartRedeliveryCount] = strconv.FormatUint(uint64(msg.RedeliveryCount()), 10)
-
+	// total consume times on the message
 	xReconsumeTimes := message.Parser.GetXReconsumeTimes(msg)
 	xReconsumeTimes++
 	props[message.XPropertyReconsumeTimes] = strconv.Itoa(xReconsumeTimes) // initialize continuous consume times for the new msg
-
+	// reconsume time and reentrant time
+	now := time.Now()
 	props[message.XPropertyReconsumeTime] = now.Add(time.Duration(delay) * time.Second).UTC().Format(internal.RFC3339TimeInSecondPattern)
 	props[message.XPropertyReentrantTime] = now.Add(time.Duration(hd.policy.ReentrantDelay) * time.Second).UTC().Format(internal.RFC3339TimeInSecondPattern)
+	// reconsume times for goto status
+	reentrantStartRedeliveryCount := message.Parser.GetReentrantStartRedeliveryCount(msg)
+	statusReconsumeTimes += int(msg.RedeliveryCount() - reentrantStartRedeliveryCount + 1) // the subtraction is the nack times in current status
+	message.Helper.InjectStatusReconsumeTimes(hd.options.status, statusReconsumeTimes, &props)
+	props[message.XPropertyReentrantStartRedeliveryCount] = strconv.FormatUint(uint64(msg.RedeliveryCount()), 10)
+	// reentrant times for goto status
+	statusReentrantTimes++
+	message.Helper.InjectStatusReentrantTimes(hd.options.status, statusReentrantTimes, &props)
 
-	if statusReconsumeTimesHeader, ok := message.XPropertyConsumeTimes(hd.options.status); ok {
-		statusReconsumeTimes += int(msg.RedeliveryCount() - reentrantStartRedeliveryCount) // the subtraction is the nack times in current status
-		props[statusReconsumeTimesHeader] = strconv.Itoa(statusReconsumeTimes)
-	}
-	if statusReentrantTimesHeader, ok := message.XPropertyReentrantTimes(hd.options.status); ok {
-		statusReentrantTimes++
-		props[statusReentrantTimesHeader] = strconv.Itoa(statusReentrantTimes)
-	}
 	producerMsg := pulsar.ProducerMessage{
 		Payload:     msg.Payload(),
 		Key:         msg.Key(),

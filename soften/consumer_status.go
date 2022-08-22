@@ -40,6 +40,7 @@ func (sc *statusConsumer) start() {
 	for {
 		// block to read pulsar chan
 		msg := <-sc.Consumer.Chan()
+
 		reentrantTime := message.Parser.GetReentrantTime(msg)
 
 		// consume ready message immediately
@@ -59,8 +60,8 @@ func (sc *statusConsumer) start() {
 
 		reconsumeTime := message.Parser.GetReconsumeTime(msg)
 		now = time.Now().UTC()
-		// delivery message to client if reconsumeTime doesn't exist or before/equal now
-		// 'not exist' means it is consumed first time, 'before/equal now' means it is time to consume
+		// delivery message to client if reconsumeTime doesn't exist or before/equal now.
+		// 'not exist' means it is consumed first time, 'before/equal now' means it is time to consume.
 		if reconsumeTime.IsZero() || !reconsumeTime.After(now) {
 			sc.statusMessageCh <- ConsumerMessage{
 				ConsumerMessage: msg,
@@ -69,7 +70,7 @@ func (sc *statusConsumer) start() {
 			continue
 		}
 
-		// Nack or wait by hang it in memory util meet the reconsume time if reconsumeTime is before `now + policy.MaxNackDelay`
+		// Nack or wait by hanging it in memory util meet the reconsume time if reconsumeTime is before `now + policy.ReentrantDelay`
 		maxNackDelayAt := time.Now().UTC().Add(time.Duration(sc.policy.ReentrantDelay))
 		if reconsumeTime.Before(maxNackDelayAt) {
 			// do not increase reconsume times if it is after less than one reentrant delay

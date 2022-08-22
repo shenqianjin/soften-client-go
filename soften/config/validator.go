@@ -85,29 +85,32 @@ func (v *validator) ValidateAndDefaultConsumerConfig(conf *ConsumerConfig) error
 	// default status Policy
 	if conf.Ready == nil {
 		conf.Ready = defaultStatusPolicyReady
-	} else {
-		if err := v.validateAndDefaultStatusPolicy(conf.Ready, defaultStatusPolicyReady); err != nil {
-			return err
-		}
 	}
+	if err := v.validateAndDefaultStatusPolicy(conf.Ready, defaultStatusPolicyReady); err != nil {
+		return err
+	}
+
 	if conf.PendingEnable {
 		if conf.Pending == nil {
 			conf.Pending = defaultStatusPolicyPending
-		} else if err := v.validateAndDefaultStatusPolicy(conf.Pending, defaultStatusPolicyPending); err != nil {
+		}
+		if err := v.validateAndDefaultStatusPolicy(conf.Pending, defaultStatusPolicyPending); err != nil {
 			return err
 		}
 	}
 	if conf.BlockingEnable {
 		if conf.Blocking == nil {
 			conf.Blocking = defaultStatusPolicyBlocking
-		} else if err := v.validateAndDefaultStatusPolicy(conf.Blocking, defaultStatusPolicyBlocking); err != nil {
+		}
+		if err := v.validateAndDefaultStatusPolicy(conf.Blocking, defaultStatusPolicyBlocking); err != nil {
 			return err
 		}
 	}
 	if conf.RetryingEnable {
 		if conf.Retrying == nil {
 			conf.Retrying = defaultStatusPolicyRetrying
-		} else if err := v.validateAndDefaultStatusPolicy(conf.Retrying, defaultStatusPolicyRetrying); err != nil {
+		}
+		if err := v.validateAndDefaultStatusPolicy(conf.Retrying, defaultStatusPolicyRetrying); err != nil {
 			return err
 		}
 	}

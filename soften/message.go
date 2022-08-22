@@ -2,8 +2,9 @@ package soften
 
 import (
 	"fmt"
-	"github.com/shenqianjin/soften-client-go/soften/handler"
 	"reflect"
+
+	"github.com/shenqianjin/soften-client-go/soften/handler"
 
 	"github.com/apache/pulsar-client-go/pulsar"
 	"github.com/shenqianjin/soften-client-go/soften/checker"
@@ -22,20 +23,8 @@ type RerouteMessage struct {
 
 type ConsumerMessage struct {
 	pulsar.ConsumerMessage
-	StatusMessage
-	LeveledMessage
-}
-
-// ------ status message interface ------
-
-type StatusMessage interface {
-	Status() internal.MessageStatus
-}
-
-// ------ leveled message interface ------
-
-type LeveledMessage interface {
-	Level() internal.TopicLevel
+	internal.StatusMessage
+	internal.LeveledMessage
 }
 
 // ---------------------------------------

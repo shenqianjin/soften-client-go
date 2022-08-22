@@ -9,7 +9,6 @@ import (
 	"time"
 
 	"github.com/apache/pulsar-client-go/pulsar"
-	"github.com/shenqianjin/soften-client-go/soften"
 	"github.com/shenqianjin/soften-client-go/soften/admin"
 	"github.com/shenqianjin/soften-client-go/soften/checker"
 	"github.com/shenqianjin/soften-client-go/soften/config"
@@ -95,7 +94,8 @@ func TestListenCheck_Post_Degrade(t *testing.T) {
 		routedTopic:  topic + degradeLevel.TopicSuffix(),
 		degradeLevel: degradeLevel.String(),
 		checkpoint: checker.PostHandleDegrade(func(msg pulsar.Message, err error) checker.CheckStatus {
-			if statusMsg, ok := msg.(soften.StatusMessage); ok && statusMsg.Status() == message.StatusReady {
+
+			if consumerMsg, ok := msg.(pulsar.ConsumerMessage); ok && message.Parser.GetCurrentStatus(consumerMsg) == message.StatusReady {
 				return checker.CheckStatusPassed
 			}
 			return checker.CheckStatusRejected
@@ -113,7 +113,7 @@ func TestListenCheck_Post_Upgrade(t *testing.T) {
 		routedTopic:  topic + upgradeLevel.TopicSuffix(),
 		upgradeLevel: upgradeLevel.String(),
 		checkpoint: checker.PostHandleUpgrade(func(msg pulsar.Message, err error) checker.CheckStatus {
-			if statusMsg, ok := msg.(soften.StatusMessage); ok && statusMsg.Status() == message.StatusReady {
+			if consumerMsg, ok := msg.(pulsar.ConsumerMessage); ok && message.Parser.GetCurrentStatus(consumerMsg) == message.StatusReady {
 				return checker.CheckStatusPassed
 			}
 			return checker.CheckStatusRejected
@@ -130,7 +130,7 @@ func TestListenCheck_Post_Reroute(t *testing.T) {
 		storedTopic: topic,
 		routedTopic: reroutedTopic,
 		checkpoint: checker.PostHandleReroute(func(msg pulsar.Message, err error) checker.CheckStatus {
-			if statusMsg, ok := msg.(soften.StatusMessage); ok && statusMsg.Status() == message.StatusReady {
+			if consumerMsg, ok := msg.(pulsar.ConsumerMessage); ok && message.Parser.GetCurrentStatus(consumerMsg) == message.StatusReady {
 				return checker.CheckStatusPassed.WithRerouteTopic(reroutedTopic)
 			}
 			return checker.CheckStatusRejected
@@ -173,6 +173,9 @@ func testListenCheckPostHandle(t *testing.T, checkCase testListenCheckCase) {
 
 	// ---------------
 
+	testPolicy := &config.StatusPolicy{
+		BackoffDelays: []string{"1s"},
+	}
 	// create listener
 	upgradeLevel, _ := topiclevel.LevelOf(checkCase.upgradeLevel)
 	degradeLevel, _ := topiclevel.LevelOf(checkCase.degradeLevel)
@@ -183,8 +186,11 @@ func testListenCheckPostHandle(t *testing.T, checkCase testListenCheckCase) {
 		DiscardEnable:               checkCase.checkpoint.CheckType == checker.CheckTypePostDiscard,
 		DeadEnable:                  checkCase.checkpoint.CheckType == checker.CheckTypePostDead,
 		PendingEnable:               checkCase.checkpoint.CheckType == checker.CheckTypePostPending,
+		Pending:                     testPolicy,
 		BlockingEnable:              checkCase.checkpoint.CheckType == checker.CheckTypePostBlocking,
+		Blocking:                    testPolicy,
 		RetryingEnable:              checkCase.checkpoint.CheckType == checker.CheckTypePostRetrying,
+		Retrying:                    testPolicy,
 		UpgradeEnable:               checkCase.checkpoint.CheckType == checker.CheckTypePostUpgrade,
 		DegradeEnable:               checkCase.checkpoint.CheckType == checker.CheckTypePostDegrade,
 		RerouteEnable:               checkCase.checkpoint.CheckType == checker.CheckTypePostReroute,
@@ -216,7 +222,7 @@ func testListenCheckPostHandle(t *testing.T, checkCase testListenCheckCase) {
 	// check rerouted stats
 	if routedTopic != "" {
 		// wait for decide the message
-		time.Sleep(100 * time.Millisecond)
+		time.Sleep(100*time.Millisecond + time.Second)
 		stats, err = manager.Stats(routedTopic)
 		assert.Nil(t, err)
 		assert.Equal(t, 1, stats.MsgInCounter)
@@ -341,21 +347,21 @@ func TestListenCheck_Post_All(t *testing.T) {
 		return checker.CheckStatusRejected
 	}), checker.PostHandleUpgrade(func(msg pulsar.Message, err error) checker.CheckStatus {
 		if index, ok := msg.Properties()["Index"]; ok && index == "6" {
-			if statusMsg, ok := msg.(soften.StatusMessage); ok && statusMsg.Status() == message.StatusReady {
+			if consumerMsg, ok := msg.(pulsar.ConsumerMessage); ok && message.Parser.GetCurrentStatus(consumerMsg) == message.StatusReady {
 				return checker.CheckStatusPassed
 			}
 		}
 		return checker.CheckStatusRejected
 	}), checker.PostHandleDegrade(func(msg pulsar.Message, err error) checker.CheckStatus {
 		if index, ok := msg.Properties()["Index"]; ok && index == "7" {
-			if statusMsg, ok := msg.(soften.StatusMessage); ok && statusMsg.Status() == message.StatusReady {
+			if consumerMsg, ok := msg.(pulsar.ConsumerMessage); ok && message.Parser.GetCurrentStatus(consumerMsg) == message.StatusReady {
 				return checker.CheckStatusPassed
 			}
 		}
 		return checker.CheckStatusRejected
 	}), checker.PostHandleReroute(func(msg pulsar.Message, err error) checker.CheckStatus {
 		if index, ok := msg.Properties()["Index"]; ok && index == "8" {
-			if statusMsg, ok := msg.(soften.StatusMessage); ok && statusMsg.Status() == message.StatusReady {
+			if consumerMsg, ok := msg.(pulsar.ConsumerMessage); ok && message.Parser.GetCurrentStatus(consumerMsg) == message.StatusReady {
 				return checker.CheckStatusPassed.WithRerouteTopic(reroutedTopic)
 			}
 		}
