@@ -8,6 +8,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/shenqianjin/soften-client-go/soften"
+
 	"github.com/apache/pulsar-client-go/pulsar"
 	"github.com/shenqianjin/soften-client-go/soften/admin"
 	"github.com/shenqianjin/soften-client-go/soften/config"
@@ -158,6 +160,10 @@ func testListenHandleGoto(t *testing.T, handleCase testListenHandleCase) {
 
 	// ---------------
 
+	testPolicy := &config.StatusPolicy{
+		BackoffDelays:  []string{"1s"},
+		ReentrantDelay: 1,
+	}
 	// create listener
 	upgradeLevel, _ := topiclevel.LevelOf(handleCase.upgradeLevel)
 	degradeLevel, _ := topiclevel.LevelOf(handleCase.degradeLevel)
@@ -168,8 +174,11 @@ func testListenHandleGoto(t *testing.T, handleCase testListenHandleCase) {
 		DiscardEnable:               handleCase.handleGoto == handler.GotoDiscard.String(),
 		DeadEnable:                  handleCase.handleGoto == handler.GotoDead.String(),
 		PendingEnable:               handleCase.handleGoto == handler.GotoPending.String(),
+		Pending:                     testPolicy,
 		BlockingEnable:              handleCase.handleGoto == handler.GotoBlocking.String(),
+		Blocking:                    testPolicy,
 		RetryingEnable:              handleCase.handleGoto == handler.GotoRetrying.String(),
+		Retrying:                    testPolicy,
 		UpgradeEnable:               handleCase.handleGoto == handler.GotoUpgrade.String(),
 		DegradeEnable:               handleCase.handleGoto == handler.GotoDegrade.String(),
 		UpgradeTopicLevel:           upgradeLevel,
@@ -282,6 +291,10 @@ func TestListenHandle_All(t *testing.T) {
 
 	// ---------------
 
+	testPolicy := &config.StatusPolicy{
+		BackoffDelays:  []string{"1s"},
+		ReentrantDelay: 1,
+	}
 	// create listener
 	listener, err := client.CreateListener(config.ConsumerConfig{
 		Topic:                       topic,
@@ -290,8 +303,11 @@ func TestListenHandle_All(t *testing.T) {
 		DiscardEnable:               true,
 		DeadEnable:                  true,
 		PendingEnable:               true,
+		Pending:                     testPolicy,
 		BlockingEnable:              true,
+		Blocking:                    testPolicy,
 		RetryingEnable:              true,
+		Retrying:                    testPolicy,
 		UpgradeEnable:               true,
 		DegradeEnable:               true,
 		RerouteEnable:               true,
@@ -323,11 +339,11 @@ func TestListenHandle_All(t *testing.T) {
 			case "5":
 				return handler.HandleStatusBuilder().Goto(handler.GotoRetrying).Build()
 			case "6":
-				if consumerMsg, ok := msg.(pulsar.ConsumerMessage); ok && message.Parser.GetCurrentStatus(consumerMsg) == message.StatusReady {
+				if consumerMsg, ok := msg.(soften.ConsumerMessage); ok && consumerMsg.Status() == message.StatusReady {
 					return handler.HandleStatusBuilder().Goto(handler.GotoUpgrade).Build()
 				}
 			case "7":
-				if consumerMsg, ok := msg.(pulsar.ConsumerMessage); ok && message.Parser.GetCurrentStatus(consumerMsg) == message.StatusReady {
+				if consumerMsg, ok := msg.(soften.ConsumerMessage); ok && consumerMsg.Status() == message.StatusReady {
 					return handler.HandleStatusBuilder().Goto(handler.GotoDegrade).Build()
 				}
 			case "8": // no reroute decider for handle goto

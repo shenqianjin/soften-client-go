@@ -53,11 +53,11 @@ func (hd *statusDecider) Decide(msg pulsar.ConsumerMessage, cheStatus checker.Ch
 	}
 	// check Nack for equal status
 	delay := hd.policy.BackoffPolicy.Next(0, statusReconsumeTimes)
-	if delay < hd.policy.ReentrantDelay { // delay equals or larger than reentrant delay is the essential condition to switch status
-		msg.Consumer.Nack(msg.Message)
-		return true
-	} else if delay == 0 {
+	if delay == 0 {
 		delay = hd.policy.ReentrantDelay // default a newStatus.reentrantDelay
+	} else if delay < hd.policy.ReentrantDelay { // delay equals or larger than reentrant delay is the essential condition to switch status
+		msg.Consumer.NackLater(msg.Message, time.Duration(delay)*time.Second)
+		return true
 	}
 
 	// prepare to re-route

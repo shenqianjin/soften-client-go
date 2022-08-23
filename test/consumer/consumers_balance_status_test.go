@@ -148,6 +148,10 @@ func testConsumerBalanceStatus(t *testing.T, testCase consumerBalanceCase) {
 
 	// ---------------
 
+	testPolicy := &config.StatusPolicy{
+		BackoffDelays:  []string{"1s"},
+		ReentrantDelay: 1,
+	}
 	// create listener
 	consumerConf := config.ConsumerConfig{
 		Topic:                       topic,
@@ -164,13 +168,13 @@ func testConsumerBalanceStatus(t *testing.T, testCase consumerBalanceCase) {
 		consumerConf.Ready = &config.StatusPolicy{ConsumeWeight: uint(w)}
 	}
 	if w, ok := expectedWeights[message.StatusPending.String()]; ok {
-		consumerConf.Pending = &config.StatusPolicy{ConsumeWeight: uint(w)}
+		consumerConf.Pending = &config.StatusPolicy{ConsumeWeight: uint(w), BackoffDelays: testPolicy.BackoffDelays, ReentrantDelay: testPolicy.ReentrantDelay}
 	}
 	if w, ok := expectedWeights[message.StatusRetrying.String()]; ok {
-		consumerConf.Retrying = &config.StatusPolicy{ConsumeWeight: uint(w)}
+		consumerConf.Retrying = &config.StatusPolicy{ConsumeWeight: uint(w), BackoffDelays: testPolicy.BackoffDelays, ReentrantDelay: testPolicy.ReentrantDelay}
 	}
 	if w, ok := expectedWeights[message.StatusBlocking.String()]; ok {
-		consumerConf.Blocking = &config.StatusPolicy{ConsumeWeight: uint(w)}
+		consumerConf.Blocking = &config.StatusPolicy{ConsumeWeight: uint(w), BackoffDelays: testPolicy.BackoffDelays, ReentrantDelay: testPolicy.ReentrantDelay}
 	}
 	listener, err := client.CreateListener(consumerConf)
 

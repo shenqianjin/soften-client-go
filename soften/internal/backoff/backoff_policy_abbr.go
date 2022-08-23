@@ -27,14 +27,14 @@ func NewAbbrBackoffPolicy(delays []string) (*abbrBackoffPolicy, error) {
 		return nil, errors.New("backoffDelays is empty")
 	}
 	backoffDelays := make([]uint, len(delays))
-	for _, delay := range delays {
-		last := delay[len(delay)-1]
-		if unit, err := ValueOf(string(last)); err != nil {
+	for index, delay := range delays {
+		last := delay[len(delay)-1:]
+		if unit, err := ValueOf(last); err != nil {
 			return nil, err
 		} else if d, err := strconv.Atoi(delay[0 : len(delay)-1]); err != nil {
 			return nil, errors.New(fmt.Sprintf("invalid in backOffDelays: %s", delay))
 		} else {
-			backoffDelays = append(backoffDelays, uint(d)*unit.Delay())
+			backoffDelays[index] = uint(d) * unit.Delay()
 		}
 	}
 	return &abbrBackoffPolicy{backoffDelays: backoffDelays}, nil
