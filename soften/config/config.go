@@ -11,6 +11,15 @@ import (
 
 // ------ library configuration ------
 
+type PulsarConfig struct {
+	Client    ClientConfig     `json:"client"`    // client configuration
+	Producer  ProducerConfig   `json:"producer"`  // producer instance configuration, it has higher priority than producers.
+	Producers []ProducerConfig `json:"producers"` // a list of producer instances to support more than one producer instances, Either a producer.
+	Consumer  ConsumerConfig   `json:"consumer"`  // consumer instance configuration, it has higher priority than consumers.
+	Consumers []ConsumerConfig `json:"consumers"` // a list of consumer instances to support more than one consumer instances, Either a consumer.
+	LogLevel  int              `json:"log_level"` // logrus trace level: 0 panic; 1 Fatal; 2 Error; 3 Warn; 4 Info; 5 Debug; 6 Trace
+}
+
 var DebugMode = false
 
 // ------ client configuration ------
