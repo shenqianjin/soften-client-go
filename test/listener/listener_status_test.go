@@ -55,7 +55,7 @@ func testListenBySingleStatus(t *testing.T, status string) {
 		Topic:          topic,
 		TransferEnable: true,
 		Transfer:       &config.TransferPolicy{ConnectInSyncEnable: true},
-	}, checker.PrevSendTransfer(func(ctx context.Context, msg *pulsar.ProducerMessage) checker.CheckStatus {
+	}, checker.PrevSendTransfer(func(ctx context.Context, msg *message.ProducerMessage) checker.CheckStatus {
 		if storedTopic, ok := msg.Properties["routeTopic"]; ok {
 			return checker.CheckStatusPassed.WithGotoExtra(decider.GotoExtra{Topic: storedTopic})
 		}
@@ -146,7 +146,7 @@ func TestListen_4Msg_Ready_Retrying_Pending_Blocking(t *testing.T) {
 		Topic:          topic,
 		TransferEnable: true,
 		Transfer:       &config.TransferPolicy{ConnectInSyncEnable: true},
-	}, checker.PrevSendTransfer(func(ctx context.Context, msg *pulsar.ProducerMessage) checker.CheckStatus {
+	}, checker.PrevSendTransfer(func(ctx context.Context, msg *message.ProducerMessage) checker.CheckStatus {
 		if storedTopic, ok := msg.Properties["routeTopic"]; ok {
 			return checker.CheckStatusPassed.WithGotoExtra(decider.GotoExtra{Topic: storedTopic})
 		}

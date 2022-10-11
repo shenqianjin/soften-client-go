@@ -84,7 +84,7 @@ func testListenByMultiLevels(t *testing.T, levels message.Levels) {
 		Topic:          testTopic,
 		TransferEnable: true,
 		Transfer:       &config.TransferPolicy{ConnectInSyncEnable: true},
-	}, checker.PrevSendTransfer(func(ctx context.Context, msg *pulsar.ProducerMessage) checker.CheckStatus {
+	}, checker.PrevSendTransfer(func(ctx context.Context, msg *message.ProducerMessage) checker.CheckStatus {
 		if storedTopic, ok := msg.Properties["routeTopic"]; ok {
 			return checker.CheckStatusPassed.WithGotoExtra(decider.GotoExtra{Topic: storedTopic})
 		}
