@@ -38,7 +38,7 @@ type consumeListener struct {
 	groundTopic       string
 	subscription      string
 	messageCh         chan consumerMessage // channel used to deliver message to application
-	enables           *internal.StatusEnables
+	enables           *internal.ConsumeEnables
 	concurrency       *config.ConcurrencyPolicy
 	escapeHandler     config.EscapeHandler
 	generalDeciders   *generalConsumeDeciders
@@ -78,7 +78,7 @@ func newConsumeListener(cli *client, conf config.ConsumerConfig, checkpoints map
 	// collect check orders
 	l.prevCheckOrders, l.postCheckOrders = l.collectCheckOrders()
 	// initialize general deciders
-	generalHdOptions := l.formatGeneralDecidersOptions(conf.Topics[0], &conf)
+	generalHdOptions := l.formatGeneralDecidersOptions(conf.Topics[0], l.enables, &conf)
 	if deciders, err := newGeneralConsumeDeciders(cli, l, generalHdOptions); err != nil {
 		return nil, err
 	} else {
@@ -88,13 +88,15 @@ func newConsumeListener(cli *client, conf config.ConsumerConfig, checkpoints map
 	l.levelDeciders = make(map[internal.TopicLevel]*leveledConsumeDeciders, len(conf.Levels))
 	for _, level := range conf.Levels {
 		suffix := level.TopicSuffix()
-		options := l.formatLeveledDecidersOptions(conf.Topics[0]+suffix, level, &conf)
+		options := l.formatLeveledDecidersOptions(conf.Topics[0]+suffix, level, l.enables, &conf)
 		if deciders, err := newLeveledConsumeDeciders(cli, l, options, l.generalDeciders.deadDecider); err != nil {
 			return nil, err
 		} else {
 			l.levelDeciders[level] = deciders
 		}
 	}
+	// initialize escape handler
+	l.initEscapeHandler(&conf)
 	// initialize status singleLeveledConsumer
 	if len(conf.Levels) == 1 {
 		level := conf.Levels[0]
@@ -127,7 +129,10 @@ func (l *consumeListener) initEscapeHandler(conf *config.ConsumerConfig) {
 			lvl := message.Parser.GetCurrentLevel(msg)
 			status := message.Parser.GetCurrentStatus(msg)
 			l.logger.Warnf("ack unexpected escaped msgId: %v, level: %v, status: %v, props: %v", msg.ID(), lvl, status, msg.Properties())
-			msg.Consumer.Ack(msg.Message)
+			err1 := msg.Consumer.Ack(msg)
+			for err1 != nil { // SDK 内部错误, 重试
+				err1 = msg.Consumer.Ack(msg.Message)
+			}
 		}
 		break
 	case config.EscapeAsNack:
@@ -152,23 +157,23 @@ func (l *consumeListener) initEscapeHandler(conf *config.ConsumerConfig) {
 	return
 }
 
-func (l *consumeListener) collectEnables(conf *config.ConsumerConfig) *internal.StatusEnables {
-	enables := internal.StatusEnables{
+func (l *consumeListener) collectEnables(conf *config.ConsumerConfig) *internal.ConsumeEnables {
+	enables := internal.ConsumeEnables{
 		ReadyEnable:    true,
-		DeadEnable:     conf.DeadEnable,
-		DiscardEnable:  conf.DiscardEnable,
-		BlockingEnable: conf.BlockingEnable,
-		PendingEnable:  conf.PendingEnable,
-		RetryingEnable: conf.RetryingEnable,
-		TransferEnable: conf.TransferEnable,
-		UpgradeEnable:  conf.UpgradeEnable,
-		DegradeEnable:  conf.DegradeEnable,
-		ShiftEnable:    conf.ShiftEnable,
+		DeadEnable:     *conf.DeadEnable,
+		DiscardEnable:  *conf.DiscardEnable,
+		BlockingEnable: *conf.BlockingEnable,
+		PendingEnable:  *conf.PendingEnable,
+		RetryingEnable: *conf.RetryingEnable,
+		TransferEnable: *conf.TransferEnable,
+		UpgradeEnable:  *conf.UpgradeEnable,
+		DegradeEnable:  *conf.DegradeEnable,
+		ShiftEnable:    *conf.ShiftEnable,
 	}
 	return &enables
 }
 
-func (l *consumeListener) collectCheckers(enables *internal.StatusEnables, checkpointMap map[checker.CheckType][]*checker.ConsumeCheckpoint) map[checker.CheckType]*consumeCheckpointChain {
+func (l *consumeListener) collectCheckers(enables *internal.ConsumeEnables, checkpointMap map[checker.CheckType][]*checker.ConsumeCheckpoint) map[checker.CheckType]*consumeCheckpointChain {
 	checkers := make(map[checker.CheckType]*consumeCheckpointChain)
 	if enables.TransferEnable {
 		l.tryLoadConfiguredChecker(&checkers, checker.CheckTypePrevTransfer, checkpointMap)
@@ -236,20 +241,20 @@ func (l *consumeListener) collectCheckOrders() ([]checker.CheckType, []checker.C
 	return prevCheckOrders, postCheckOrders
 }
 
-func (l *consumeListener) formatGeneralDecidersOptions(topic string, conf *config.ConsumerConfig) generalConsumeDeciderOptions {
+func (l *consumeListener) formatGeneralDecidersOptions(topic string, enables *internal.ConsumeEnables, conf *config.ConsumerConfig) generalConsumeDeciderOptions {
 	options := generalConsumeDeciderOptions{
 		Topic:            topic,
 		Level:            conf.Level,
 		subscriptionName: conf.SubscriptionName,
-		DiscardEnable:    conf.DiscardEnable,
-		DeadEnable:       conf.DeadEnable,
-		TransferEnable:   conf.TransferEnable,
+		DiscardEnable:    enables.DiscardEnable,
+		DeadEnable:       enables.DeadEnable,
+		TransferEnable:   enables.TransferEnable,
 		Transfer:         conf.Transfer,
-		UpgradeEnable:    conf.UpgradeEnable,
+		UpgradeEnable:    enables.UpgradeEnable,
 		Upgrade:          conf.Upgrade,
-		DegradeEnable:    conf.DegradeEnable,
+		DegradeEnable:    enables.DegradeEnable,
 		Degrade:          conf.Degrade,
-		ShiftEnable:      conf.ShiftEnable,
+		ShiftEnable:      enables.ShiftEnable,
 		Shift:            conf.Shift,
 		metricsTopics:    internal.TopicParser.FormatListAsAbbr(conf.Topics),
 		metricsLevels:    internal.TopicLevelParser.FormatList(conf.Levels),
@@ -257,20 +262,20 @@ func (l *consumeListener) formatGeneralDecidersOptions(topic string, conf *confi
 	return options
 }
 
-func (l *consumeListener) formatLeveledDecidersOptions(topic string, level internal.TopicLevel, conf *config.ConsumerConfig) leveledConsumeDeciderOptions {
+func (l *consumeListener) formatLeveledDecidersOptions(topic string, level internal.TopicLevel, enables *internal.ConsumeEnables, conf *config.ConsumerConfig) leveledConsumeDeciderOptions {
 	options := leveledConsumeDeciderOptions{
 		Topic:            topic,
 		subscriptionName: conf.SubscriptionName,
 		Level:            level,
-		BlockingEnable:   conf.BlockingEnable,
+		BlockingEnable:   enables.BlockingEnable,
 		Blocking:         conf.Blocking,
-		PendingEnable:    conf.PendingEnable,
+		PendingEnable:    enables.PendingEnable,
 		Pending:          conf.Pending,
-		RetryingEnable:   conf.RetryingEnable,
+		RetryingEnable:   enables.RetryingEnable,
 		Retrying:         conf.Retrying,
-		UpgradeEnable:    conf.UpgradeEnable,
+		UpgradeEnable:    enables.UpgradeEnable,
 		Upgrade:          conf.Upgrade,
-		DegradeEnable:    conf.DegradeEnable,
+		DegradeEnable:    enables.DegradeEnable,
 		Degrade:          conf.Degrade,
 		metricsTopics:    internal.TopicParser.FormatListAsAbbr(conf.Topics),
 		metricsLevels:    internal.TopicLevelParser.FormatList(conf.Levels),
@@ -300,7 +305,10 @@ func (l *consumeListener) StartPremium(ctx context.Context, handleFunc handler.P
 	}
 	l.startListenerOnce.Do(func() {
 		// initialize task pool
-		pool, onceErr := ants.NewPool(int(l.concurrency.CorePoolSize), ants.WithExpiryDuration(60*time.Second))
+		pool, onceErr := ants.NewPool(int(l.concurrency.CorePoolSize),
+			ants.WithExpiryDuration(time.Duration(l.concurrency.KeepAliveTime)*time.Second),
+			ants.WithPanicHandler(l.concurrency.PanicHandler),
+		)
 		if onceErr != nil {
 			err = onceErr
 			return
@@ -335,12 +343,11 @@ func (l *consumeListener) internalStartInPool(ctx context.Context, handler handl
 				msg.internalExtra.consumerMetrics.ListenLatencyFromEvent.Observe(time.Since(msg.EventTime()).Seconds())
 			}
 
-			// As pool.Submit is blocking, err happens only if pool is closed.
+			// submit task in blocking mode, err happens only if pool is closed.
 			// Namely, the 'err != nil' condition is never meet.
-			if err := pool.Submit(func() { l.consume(ctx, handler, msg) }); err != nil {
-				l.logger.Errorf("submit msg failed. err: %v", err)
-				//msg.Consumer.Nack(msg.Message)
-				//return
+			cCtx := meta.NewContext(context.Background())
+			if err := pool.Submit(func() { l.consume(cCtx, handler, msg) }); err != nil {
+				panic(fmt.Sprintf("submit msg failed. err: %v", err))
 			}
 		case <-ctx.Done():
 			l.logger.Warnf("closed soften listener")
@@ -359,7 +366,9 @@ func (l *consumeListener) internalStartInParallel(ctx context.Context, handler h
 			}
 			concurrencyChan <- true
 			go func(msg consumerMessage) {
-				l.consume(ctx, handler, msg)
+				// setup meta context
+				cCtx := meta.NewContext(context.Background())
+				l.consume(cCtx, handler, msg)
 				<-concurrencyChan
 			}(msg)
 		case <-ctx.Done():
@@ -370,8 +379,6 @@ func (l *consumeListener) internalStartInParallel(ctx context.Context, handler h
 }
 
 func (l *consumeListener) consume(ctx context.Context, handlerFunc handler.PremiumHandleFunc, msg consumerMessage) {
-	// setup meta context
-	ctx = meta.NewContext(ctx)
 	msg.internalExtra.prevCheckBeginTime = time.Now()
 	// prev-check to handle in turn
 	for _, checkType := range l.prevCheckOrders {
@@ -394,11 +401,11 @@ func (l *consumeListener) consume(ctx context.Context, handlerFunc handler.Premi
 	start := time.Now()
 	bizHandleStatus := handlerFunc(ctx, msg)
 	latency := time.Now().Sub(start).Seconds()
-	reconsumeTimes := message.Parser.GetReconsumeTimes(msg.Message)
+	msgCounter := message.Parser.GetMessageCounter(msg.Message)
 	metrics := l.metricsProvider.GetListenerHandleMetrics(l.groundTopic, msg.Level(), msg.Status(),
 		l.subscription, msg.Topic(), bizHandleStatus.GetGoto())
 	metrics.HandleLatency.Observe(latency)
-	metrics.HandleReconsumeTimes.Observe(float64(reconsumeTimes))
+	metrics.HandleConsumeTimes.Observe(float64(msgCounter.ConsumeTimes))
 
 	// post-check to Transfer - for obvious goto action
 	if bizHandleStatus.GetGoto() != "" {

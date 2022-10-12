@@ -157,9 +157,9 @@ func testConsumerBalanceStatus(t *testing.T, testCase consumerBalanceCase) {
 		ReentrantDelay: 1,
 	}
 	leveledPolicy := &config.LevelPolicy{
-		PendingEnable:  true,
-		BlockingEnable: true,
-		RetryingEnable: true,
+		PendingEnable:  config.True(),
+		BlockingEnable: config.True(),
+		RetryingEnable: config.True(),
 	}
 	// create listener
 	consumerConf := config.ConsumerConfig{

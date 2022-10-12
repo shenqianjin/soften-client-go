@@ -3,6 +3,7 @@ package message
 import (
 	"fmt"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/apache/pulsar-client-go/pulsar"
@@ -50,52 +51,47 @@ func (p *messageParser) GetPreviousStatus(msg pulsar.Message) internal.MessageSt
 	return ""
 }
 
-func (p *messageParser) GetReconsumeTimes(msg pulsar.Message) int {
+func (p *messageParser) GetMessageCounter(msg pulsar.Message) internal.MessageCounter {
 	properties := msg.Properties()
-	if timesStr, ok := properties[XPropertyReconsumeTimes]; ok {
-		if times, err := strconv.Atoi(timesStr); err == nil {
-			return times
-		}
+	if timesStr, ok := properties[XPropertyMessageCounter]; ok {
+		return p.parseMessageCounter(timesStr)
 	}
-	return 0
+	return internal.MessageCounter{}
 }
 
-func (p *messageParser) GetReentrantStartRedeliveryCount(msg pulsar.Message) uint32 {
-	properties := msg.Properties()
-	if timesStr, ok := properties[XPropertyReentrantStartRedeliveryCount]; ok {
-		if times, err := strconv.ParseUint(timesStr, 10, 32); err == nil {
-			return uint32(times)
+func (p *messageParser) parseMessageCounter(timesStr string) internal.MessageCounter {
+	countedMsg := internal.MessageCounter{}
+	segments := strings.Split(timesStr, ":")
+	segmentsLen := len(segments)
+	switch segmentsLen {
+	case 3:
+		if times, err := strconv.Atoi(segments[2]); err == nil {
+			countedMsg.ConsumeReckonTimes = times
+		}
+		fallthrough
+	case 2:
+		if times, err := strconv.Atoi(segments[1]); err == nil {
+			countedMsg.ConsumeTimes = times
+		}
+		fallthrough
+	case 1:
+		if times, err := strconv.Atoi(segments[0]); err == nil {
+			countedMsg.PublishTimes = times
 		}
 	}
-	return 0
+	return countedMsg
 }
 
-func (p *messageParser) GetStatusConsumeTimes(status internal.MessageStatus, msg pulsar.Message) int {
-	statusConsumeTimesHeader, ok := statusConsumeTimesMap[status]
+func (p *messageParser) GetStatusMessageCounter(status internal.MessageStatus, msg pulsar.Message) internal.MessageCounter {
+	statusConsumeTimesHeader, ok := statusMessageCounterMap[status]
 	if !ok {
-		panic(fmt.Sprintf("invalid status for statusConsumeTimes: %s", status))
+		panic(fmt.Sprintf("invalid status for statusMessageCounter: %s", status))
 	}
 	properties := msg.Properties()
-	if timesStr, ok := properties[statusConsumeTimesHeader]; ok {
-		if times, err := strconv.Atoi(timesStr); err == nil {
-			return times
-		}
+	if timesStr, ok2 := properties[statusConsumeTimesHeader]; ok2 {
+		return p.parseMessageCounter(timesStr)
 	}
-	return 0
-}
-
-func (p *messageParser) GetStatusReentrantTimes(status internal.MessageStatus, msg pulsar.Message) int {
-	statusReentrantTimesHeader, ok := statusReentrantTimesMap[status]
-	if !ok {
-		panic("invalid status for statusReentrantTimes")
-	}
-	properties := msg.Properties()
-	if timesStr, ok2 := properties[statusReentrantTimesHeader]; ok2 {
-		if times, err := strconv.Atoi(timesStr); err == nil {
-			return times
-		}
-	}
-	return 0
+	return internal.MessageCounter{}
 }
 
 func (p *messageParser) GetConsumeTime(msg pulsar.Message) time.Time {

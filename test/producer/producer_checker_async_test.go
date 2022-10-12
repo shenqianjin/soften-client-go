@@ -31,52 +31,14 @@ func TestProduceCheck_Discard_BySendAsync(t *testing.T) {
 }
 
 func TestProduceCheck_Dead_BySendAsync(t *testing.T) {
+	deadLevel := message.D1
 	topic := internal.GenerateTestTopic(internal.PrefixTestProduce)
 	checkCase := testProduceCheckCase{
 		topic:               topic,
-		storedTopic:         topic + message.StatusDead.TopicSuffix(),
+		storedTopic:         topic + deadLevel.TopicSuffix(),
 		expectedStoredCount: 1,
 		checkpoint: checker.PrevSendDead(func(ctx context.Context, msg *message.ProducerMessage) checker.CheckStatus {
-			return checker.CheckStatusPassed
-		}),
-	}
-	testProduceCheckBySendAsync(t, checkCase)
-}
-
-func TestProduceCheck_Pending_BySendAsync(t *testing.T) {
-	topic := internal.GenerateTestTopic(internal.PrefixTestProduce)
-	checkCase := testProduceCheckCase{
-		topic:               topic,
-		storedTopic:         topic + message.StatusPending.TopicSuffix(),
-		expectedStoredCount: 1,
-		checkpoint: checker.PrevSendPending(func(ctx context.Context, msg *message.ProducerMessage) checker.CheckStatus {
-			return checker.CheckStatusPassed
-		}),
-	}
-	testProduceCheckBySendAsync(t, checkCase)
-}
-
-func TestProduceCheck_Blocking_BySendAsync(t *testing.T) {
-	topic := internal.GenerateTestTopic(internal.PrefixTestProduce)
-	checkCase := testProduceCheckCase{
-		topic:               topic,
-		storedTopic:         topic + message.StatusBlocking.TopicSuffix(),
-		expectedStoredCount: 1,
-		checkpoint: checker.PrevSendBlocking(func(ctx context.Context, msg *message.ProducerMessage) checker.CheckStatus {
-			return checker.CheckStatusPassed
-		}),
-	}
-	testProduceCheckBySendAsync(t, checkCase)
-}
-
-func TestProduceCheck_Retrying_BySendAsync(t *testing.T) {
-	topic := internal.GenerateTestTopic(internal.PrefixTestProduce)
-	checkCase := testProduceCheckCase{
-		topic:               topic,
-		storedTopic:         topic + message.StatusRetrying.TopicSuffix(),
-		expectedStoredCount: 1,
-		checkpoint: checker.PrevSendRetrying(func(ctx context.Context, msg *message.ProducerMessage) checker.CheckStatus {
-			return checker.CheckStatusPassed
+			return checker.CheckStatusPassed.WithGotoExtra(decider.GotoExtra{Level: deadLevel})
 		}),
 	}
 	testProduceCheckBySendAsync(t, checkCase)
@@ -107,6 +69,21 @@ func TestProduceCheck_Degrade_BySendAsync(t *testing.T) {
 		expectedStoredCount: 1,
 		checkpoint: checker.PrevSendDegrade(func(ctx context.Context, msg *message.ProducerMessage) checker.CheckStatus {
 			return checker.CheckStatusPassed
+		}),
+	}
+	testProduceCheckBySendAsync(t, checkCase)
+}
+
+func TestProduceCheck_Shift_BySendAsync(t *testing.T) {
+	shiftLevel := message.B2
+	topic := internal.GenerateTestTopic(internal.PrefixTestProduce)
+	transferredTopic := topic + shiftLevel.TopicSuffix()
+	checkCase := testProduceCheckCase{
+		topic:               topic,
+		storedTopic:         transferredTopic,
+		expectedStoredCount: 1,
+		checkpoint: checker.PrevSendShift(func(ctx context.Context, msg *message.ProducerMessage) checker.CheckStatus {
+			return checker.CheckStatusPassed.WithGotoExtra(decider.GotoExtra{Level: shiftLevel})
 		}),
 	}
 	testProduceCheckBySendAsync(t, checkCase)
@@ -143,17 +120,17 @@ func testProduceCheckBySendAsync(t *testing.T, checkCase testProduceCheckCase) {
 	degradeLevel, _ := message.LevelOf(checkCase.degradeLevel)
 	producer, err := client.CreateProducer(config.ProducerConfig{
 		Topic:          checkCase.topic,
-		TransferEnable: checkCase.checkpoint.CheckType == checker.ProduceCheckTypeTransfer,
-		DiscardEnable:  checkCase.checkpoint.CheckType == checker.ProduceCheckTypeDiscard,
-		DeadEnable:     checkCase.checkpoint.CheckType == checker.ProduceCheckTypeDead,
-		PendingEnable:  checkCase.checkpoint.CheckType == checker.ProduceCheckTypePending,
-		BlockingEnable: checkCase.checkpoint.CheckType == checker.ProduceCheckTypeBlocking,
-		RetryingEnable: checkCase.checkpoint.CheckType == checker.ProduceCheckTypeRetrying,
-		UpgradeEnable:  checkCase.checkpoint.CheckType == checker.ProduceCheckTypeUpgrade,
-		DegradeEnable:  checkCase.checkpoint.CheckType == checker.ProduceCheckTypeDegrade,
+		DiscardEnable:  config.ToPointer(checkCase.checkpoint.CheckType == checker.ProduceCheckTypeDiscard),
+		DeadEnable:     config.ToPointer(checkCase.checkpoint.CheckType == checker.ProduceCheckTypeDead),
+		UpgradeEnable:  config.ToPointer(checkCase.checkpoint.CheckType == checker.ProduceCheckTypeUpgrade),
+		DegradeEnable:  config.ToPointer(checkCase.checkpoint.CheckType == checker.ProduceCheckTypeDegrade),
+		ShiftEnable:    config.ToPointer(checkCase.checkpoint.CheckType == checker.ProduceCheckTypeShift),
+		TransferEnable: config.ToPointer(checkCase.checkpoint.CheckType == checker.ProduceCheckTypeTransfer),
 		Transfer:       &config.TransferPolicy{ConnectInSyncEnable: true},
 		Upgrade:        &config.ShiftPolicy{Level: upgradeLevel, ConnectInSyncEnable: true},
 		Degrade:        &config.ShiftPolicy{Level: degradeLevel, ConnectInSyncEnable: true},
+		Shift:          &config.ShiftPolicy{ConnectInSyncEnable: true},
+		Dead:           &config.ShiftPolicy{ConnectInSyncEnable: true},
 	}, checkCase.checkpoint)
 	if err != nil {
 		log.Fatal(err)
@@ -178,65 +155,59 @@ func testProduceCheckBySendAsync(t *testing.T, checkCase testProduceCheckCase) {
 func TestProduceCheck_All_BySendAsync(t *testing.T) {
 	upgradeLevel := message.L2
 	degradeLevel := message.B2
+	shiftLevel := message.L3
+	deadLevel := message.D1
 	topic := internal.GenerateTestTopic(internal.PrefixTestProduce)
-	transferredTopic := topic + "-S1"
+	transferredTopic := topic + message.S1.TopicSuffix()
 	storedTopics := []string{
-		topic, // ready
-		"",    // discard
-		topic + message.StatusDead.TopicSuffix(),
-		topic + message.StatusPending.TopicSuffix(),
-		topic + message.StatusBlocking.TopicSuffix(),
-		topic + message.StatusRetrying.TopicSuffix(),
-		topic + upgradeLevel.TopicSuffix(),
-		topic + degradeLevel.TopicSuffix(),
-		transferredTopic,
+		topic,                              // ready
+		"",                                 // discard
+		topic + deadLevel.TopicSuffix(),    // dead
+		topic + upgradeLevel.TopicSuffix(), // upgrade
+		topic + degradeLevel.TopicSuffix(), // degrade
+		topic + shiftLevel.TopicSuffix(),   // shift
+		transferredTopic,                   //transfer
 	}
 	checkpoints := []checker.ProduceCheckpoint{
 		// 0 为 ready
+		// discard
 		checker.PrevSendDiscard(func(ctx context.Context, msg *message.ProducerMessage) checker.CheckStatus {
 			if index, ok := msg.Properties["Index"]; ok && index == "1" {
 				return checker.CheckStatusPassed
 			}
 			return checker.CheckStatusRejected
 		}),
+		// dead
 		checker.PrevSendDead(func(ctx context.Context, msg *message.ProducerMessage) checker.CheckStatus {
 			if index, ok := msg.Properties["Index"]; ok && index == "2" {
 				return checker.CheckStatusPassed
 			}
 			return checker.CheckStatusRejected
 		}),
-		checker.PrevSendPending(func(ctx context.Context, msg *message.ProducerMessage) checker.CheckStatus {
+		// upgrade
+		checker.PrevSendUpgrade(func(ctx context.Context, msg *message.ProducerMessage) checker.CheckStatus {
 			if index, ok := msg.Properties["Index"]; ok && index == "3" {
 				return checker.CheckStatusPassed
 			}
 			return checker.CheckStatusRejected
 		}),
-		checker.PrevSendBlocking(func(ctx context.Context, msg *message.ProducerMessage) checker.CheckStatus {
+		// degrade
+		checker.PrevSendDegrade(func(ctx context.Context, msg *message.ProducerMessage) checker.CheckStatus {
 			if index, ok := msg.Properties["Index"]; ok && index == "4" {
 				return checker.CheckStatusPassed
 			}
 			return checker.CheckStatusRejected
 		}),
-		checker.PrevSendRetrying(func(ctx context.Context, msg *message.ProducerMessage) checker.CheckStatus {
+		// shift
+		checker.PrevSendShift(func(ctx context.Context, msg *message.ProducerMessage) checker.CheckStatus {
 			if index, ok := msg.Properties["Index"]; ok && index == "5" {
 				return checker.CheckStatusPassed
 			}
 			return checker.CheckStatusRejected
 		}),
-		checker.PrevSendUpgrade(func(ctx context.Context, msg *message.ProducerMessage) checker.CheckStatus {
-			if index, ok := msg.Properties["Index"]; ok && index == "6" {
-				return checker.CheckStatusPassed
-			}
-			return checker.CheckStatusRejected
-		}),
-		checker.PrevSendDegrade(func(ctx context.Context, msg *message.ProducerMessage) checker.CheckStatus {
-			if index, ok := msg.Properties["Index"]; ok && index == "7" {
-				return checker.CheckStatusPassed
-			}
-			return checker.CheckStatusRejected
-		}),
+		// transfer
 		checker.PrevSendTransfer(func(ctx context.Context, msg *message.ProducerMessage) checker.CheckStatus {
-			if index, ok := msg.Properties["Index"]; ok && index == "8" {
+			if index, ok := msg.Properties["Index"]; ok && index == "6" {
 				return checker.CheckStatusPassed.WithGotoExtra(decider.GotoExtra{Topic: transferredTopic})
 			}
 			return checker.CheckStatusRejected
@@ -263,17 +234,17 @@ func TestProduceCheck_All_BySendAsync(t *testing.T) {
 	defer client.Close()
 	producer, err := client.CreateProducer(config.ProducerConfig{
 		Topic:          topic,
-		TransferEnable: true,
-		DiscardEnable:  true,
-		DeadEnable:     true,
-		PendingEnable:  true,
-		BlockingEnable: true,
-		RetryingEnable: true,
-		UpgradeEnable:  true,
-		DegradeEnable:  true,
+		TransferEnable: config.True(),
+		DiscardEnable:  config.True(),
+		DeadEnable:     config.True(),
+		UpgradeEnable:  config.True(),
+		DegradeEnable:  config.True(),
+		ShiftEnable:    config.True(),
+		Dead:           &config.ShiftPolicy{Level: deadLevel, ConnectInSyncEnable: true},
 		Transfer:       &config.TransferPolicy{ConnectInSyncEnable: true},
 		Upgrade:        &config.ShiftPolicy{Level: upgradeLevel, ConnectInSyncEnable: true},
 		Degrade:        &config.ShiftPolicy{Level: degradeLevel, ConnectInSyncEnable: true},
+		Shift:          &config.ShiftPolicy{Level: shiftLevel, ConnectInSyncEnable: true},
 	}, checkpoints...)
 	if err != nil {
 		log.Fatal(err)
@@ -281,7 +252,7 @@ func TestProduceCheck_All_BySendAsync(t *testing.T) {
 	defer producer.Close()
 
 	wg := sync.WaitGroup{}
-	for i := 0; i < 9; i++ {
+	for i := 0; i < len(storedTopics); i++ {
 		wg.Add(1)
 		msg := internal.GenerateProduceMessage(internal.Size64, "Index", strconv.Itoa(i))
 		producer.SendAsync(context.Background(), msg,
@@ -299,7 +270,7 @@ func TestProduceCheck_All_BySendAsync(t *testing.T) {
 			storedTopic = topic
 		}
 		stats, err := manager.Stats(storedTopic)
-		assert.Nil(t, err)
+		assert.Nil(t, err, "index = "+strconv.Itoa(index))
 		assert.Equal(t, expected, stats.MsgInCounter, fmt.Sprintf("failed to validate stats for the %v topic: %v", index, storedTopic))
 	}
 }

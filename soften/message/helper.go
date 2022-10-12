@@ -2,7 +2,6 @@ package message
 
 import (
 	"fmt"
-	"strconv"
 	"time"
 
 	"github.com/apache/pulsar-client-go/pulsar"
@@ -16,15 +15,13 @@ var Helper = &messageHelper{}
 type messageHelper struct {
 }
 
-func (h *messageHelper) InjectOriginTopic(msg pulsar.Message, properties *map[string]string) {
-	props := *properties
+func (h *messageHelper) InjectOriginTopic(msg pulsar.Message, props map[string]string) {
 	if _, ok := props[XPropertyOriginTopic]; !ok {
 		props[XPropertyOriginTopic] = msg.Topic()
 	}
 }
 
-func (h *messageHelper) InjectOriginLevel(msg pulsar.Message, properties *map[string]string) {
-	props := *properties
+func (h *messageHelper) InjectOriginLevel(msg pulsar.Message, props map[string]string) {
 	if _, ok := props[XPropertyOriginLevel]; !ok {
 		if leveledMsg, ok2 := msg.(internal.LeveledMessage); ok2 {
 			props[XPropertyOriginLevel] = leveledMsg.Level().String()
@@ -33,8 +30,7 @@ func (h *messageHelper) InjectOriginLevel(msg pulsar.Message, properties *map[st
 	}
 }
 
-func (h *messageHelper) InjectOriginStatus(msg pulsar.Message, properties *map[string]string) {
-	props := *properties
+func (h *messageHelper) InjectOriginStatus(msg pulsar.Message, props map[string]string) {
 	if _, ok := props[XPropertyOriginStatus]; !ok {
 		if statusMsg, ok2 := msg.(internal.StatusMessage); ok2 {
 			props[XPropertyOriginStatus] = statusMsg.Status().String()
@@ -43,22 +39,19 @@ func (h *messageHelper) InjectOriginStatus(msg pulsar.Message, properties *map[s
 	}
 }
 
-func (h *messageHelper) InjectOriginMessageId(msg pulsar.Message, properties *map[string]string) {
-	props := *properties
+func (h *messageHelper) InjectOriginMessageId(msg pulsar.Message, props map[string]string) {
 	if _, ok := props[XPropertyOriginMessageID]; !ok {
 		props[XPropertyOriginMessageID] = Parser.GetMessageId(msg)
 	}
 }
 
-func (h *messageHelper) InjectOriginPublishTime(msg pulsar.Message, properties *map[string]string) {
-	props := *properties
+func (h *messageHelper) InjectOriginPublishTime(msg pulsar.Message, props map[string]string) {
 	if _, ok := props[XPropertyOriginPublishTime]; !ok {
 		props[XPropertyOriginPublishTime] = msg.PublishTime().UTC().Format(internal.RFC3339TimeInSecondPattern)
 	}
 }
 
-func (h *messageHelper) InjectPreviousStatus(msg pulsar.Message, properties *map[string]string) {
-	props := *properties
+func (h *messageHelper) InjectPreviousStatus(msg pulsar.Message, props map[string]string) {
 	previousStatus := Parser.GetPreviousStatus(msg)
 	currentStatus := Parser.GetCurrentStatus(msg)
 	if previousStatus != "" && currentStatus != previousStatus {
@@ -66,8 +59,7 @@ func (h *messageHelper) InjectPreviousStatus(msg pulsar.Message, properties *map
 	}
 }
 
-func (h *messageHelper) InjectPreviousLevel(msg pulsar.Message, properties *map[string]string) {
-	props := *properties
+func (h *messageHelper) InjectPreviousLevel(msg pulsar.Message, props map[string]string) {
 	previousLevel := Parser.GetPreviousLevel(msg)
 	currentLevel := Parser.GetCurrentLevel(msg)
 	if currentLevel != "" && currentLevel != previousLevel {
@@ -75,34 +67,36 @@ func (h *messageHelper) InjectPreviousLevel(msg pulsar.Message, properties *map[
 	}
 }
 
-func (h *messageHelper) InjectConsumeTime(properties *map[string]string, consumeTime time.Time) {
-	props := *properties
+func (h *messageHelper) InjectConsumeTime(props map[string]string, consumeTime time.Time) {
 	if !consumeTime.IsZero() {
 		props[XPropertyConsumeTime] = consumeTime.UTC().Format(internal.RFC3339TimeInSecondPattern)
 	}
 }
 
-func (h *messageHelper) InjectReentrantTime(properties *map[string]string, reentrant time.Time) {
-	props := *properties
+func (h *messageHelper) InjectReentrantTime(props map[string]string, reentrant time.Time) {
 	if !reentrant.IsZero() {
 		props[XPropertyReentrantTime] = reentrant.UTC().Format(internal.RFC3339TimeInSecondPattern)
 	}
 }
 
-func (h *messageHelper) InjectStatusReconsumeTimes(status internal.MessageStatus, statusReconsumeTimes int, properties *map[string]string) {
-	statusReconsumeTimesHeader, ok := statusConsumeTimesMap[status]
-	if !ok {
-		panic(fmt.Sprintf("invalid status for statusConsumeTimes: %s", status))
-	}
-	props := *properties
-	props[statusReconsumeTimesHeader] = strconv.Itoa(statusReconsumeTimes)
+func (h *messageHelper) InjectMessageCounter(props map[string]string, msgCounter internal.MessageCounter) {
+	props[XPropertyMessageCounter] = msgCounter.ToString()
 }
 
-func (h *messageHelper) InjectStatusReentrantTimes(status internal.MessageStatus, statusReentrantTimes int, properties *map[string]string) {
-	statusReentrantTimesHeader, ok := statusReentrantTimesMap[status]
+func (h *messageHelper) InjectStatusMessageCounter(props map[string]string, status internal.MessageStatus, msgCounter internal.MessageCounter) {
+	statusMessageCounterHeader, ok := statusMessageCounterMap[status]
 	if !ok {
 		panic(fmt.Sprintf("invalid status for statusConsumeTimes: %s", status))
 	}
-	props := *properties
-	props[statusReentrantTimesHeader] = strconv.Itoa(statusReentrantTimes)
+	props[statusMessageCounterHeader] = msgCounter.ToString()
+}
+
+func (h *messageHelper) ClearMessageCounter(props map[string]string) {
+	delete(props, XPropertyMessageCounter)
+}
+
+func (h *messageHelper) ClearStatusMessageCounters(props map[string]string) {
+	for _, header := range statusMessageCounterMap {
+		delete(props, header)
+	}
 }

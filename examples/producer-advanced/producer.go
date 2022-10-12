@@ -21,9 +21,9 @@ func main() {
 
 	producer, err := client.CreateProducer(config.ProducerConfig{
 		Topic:         "topic-1",
-		UpgradeEnable: true,
+		UpgradeEnable: config.True(),
 		Upgrade:       &config.ShiftPolicy{Level: message.L2},
-		DeadEnable:    true,
+		DeadEnable:    config.True(),
 	}, checker.PrevSendUpgrade(func(ctx context.Context, msg *message.ProducerMessage) checker.CheckStatus {
 		if "VIP" == msg.Properties["UserType"] {
 			return checker.CheckStatusPassed

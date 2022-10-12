@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strings"
 	"sync"
 	"sync/atomic"
 
@@ -43,20 +44,25 @@ func newProducerShiftDecider(producer *producer, options *producerShiftDeciderOp
 	if options.level == "" {
 		return nil, errors.New("level is blank")
 	}
-	if options.msgGoto != decider.GotoUpgrade && options.msgGoto != decider.GotoDegrade && options.msgGoto != decider.GotoShift {
-		return nil, errors.New(fmt.Sprintf("invalid goto decision for consumer shift decider: %v", options.msgGoto))
-	}
 	if options.shift == nil {
 		return nil, errors.New(fmt.Sprintf("missing shift policy for %v decider", options.msgGoto))
 	}
-	if options.msgGoto == decider.GotoUpgrade {
+	switch options.msgGoto {
+	case decider.GotoUpgrade:
 		if options.shift.Level != "" && options.shift.Level.OrderOf() <= options.level.OrderOf() {
 			return nil, errors.New("the specified level is too lower for upgrade decider")
 		}
-	} else if options.msgGoto == decider.GotoDegrade {
+	case decider.GotoDegrade:
 		if options.shift.Level != "" && options.shift.Level.OrderOf() >= options.level.OrderOf() {
 			return nil, errors.New("the specified level is too higher for degrade decider")
 		}
+	case decider.GotoDead:
+		if options.shift.Level != "" && !strings.HasPrefix(options.shift.Level.String(), "D") {
+			return nil, errors.New(fmt.Sprintf("the specified level is invalid for dead decider: %v", options.shift.Level))
+		}
+	case decider.GotoShift:
+	default:
+		return nil, errors.New(fmt.Sprintf("invalid goto for shift decider: %v", options.msgGoto))
 	}
 
 	d := &producerShiftDecider{
@@ -83,8 +89,12 @@ func (d *producerShiftDecider) Decide(ctx context.Context, msg *pulsar.ProducerM
 		d.logger.Error(err)
 	}
 
+	if d.options.shift.CountMode == config.CountPassNull {
+		message.Helper.ClearMessageCounter(msg.Properties)
+		message.Helper.ClearStatusMessageCounters(msg.Properties)
+	}
 	// consume time info
-	message.Helper.InjectConsumeTime(&msg.Properties, checkStatus.GetGotoExtra().ConsumeTime)
+	message.Helper.InjectConsumeTime(msg.Properties, checkStatus.GetGotoExtra().ConsumeTime)
 
 	// get or create router
 	rtr, err := d.internalSafeGetRouter(routeTopic)
@@ -141,11 +151,10 @@ func (d *producerShiftDecider) DecideAsync(ctx context.Context, msg *pulsar.Prod
 	}
 
 	// consume time info
-	message.Helper.InjectConsumeTime(&msg.Properties, checkStatus.GetGotoExtra().ConsumeTime)
+	message.Helper.InjectConsumeTime(msg.Properties, checkStatus.GetGotoExtra().ConsumeTime)
 	// get or create router
 	rtr, err := d.internalSafeGetRouter(destTopic)
 	if err != nil {
-		errors.New(fmt.Sprintf("failed to create router for topic: %s", destTopic))
 		callback(nil, msg, err)
 		return false
 	}
@@ -177,44 +186,24 @@ func (d *producerShiftDecider) internalFormatDestTopic(cs checker.CheckStatus, m
 		return "", errors.New(fmt.Sprintf("failed to shift (%v) message "+
 			"because there is no level is specified. msg: %v", d.options.msgGoto, string(msg.Payload)))
 	}
-	if d.options.msgGoto == decider.GotoUpgrade {
+	switch d.options.msgGoto {
+	case decider.GotoUpgrade:
 		if destLevel.OrderOf() <= d.options.level.OrderOf() {
 			return "", errors.New(fmt.Sprintf("failed to upgrade message "+
 				"because the specified level is too lower. msg: %v", string(msg.Payload)))
 		}
-	} else if d.options.msgGoto == decider.GotoDegrade {
+	case decider.GotoDegrade:
 		if destLevel.OrderOf() >= d.options.level.OrderOf() {
 			return "", errors.New(fmt.Sprintf("failed to degrade message "+
 				"because the specified level is too higher. msg: %v", string(msg.Payload)))
 		}
-	} else if d.options.msgGoto == decider.GotoShift {
-		if destLevel == d.options.level {
+	case decider.GotoDead:
+		if !strings.HasPrefix(destLevel.String(), "D") {
 			return "", errors.New(fmt.Sprintf("failed to shift message "+
-				"because the specified level is equal to the produce level. msg: %v", string(msg.Payload)))
+				"because the specified level is invalid for dead decider. msg: %v", string(msg.Payload)))
 		}
-	} else {
-		panic(fmt.Sprintf("invalid shift decision: %v", d.options.msgGoto))
 	}
 	return d.options.groundTopic + destLevel.TopicSuffix(), nil
-}
-
-func (d *producerShiftDecider) tryInitTransferTopic() string {
-	destTopic := ""
-	switch d.options.msgGoto {
-	case decider.GotoDead:
-		destTopic = d.options.groundTopic + message.StatusDead.TopicSuffix()
-	/*case decider.GotoUpgrade:
-		destTopic = d.options.groundTopic + d.options.upgradePolicy.WithLevel.TopicSuffix()
-	case decider.GotoDegrade:
-		destTopic = d.options.groundTopic + d.options.degradePolicy.WithLevel.TopicSuffix()*/
-	case decider.GotoBlocking:
-		destTopic = d.options.groundTopic + message.StatusBlocking.TopicSuffix()
-	case decider.GotoPending:
-		destTopic = d.options.groundTopic + message.StatusPending.TopicSuffix()
-	case decider.GotoRetrying:
-		destTopic = d.options.groundTopic + message.StatusRetrying.TopicSuffix()
-	}
-	return destTopic
 }
 
 func (d *producerShiftDecider) internalSafeGetRouter(topic string) (*router, error) {
@@ -227,9 +216,9 @@ func (d *producerShiftDecider) internalSafeGetRouter(topic string) (*router, err
 	rtOption := routerOptions{
 		Topic:               topic,
 		connectInSyncEnable: d.options.shift.ConnectInSyncEnable,
-		BackoffMaxTimes:     d.options.shift.BackoffMaxTimes,
-		BackoffDelays:       d.options.shift.BackoffDelays,
-		BackoffPolicy:       d.options.shift.BackoffPolicy,
+		BackoffMaxTimes:     d.options.shift.PublishPolicy.BackoffMaxTimes,
+		BackoffDelays:       d.options.shift.PublishPolicy.BackoffDelays,
+		BackoffPolicy:       d.options.shift.PublishPolicy.BackoffPolicy,
 	}
 	d.routersLock.Lock()
 	defer d.routersLock.Unlock()

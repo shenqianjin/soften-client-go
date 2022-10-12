@@ -161,9 +161,9 @@ func (c *consumer) perfConsume(stop <-chan struct{}) {
 
 	// create consumer
 	lvlPolicy := &config.LevelPolicy{
-		//PendingEnable:    true,
-		//BlockingEnable:   true,
-		RetryingEnable: true,
+		//PendingEnable:    config.True(),
+		//BlockingEnable:   config.True(),
+		RetryingEnable: config.True(),
 	}
 	listener, err := client.CreateListener(config.ConsumerConfig{
 		Topic:            c.consumerArgs.Topic,

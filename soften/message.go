@@ -29,6 +29,14 @@ type consumerMessage struct {
 	internalExtra *internalExtraMessage
 }
 
+func (msg *consumerMessage) Ack() {
+	err := msg.Consumer.Ack(msg)
+	for err != nil { // SDK 内部错误, 重试
+		msg.internalExtra.consumerMetrics.ConsumeMessageAckErrs.Inc()
+		err = msg.Consumer.Ack(msg.Message)
+	}
+}
+
 type messageImpl struct {
 	pulsar.Message
 	internal.StatusMessage
@@ -143,8 +151,5 @@ var checkTypeGotoMap = map[checker.CheckType]internal.DecideGoto{
 	checker.ProduceCheckTypeUpgrade:  decider.GotoUpgrade,
 	checker.ProduceCheckTypeDegrade:  decider.GotoDegrade,
 	checker.ProduceCheckTypeShift:    decider.GotoShift,
-	checker.ProduceCheckTypeBlocking: decider.GotoBlocking,
-	checker.ProduceCheckTypePending:  decider.GotoPending,
-	checker.ProduceCheckTypeRetrying: decider.GotoRetrying,
 	checker.ProduceCheckTypeTransfer: decider.GotoTransfer,
 }

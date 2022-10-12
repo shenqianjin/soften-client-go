@@ -23,10 +23,10 @@ func main() {
 	defer client.Close()
 
 	lvlPolicy := &config.LevelPolicy{
-		DegradeEnable:  true,
+		DegradeEnable:  config.True(),
 		Degrade:        &config.ShiftPolicy{Level: message.B1},
-		DeadEnable:     true,
-		RetryingEnable: true,
+		DeadEnable:     config.True(),
+		RetryingEnable: config.True(),
 	}
 	listener, err := client.CreateListener(config.ConsumerConfig{
 		Topic:                       "topic-1",

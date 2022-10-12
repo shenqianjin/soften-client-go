@@ -34,7 +34,7 @@ type producer struct {
 	topic           string //
 	upgradePolicy   *config.ShiftPolicy
 	degradePolicy   *config.ShiftPolicy
-	enables         *internal.StatusEnables
+	enables         *internal.ProduceEnables
 	routePolicy     *config.TransferPolicy
 	prevCheckOrders []checker.CheckType
 	checkers        map[checker.CheckType]*produceCheckpointChain
@@ -95,34 +95,22 @@ func newProducer(client *client, conf *config.ProducerConfig, checkpoints map[ch
 	return p, nil
 }
 
-func (p *producer) collectEnables(conf *config.ProducerConfig) *internal.StatusEnables {
-	enables := internal.StatusEnables{
-		ReadyEnable:    true,
-		DeadEnable:     conf.DeadEnable,
-		DiscardEnable:  conf.DiscardEnable,
-		BlockingEnable: conf.BlockingEnable,
-		PendingEnable:  conf.PendingEnable,
-		RetryingEnable: conf.RetryingEnable,
-		TransferEnable: conf.TransferEnable,
-		UpgradeEnable:  conf.UpgradeEnable,
-		DegradeEnable:  conf.DegradeEnable,
+func (p *producer) collectEnables(conf *config.ProducerConfig) *internal.ProduceEnables {
+	enables := internal.ProduceEnables{
+		DiscardEnable:  *conf.DiscardEnable,
+		DeadEnable:     *conf.DeadEnable,
+		TransferEnable: *conf.TransferEnable,
+		UpgradeEnable:  *conf.UpgradeEnable,
+		DegradeEnable:  *conf.DegradeEnable,
+		ShiftEnable:    *conf.ShiftEnable,
 	}
 	return &enables
 }
 
-func (p *producer) collectCheckers(enables *internal.StatusEnables, checkpointMap map[checker.CheckType][]*checker.ProduceCheckpoint) map[checker.CheckType]*produceCheckpointChain {
+func (p *producer) collectCheckers(enables *internal.ProduceEnables, checkpointMap map[checker.CheckType][]*checker.ProduceCheckpoint) map[checker.CheckType]*produceCheckpointChain {
 	checkers := make(map[checker.CheckType]*produceCheckpointChain)
 	if enables.TransferEnable {
 		p.tryLoadConfiguredChecker(&checkers, checker.ProduceCheckTypeTransfer, checkpointMap)
-	}
-	if enables.PendingEnable {
-		p.tryLoadConfiguredChecker(&checkers, checker.ProduceCheckTypePending, checkpointMap)
-	}
-	if enables.BlockingEnable {
-		p.tryLoadConfiguredChecker(&checkers, checker.ProduceCheckTypeBlocking, checkpointMap)
-	}
-	if enables.RetryingEnable {
-		p.tryLoadConfiguredChecker(&checkers, checker.ProduceCheckTypeRetrying, checkpointMap)
 	}
 	if enables.DeadEnable {
 		p.tryLoadConfiguredChecker(&checkers, checker.ProduceCheckTypeDead, checkpointMap)
@@ -135,6 +123,9 @@ func (p *producer) collectCheckers(enables *internal.StatusEnables, checkpointMa
 	}
 	if enables.DegradeEnable {
 		p.tryLoadConfiguredChecker(&checkers, checker.ProduceCheckTypeDegrade, checkpointMap)
+	}
+	if enables.ShiftEnable {
+		p.tryLoadConfiguredChecker(&checkers, checker.ProduceCheckTypeShift, checkpointMap)
 	}
 	return checkers
 }
@@ -160,18 +151,16 @@ func (p *producer) formatDecidersOptions(conf *config.ProducerConfig) produceDec
 	options := produceDecidersOptions{
 		groundTopic:    conf.Topic,
 		level:          conf.Level,
-		DiscardEnable:  conf.DiscardEnable,
-		DeadEnable:     conf.DeadEnable,
-		BlockingEnable: conf.BlockingEnable,
-		PendingEnable:  conf.PendingEnable,
-		RetryingEnable: conf.RetryingEnable,
-		UpgradeEnable:  conf.UpgradeEnable,
+		DiscardEnable:  *conf.DiscardEnable,
+		DeadEnable:     *conf.DeadEnable,
+		Dead:           conf.Dead,
+		UpgradeEnable:  *conf.UpgradeEnable,
 		Upgrade:        conf.Upgrade,
-		DegradeEnable:  conf.DegradeEnable,
+		DegradeEnable:  *conf.DegradeEnable,
 		Degrade:        conf.Degrade,
-		ShiftEnable:    conf.ShiftEnable,
+		ShiftEnable:    *conf.ShiftEnable,
 		Shift:          conf.Shift,
-		TransferEnable: conf.TransferEnable,
+		TransferEnable: *conf.TransferEnable,
 		Transfer:       conf.Transfer,
 	}
 	return options
@@ -197,6 +186,10 @@ func (p *producer) Send(ctx context.Context, msg *pulsar.ProducerMessage) (msgId
 			}
 		}
 	}
+	// inject message counter
+	initMsgCounter := internal.MessageCounter{PublishTimes: 1}
+	message.Helper.InjectMessageCounter(msg.Properties, initMsgCounter)
+	message.Helper.InjectStatusMessageCounter(msg.Properties, message.StatusReady, initMsgCounter)
 	// send
 	msgId, err = p.Producer.Send(ctx, msg)
 	// backoff
@@ -254,6 +247,10 @@ func (p *producer) SendAsync(ctx context.Context, msg *pulsar.ProducerMessage,
 			}
 		}
 	}
+	// inject message counter
+	initMsgCounter := internal.MessageCounter{PublishTimes: 1}
+	message.Helper.InjectMessageCounter(msg.Properties, initMsgCounter)
+	message.Helper.InjectStatusMessageCounter(msg.Properties, message.StatusReady, initMsgCounter)
 	// send async
 	p.Producer.SendAsync(ctx, msg, callbackNew)
 	return

@@ -1,6 +1,7 @@
 package admin
 
 import (
+	"bytes"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -9,13 +10,13 @@ import (
 	"net/http/httputil"
 	"strings"
 
+	"github.com/shenqianjin/soften-client-go/soften/config"
 	"github.com/shenqianjin/soften-client-go/soften/internal"
 )
 
 // ------ topic admin interface ------
 
 type BaseTopicAdmin interface {
-	List(namespace string) (topics string, err error)
 	Stats(topic string) (stats TopicStats, err error)
 	StatsInternal(topic string) (stats TopicStatsInternal, err error)
 	Unload(topic string) error
@@ -24,13 +25,15 @@ type BaseTopicAdmin interface {
 type NonPartitionedTopicAdmin interface {
 	Create(topic string) error
 	Delete(topic string) error
+	List(namespace string) (topics []string, err error)
 }
 
 type PartitionedTopicAdmin interface {
-	PartitionedCreate(topic string) error
+	PartitionedCreate(topic string, partitions uint) error
 	PartitionedCreateMissedPartitions(topic string) error
 	PartitionedDelete(topic string) error
 	PartitionedUpdate(topic string, partitions uint) error
+	PartitionedList(namespace string) (topics []string, err error)
 	PartitionedStats(topic string) (stats PartitionedTopicStats, err error)
 	GetMetadata(topic string) (meta PartitionedTopicStatsMetadata, err error)
 }
@@ -51,7 +54,7 @@ func NewTopicManager(url string) *topicAdminImpl {
 }
 
 func (m *topicAdminImpl) callWithRet(c *http.Client, req *http.Request, ret interface{}) error {
-	if internal.DebugMode {
+	if config.DebugMode {
 		reqBytes, dumpErr := httputil.DumpRequestOut(req, true)
 		fmt.Println(string(reqBytes), dumpErr)
 	}
@@ -59,45 +62,33 @@ func (m *topicAdminImpl) callWithRet(c *http.Client, req *http.Request, ret inte
 	if err != nil {
 		return err
 	}
-	if internal.DebugMode {
+	if config.DebugMode {
 		respBytes, dumpErr := httputil.DumpResponse(resp, resp.ContentLength > 0)
 		fmt.Println(string(respBytes), dumpErr)
 	}
 	// success
 	if resp.StatusCode/100 == 2 {
 		if ret != nil {
-			if err := json.NewDecoder(resp.Body).Decode(ret); err != nil {
-				fmt.Printf("failed to unmarshal resp body, err: %v\n", err)
-				return err
+			if err1 := json.NewDecoder(resp.Body).Decode(ret); err1 != nil {
+				return err1
 			}
 		}
 		return nil
 	}
 	// failed
 	if resp.ContentLength != 0 {
-		if respData, err := ioutil.ReadAll(resp.Body); err != nil {
-			fmt.Printf("failed to unmarshal resp body, err: %v\n", err)
-			return err
+		if respData, err1 := ioutil.ReadAll(resp.Body); err1 != nil {
+			err = err1
 		} else {
-			err = errors.New(fmt.Sprintf("failed to call pulsar: %s => %s", resp.Status, respData))
+			err = errors.New(fmt.Sprintf("%s => %s", resp.Status, string(respData)))
 		}
 	} else {
-		err = errors.New(fmt.Sprintf("failed to call pulsar: %s", resp.Status))
+		err = errors.New(fmt.Sprintf("%s", resp.Status))
 	}
 	return err
 }
 
 // ------ base implementation ------
-
-func (m *topicAdminImpl) List(namespace string) (topics string, err error) {
-	pathPattern := "%s/admin/v2/%s"
-	req, err := http.NewRequest(http.MethodGet, fmt.Sprintf(pathPattern, m.url, namespace), http.NoBody)
-	if err != nil {
-		return topics, err
-	}
-	err = m.callWithRet(m.httpclient, req, &topics)
-	return topics, err
-}
 
 func (m *topicAdminImpl) StatsInternal(topic string) (stats TopicStatsInternal, err error) {
 	parsedTopic, err := internal.ParseTopicName(topic)
@@ -153,6 +144,20 @@ func (m *topicAdminImpl) Delete(topic string) error {
 	return err
 }
 
+func (m *topicAdminImpl) List(namespace string) (topics []string, err error) {
+	pathPattern := "%s/admin/v2/%s"
+	if !strings.Contains(namespace, "://") {
+		namespace = "persistent://" + namespace
+	}
+	restPath := strings.Replace(namespace, "://", "/", 1)
+	req, err := http.NewRequest(http.MethodGet, fmt.Sprintf(pathPattern, m.url, restPath), http.NoBody)
+	if err != nil {
+		return topics, err
+	}
+	err = m.callWithRet(m.httpclient, req, &topics)
+	return topics, err
+}
+
 func (m *topicAdminImpl) Stats(topic string) (stats TopicStats, err error) {
 	parsedTopic, err := internal.ParseTopicName(topic)
 	if err != nil {
@@ -169,16 +174,21 @@ func (m *topicAdminImpl) Stats(topic string) (stats TopicStats, err error) {
 
 // ------ partitioned implementation ------
 
-func (m *topicAdminImpl) PartitionedCreate(topic string) error {
+func (m *topicAdminImpl) PartitionedCreate(topic string, partitions uint) error {
 	parsedTopic, err := internal.ParseTopicName(topic)
 	if err != nil {
 		return err
 	}
 	pathPattern := "%s/admin/v2/%s/partitions"
-	req, err := http.NewRequest(http.MethodPut, fmt.Sprintf(pathPattern, m.url, parsedTopic.GetTopicRestPath()), http.NoBody)
+	json, err := json.Marshal(partitions)
 	if err != nil {
 		return err
 	}
+	req, err := http.NewRequest(http.MethodPut, fmt.Sprintf(pathPattern, m.url, parsedTopic.GetTopicRestPath()), bytes.NewReader(json))
+	if err != nil {
+		return err
+	}
+	req.Header.Set("Content-Type", "application/json")
 	err = m.callWithRet(m.httpclient, req, nil)
 	return err
 }
@@ -203,13 +213,31 @@ func (m *topicAdminImpl) PartitionedUpdate(topic string, partitions uint) error 
 		return err
 	}
 	pathPattern := "%s/admin/v2/%s/partitions"
-	req, err := http.NewRequest(http.MethodPost, fmt.Sprintf(pathPattern, m.url, parsedTopic.GetTopicRestPath()),
-		strings.NewReader(fmt.Sprint(partitions)))
+	json, err := json.Marshal(partitions)
 	if err != nil {
 		return err
 	}
+	req, err := http.NewRequest(http.MethodPost, fmt.Sprintf(pathPattern, m.url, parsedTopic.GetTopicRestPath()), bytes.NewReader(json))
+	if err != nil {
+		return err
+	}
+	req.Header.Set("Content-Type", "application/json")
 	err = m.callWithRet(m.httpclient, req, nil)
 	return err
+}
+
+func (m *topicAdminImpl) PartitionedList(namespace string) (topics []string, err error) {
+	pathPattern := "%s/admin/v2/%s/partitioned"
+	if !strings.Contains(namespace, "://") {
+		namespace = "persistent://" + namespace
+	}
+	restPath := strings.Replace(namespace, "://", "/", 1)
+	req, err := http.NewRequest(http.MethodGet, fmt.Sprintf(pathPattern, m.url, restPath), http.NoBody)
+	if err != nil {
+		return topics, err
+	}
+	err = m.callWithRet(m.httpclient, req, &topics)
+	return topics, err
 }
 
 func (m *topicAdminImpl) PartitionedStats(topic string) (stats PartitionedTopicStats, err error) {

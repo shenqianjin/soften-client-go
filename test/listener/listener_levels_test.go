@@ -82,7 +82,7 @@ func testListenByMultiLevels(t *testing.T, levels message.Levels) {
 	// create producer
 	producer, err := client.CreateProducer(config.ProducerConfig{
 		Topic:          testTopic,
-		TransferEnable: true,
+		TransferEnable: config.True(),
 		Transfer:       &config.TransferPolicy{ConnectInSyncEnable: true},
 	}, checker.PrevSendTransfer(func(ctx context.Context, msg *message.ProducerMessage) checker.CheckStatus {
 		if storedTopic, ok := msg.Properties["routeTopic"]; ok {

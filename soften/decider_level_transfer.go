@@ -87,17 +87,21 @@ func (d *transferDecider) Decide(msg consumerMessage, cheStatus checker.CheckSta
 	for k, v := range msg.Properties() {
 		props[k] = v
 	}
+	if d.options.transfer.CountMode == config.CountPassNull {
+		message.Helper.ClearMessageCounter(props)
+		message.Helper.ClearStatusMessageCounters(props)
+	}
 	// record origin information when re-Transfer first time
-	message.Helper.InjectOriginTopic(msg.Message, &props)
-	message.Helper.InjectOriginMessageId(msg.Message, &props)
-	message.Helper.InjectOriginPublishTime(msg.Message, &props)
-	message.Helper.InjectOriginLevel(msg.Message, &props)
-	message.Helper.InjectOriginStatus(msg.Message, &props)
+	message.Helper.InjectOriginTopic(msg.Message, props)
+	message.Helper.InjectOriginMessageId(msg.Message, props)
+	message.Helper.InjectOriginPublishTime(msg.Message, props)
+	message.Helper.InjectOriginLevel(msg.Message, props)
+	message.Helper.InjectOriginStatus(msg.Message, props)
 	// record previous level/status information
-	message.Helper.InjectPreviousLevel(msg.Message, &props)
-	message.Helper.InjectPreviousStatus(msg.Message, &props)
+	message.Helper.InjectPreviousLevel(msg.Message, props)
+	message.Helper.InjectPreviousStatus(msg.Message, props)
 	// consume time info
-	message.Helper.InjectConsumeTime(&props, cheStatus.GetGotoExtra().ConsumeTime)
+	message.Helper.InjectConsumeTime(props, cheStatus.GetGotoExtra().ConsumeTime)
 
 	producerMsg := pulsar.ProducerMessage{
 		Payload:     msg.Payload(),
@@ -113,7 +117,7 @@ func (d *transferDecider) Decide(msg consumerMessage, cheStatus checker.CheckSta
 			msg.internalExtra.consumerMetrics.ConsumeMessageNacks.Inc()
 		} else {
 			d.logger.WithField("msgID", msg.ID()).Debugf("Succeed to send message to destTopic: %s", rtr.options.Topic)
-			msg.Consumer.Ack(msg)
+			msg.Ack()
 			msg.internalExtra.consumerMetrics.ConsumeMessageAcks.Inc()
 		}
 	}
@@ -134,9 +138,9 @@ func (d *transferDecider) internalSafeGetRouterInAsync(topic string) (*router, e
 	rtOption := routerOptions{
 		Topic:               topic,
 		connectInSyncEnable: d.options.transfer.ConnectInSyncEnable,
-		BackoffMaxTimes:     d.options.transfer.BackoffMaxTimes,
-		BackoffDelays:       d.options.transfer.BackoffDelays,
-		BackoffPolicy:       d.options.transfer.BackoffPolicy,
+		BackoffMaxTimes:     d.options.transfer.PublishPolicy.BackoffMaxTimes,
+		BackoffDelays:       d.options.transfer.PublishPolicy.BackoffDelays,
+		BackoffPolicy:       d.options.transfer.PublishPolicy.BackoffPolicy,
 	}
 	d.routersLock.Lock()
 	defer d.routersLock.Unlock()

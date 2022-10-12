@@ -1,8 +1,10 @@
 package config
 
 import (
+	"fmt"
 	"github.com/shenqianjin/soften-client-go/soften/internal"
 	"github.com/shenqianjin/soften-client-go/soften/message"
+	"strings"
 )
 
 // ------ default weights ------
@@ -59,11 +61,11 @@ var (
 	// defaultStatusPolicyPending 默认Pending状态的校验策略。
 	defaultStatusPolicyPending = &StatusPolicy{
 		ConsumeWeight:     defaultConsumeWeightPending,
-		ConsumeMaxTimes:   5 + 30,                      // 最多消费35次(5次Nack+30次重入), 31分钟内重试
+		ConsumeMaxTimes:   0,                           // pending 默认不限制次数
 		BackoffDelays:     defaultPendingBackoffDelays, // 前5次累计1分钟, 第6次开始每隔1分钟开始重试
 		BackoffPolicy:     nil,                         //
 		ReentrantDelay:    60,                          // 每1分钟进行一次重入
-		ReentrantMaxTimes: 30,                          // 最多重入30次
+		ReentrantMaxTimes: 0,                           // 最多重入30次
 	}
 
 	// defaultStatusPolicyBlocking 默认pending状态的校验策略。
@@ -75,6 +77,9 @@ var (
 		ReentrantDelay:    600,                          // 每10min进行一次重入
 		ReentrantMaxTimes: 144,                          // 最多重入144次 (1天=144*10min)
 	}
+
+	// defaultDeadPolicy default dead to D1
+	defaultDeadPolicy = &ShiftPolicy{Level: message.D1}
 
 	// defaultUpgradePolicy
 	defaultUpgradePolicy = &ShiftPolicy{}
@@ -89,12 +94,19 @@ var (
 // ------ default consume leveled policies ------
 
 var (
-	defaultLeveledWeights = map[internal.TopicLevel]uint{
-		message.L3: 30,
-		message.L2: 20,
-		message.L1: 10,
-		message.B1: 5,
-		message.B2: 2,
+	defaultLeveledWeightFunc = func(lvl internal.TopicLevel) uint {
+		if strings.HasPrefix(string(lvl), "S") {
+			return defaultLeveledConsumeWeightMain * 2
+		} else if strings.HasPrefix(string(lvl), "L") {
+			return defaultLeveledConsumeWeightMain
+		} else if strings.HasPrefix(string(lvl), "B") {
+			return defaultLeveledConsumeWeightMain / 2
+		} else if strings.HasPrefix(string(lvl), "D") {
+			// Dead 队列默认不消费, 如果强制配置为消费, 默认权重同Ln默认权重
+			return defaultLeveledConsumeWeightMain
+		} else {
+			panic(fmt.Sprintf("invalid topic level: %v", lvl))
+		}
 	}
 )
 
@@ -105,6 +117,10 @@ var (
 		CorePoolSize:    16,
 		MaximumPoolSize: 16,
 		KeepAliveTime:   60,
+
+		PanicHandler: func(i interface{}) {
+			panic(i)
+		}, // panic to exit main process. as default ants, exits worker goroutine but not main process
 	}
 )
 
@@ -114,3 +130,17 @@ var (
 		ConnectInSyncEnable: false,
 	}
 )
+
+// ------ helper ------
+
+func ToPointer[T any](v T) *T {
+	return &v
+}
+
+func True() *bool {
+	return ToPointer(true)
+}
+
+func False() *bool {
+	return ToPointer(false)
+}

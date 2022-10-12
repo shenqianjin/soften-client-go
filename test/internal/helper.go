@@ -20,10 +20,12 @@ var (
 	DefaultPulsarUrl     = "pulsar://localhost:6650"
 	DefaultPulsarHttpUrl = "http://localhost:8080"
 
-	DefaultTopic      = "my-topic"
-	PrefixTestProduce = "test-produce"
-	PrefixTestConsume = "test-consume"
-	PrefixTestListen  = "test-listen"
+	DefaultTopic           = "my-topic"
+	PrefixTestProduce      = "test-produce"
+	PrefixTestConsume      = "test-consume"
+	PrefixTestConsumeLimit = "test-consume-limit"
+	PrefixTestConsumeBatch = "test-consume-batch"
+	PrefixTestListen       = "test-listen"
 
 	Size64 = 64
 	Size1K = 1024

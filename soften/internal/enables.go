@@ -2,7 +2,18 @@ package internal
 
 // ------ status enables ------
 
-type StatusEnables struct {
+type ProduceEnables struct {
+	DiscardEnable  bool
+	DeadEnable     bool
+	UpgradeEnable  bool
+	DegradeEnable  bool
+	ShiftEnable    bool
+	TransferEnable bool
+}
+
+// ------ status enables ------
+
+type ConsumeEnables struct {
 	ReadyEnable    bool
 	BlockingEnable bool
 	PendingEnable  bool

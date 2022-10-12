@@ -53,7 +53,7 @@ func testListenBySingleStatus(t *testing.T, status string) {
 	// create producer
 	producer, err := client.CreateProducer(config.ProducerConfig{
 		Topic:          topic,
-		TransferEnable: true,
+		TransferEnable: config.True(),
 		Transfer:       &config.TransferPolicy{ConnectInSyncEnable: true},
 	}, checker.PrevSendTransfer(func(ctx context.Context, msg *message.ProducerMessage) checker.CheckStatus {
 		if storedTopic, ok := msg.Properties["routeTopic"]; ok {
@@ -81,9 +81,9 @@ func testListenBySingleStatus(t *testing.T, status string) {
 
 	// ---------------
 	leveledPolicy := &config.LevelPolicy{
-		RetryingEnable: string(message.StatusRetrying) == status, // enable retrying if matches
-		PendingEnable:  string(message.StatusPending) == status,  // enable pending if matches
-		BlockingEnable: string(message.StatusBlocking) == status, // enable blocking if matches
+		RetryingEnable: config.ToPointer(string(message.StatusRetrying) == status), // enable retrying if matches
+		PendingEnable:  config.ToPointer(string(message.StatusPending) == status),  // enable pending if matches
+		BlockingEnable: config.ToPointer(string(message.StatusBlocking) == status), // enable blocking if matches
 	}
 	// create listener
 	listener := internal.CreateListener(client, config.ConsumerConfig{
@@ -144,7 +144,7 @@ func TestListen_4Msg_Ready_Retrying_Pending_Blocking(t *testing.T) {
 	// create producer
 	producer, err := client.CreateProducer(config.ProducerConfig{
 		Topic:          topic,
-		TransferEnable: true,
+		TransferEnable: config.True(),
 		Transfer:       &config.TransferPolicy{ConnectInSyncEnable: true},
 	}, checker.PrevSendTransfer(func(ctx context.Context, msg *message.ProducerMessage) checker.CheckStatus {
 		if storedTopic, ok := msg.Properties["routeTopic"]; ok {
@@ -175,9 +175,9 @@ func TestListen_4Msg_Ready_Retrying_Pending_Blocking(t *testing.T) {
 	// ---------------
 
 	leveledPolicy := &config.LevelPolicy{
-		RetryingEnable: true, // enable retrying if matches
-		PendingEnable:  true, // enable pending if matches
-		BlockingEnable: true, // enable blocking if matches
+		RetryingEnable: config.True(), // enable retrying if matches
+		PendingEnable:  config.True(), // enable pending if matches
+		BlockingEnable: config.True(), // enable blocking if matches
 	}
 	// create listener
 	listener := internal.CreateListener(client, config.ConsumerConfig{

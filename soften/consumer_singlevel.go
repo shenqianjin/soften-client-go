@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"sync"
+	"time"
 
 	"github.com/apache/pulsar-client-go/pulsar"
 	"github.com/apache/pulsar-client-go/pulsar/log"
@@ -48,7 +49,7 @@ func newSingleLeveledConsumer(parentLogger log.Logger, client *client, level int
 		options := statusConsumerOptions{level: level, status: message.StatusReady, policy: conf.Ready, metrics: metrics}
 		slc.mainConsumer = newStatusConsumer(slc.logger, mainConsumer, options, nil)
 	}
-	if conf.PendingEnable {
+	if *conf.PendingEnable {
 		if pendingConsumer, pendingTopic, err := slc.internalSubscribe(client, conf, level, message.StatusPending); err != nil {
 			return nil, err
 		} else {
@@ -58,7 +59,7 @@ func newSingleLeveledConsumer(parentLogger log.Logger, client *client, level int
 			slc.pendingConsumer = newStatusConsumer(slc.logger, pendingConsumer, options, deciders.pendingDecider)
 		}
 	}
-	if conf.BlockingEnable {
+	if *conf.BlockingEnable {
 		if blockingConsumer, blockingTopic, err := slc.internalSubscribe(client, conf, level, message.StatusBlocking); err != nil {
 			return nil, err
 		} else {
@@ -68,7 +69,7 @@ func newSingleLeveledConsumer(parentLogger log.Logger, client *client, level int
 			slc.blockingConsumer = newStatusConsumer(slc.logger, blockingConsumer, options, deciders.blockingDecider)
 		}
 	}
-	if conf.RetryingEnable {
+	if *conf.RetryingEnable {
 		if retryingConsumer, retryingTopic, err := slc.internalSubscribe(client, conf, level, message.StatusRetrying); err != nil {
 			return nil, err
 		} else {
@@ -168,7 +169,7 @@ func (slc *singleLeveledConsumer) internalSubscribe(cli *client, conf *config.Co
 		SubscriptionName:            conf.SubscriptionName,
 		Type:                        conf.Type,
 		SubscriptionInitialPosition: conf.SubscriptionInitialPosition,
-		NackRedeliveryDelay:         conf.NackRedeliveryDelay,
+		NackRedeliveryDelay:         time.Second * time.Duration(conf.NackRedeliveryDelay),
 		NackBackoffPolicy:           conf.NackBackoffPolicy,
 		MessageChannel:              nil,
 	}

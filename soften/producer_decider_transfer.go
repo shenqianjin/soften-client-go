@@ -73,8 +73,12 @@ func (d *producerTransferDecider) Decide(ctx context.Context, msg *pulsar.Produc
 		return nil, err, false
 	}
 
+	if d.options.transfer.CountMode == config.CountPassNull {
+		message.Helper.ClearMessageCounter(msg.Properties)
+		message.Helper.ClearStatusMessageCounters(msg.Properties)
+	}
 	// consume time info
-	message.Helper.InjectConsumeTime(&msg.Properties, checkStatus.GetGotoExtra().ConsumeTime)
+	message.Helper.InjectConsumeTime(msg.Properties, checkStatus.GetGotoExtra().ConsumeTime)
 
 	// get or create router
 	rtr, err := d.internalSafeGetRouter(destTopic)
@@ -136,7 +140,7 @@ func (d *producerTransferDecider) DecideAsync(ctx context.Context, msg *pulsar.P
 	}
 
 	// consume time info
-	message.Helper.InjectConsumeTime(&msg.Properties, checkStatus.GetGotoExtra().ConsumeTime)
+	message.Helper.InjectConsumeTime(msg.Properties, checkStatus.GetGotoExtra().ConsumeTime)
 	// get or create router
 	rtr, err := d.internalSafeGetRouter(destTopic)
 	if err != nil {
@@ -172,9 +176,9 @@ func (d *producerTransferDecider) internalSafeGetRouter(topic string) (*router, 
 	rtOption := routerOptions{
 		Topic:               topic,
 		connectInSyncEnable: d.options.transfer.ConnectInSyncEnable,
-		BackoffMaxTimes:     d.options.transfer.BackoffMaxTimes,
-		BackoffDelays:       d.options.transfer.BackoffDelays,
-		BackoffPolicy:       d.options.transfer.BackoffPolicy,
+		BackoffMaxTimes:     d.options.transfer.PublishPolicy.BackoffMaxTimes,
+		BackoffDelays:       d.options.transfer.PublishPolicy.BackoffDelays,
+		BackoffPolicy:       d.options.transfer.PublishPolicy.BackoffPolicy,
 	}
 	d.routersLock.Lock()
 	defer d.routersLock.Unlock()

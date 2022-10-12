@@ -70,12 +70,9 @@ Soften模型核心是基于状态来决定一个消息的去向。以下为支�
     <!-- body -->
     <!-- produce cases -->
     <tr align="left">
-        <th rowspan="8">Consume</th><th>Discard</th><th>checker.PrevSendDiscard</th><th>将消息丢弃</th>
+        <th rowspan="5">Produce</th><th>Discard</th><th>checker.PrevSendDiscard</th><th>将消息丢弃</th>
     </tr>
-    <tr align="left"><th>Pending</th><th>checker.PrevSendPending</th><th>路由消息到Pending队列</th></tr>
-    <tr align="left"><th>Blocking</th><th>checker.PrevSendBlocking</th><th>路由消息到Blocking队列</th></tr>
-    <tr align="left"><th>Retrying</th><th>checker.PrevSendRetrying</th><th>路由消息到Retrying队列</th></tr>
-    <tr align="left"><th>Dead</th><th>checker.PrevSendDead</th><th>路由消息到死信队列</th></tr>
+    <tr align="left"><th>Dead</th><th>checker.PrevSendDead</th><th>升降消息到死信级别队列(D1,业务不期望被订阅), 明确只能到死信级别队列</th></tr>
     <tr align="left"><th>Upgrade</th><th>checker.PrevSendUpgrade</th><th>升级消息到预配置的升级级别中; 明确升级, 不能平级或降级移动</th></tr>
     <tr align="left"><th>Degrade</th><th>checker.PrevSendDegrade</th><th>降级消息到预配置的降级级别中; 明确降级, 不能平级或升级移动</th></tr>
     <tr align="left"><th>Shift</th><th>checker.PrevSendShift</th><th>升降消息到预配置的降级级别中; 任意升降, 无级别限制</th></tr>

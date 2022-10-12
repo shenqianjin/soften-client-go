@@ -42,11 +42,13 @@ func (d *finalStatusDecider) Decide(msg consumerMessage, cheStatus checker.Check
 	}
 	switch d.options.msgGoto {
 	case decider.GotoDone:
-		msg.Consumer.Ack(msg.Message)
+		msg.Ack()
+		msg.internalExtra.consumerMetrics.ConsumeMessageAcks.Inc()
 		d.logger.Debugf("Decide message as done: %v", msg.Message.ID())
 		success = true
 	case decider.GotoDiscard:
-		msg.Consumer.Ack(msg.Message)
+		msg.Ack()
+		msg.internalExtra.consumerMetrics.ConsumeMessageAcks.Inc()
 		d.logger.Debugf("Decide message as discard: %v", msg.Message.ID())
 		success = true
 	}

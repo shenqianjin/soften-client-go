@@ -19,12 +19,12 @@ import (
 )
 
 type testListenHandleCase struct {
-	topic                     string
-	storedTopic               string // produce to / consume from
-	transferredTopic          string // Handle to
-	expectedStoredOutCount    int    // should always 1
-	expectedTransferdOutCount int    // 1 for pending, blocking, retrying; 0 for upgrade, degrade, transfer
-	handleGoto                string
+	topic                       string
+	storedTopic                 string // produce to / consume from
+	transferredTopic            string // Handle to
+	expectedStoredOutCount      int    // should always 1
+	expectedTransferredOutCount int    // 1 for pending, blocking, retrying; 0 for upgrade, degrade, transfer
+	handleGoto                  string
 
 	// extra for upgrade/degrade/shift
 	shiftLevel string
@@ -64,11 +64,11 @@ func TestListenHandle_Dead(t *testing.T) {
 func TestListenHandle_Pending(t *testing.T) {
 	topic := internal.GenerateTestTopic(internal.PrefixTestListen)
 	HandleCase := testListenHandleCase{
-		topic:                     topic,
-		storedTopic:               topic,
-		transferredTopic:          internal.FormatStatusTopic(topic, internal.TestSubscriptionName(), "", message.StatusPending.TopicSuffix()),
-		handleGoto:                decider.GotoPending.String(),
-		expectedTransferdOutCount: 1, // transfer the msg to pending queue, and then reconsume it
+		topic:                       topic,
+		storedTopic:                 topic,
+		transferredTopic:            internal.FormatStatusTopic(topic, internal.TestSubscriptionName(), "", message.StatusPending.TopicSuffix()),
+		handleGoto:                  decider.GotoPending.String(),
+		expectedTransferredOutCount: 1, // transfer the msg to pending queue, and then reconsume it
 	}
 	testListenHandleGoto(t, HandleCase)
 }
@@ -76,11 +76,11 @@ func TestListenHandle_Pending(t *testing.T) {
 func TestListenHandle_Blocking(t *testing.T) {
 	topic := internal.GenerateTestTopic(internal.PrefixTestListen)
 	HandleCase := testListenHandleCase{
-		topic:                     topic,
-		storedTopic:               topic,
-		transferredTopic:          internal.FormatStatusTopic(topic, internal.TestSubscriptionName(), "", message.StatusBlocking.TopicSuffix()),
-		handleGoto:                decider.GotoBlocking.String(),
-		expectedTransferdOutCount: 1,
+		topic:                       topic,
+		storedTopic:                 topic,
+		transferredTopic:            internal.FormatStatusTopic(topic, internal.TestSubscriptionName(), "", message.StatusBlocking.TopicSuffix()),
+		handleGoto:                  decider.GotoBlocking.String(),
+		expectedTransferredOutCount: 1,
 	}
 	testListenHandleGoto(t, HandleCase)
 }
@@ -88,11 +88,11 @@ func TestListenHandle_Blocking(t *testing.T) {
 func TestListenHandle_Retrying(t *testing.T) {
 	topic := internal.GenerateTestTopic(internal.PrefixTestListen)
 	HandleCase := testListenHandleCase{
-		topic:                     topic,
-		storedTopic:               topic,
-		transferredTopic:          internal.FormatStatusTopic(topic, internal.TestSubscriptionName(), "", message.StatusRetrying.TopicSuffix()),
-		handleGoto:                decider.GotoRetrying.String(),
-		expectedTransferdOutCount: 1,
+		topic:                       topic,
+		storedTopic:                 topic,
+		transferredTopic:            internal.FormatStatusTopic(topic, internal.TestSubscriptionName(), "", message.StatusRetrying.TopicSuffix()),
+		handleGoto:                  decider.GotoRetrying.String(),
+		expectedTransferredOutCount: 1,
 	}
 	testListenHandleGoto(t, HandleCase)
 }
@@ -152,7 +152,7 @@ func testListenHandleGoto(t *testing.T, handleCase testListenHandleCase) {
 	storedTopic := handleCase.storedTopic
 	TransferredTopic := handleCase.transferredTopic
 	manager := admin.NewAdminManager(internal.DefaultPulsarHttpUrl)
-	// clean up topic
+	// clean up groundTopic
 	internal.CleanUpTopic(t, manager, storedTopic)
 	internal.CleanUpTopic(t, manager, TransferredTopic)
 	defer func() {
@@ -188,21 +188,21 @@ func testListenHandleGoto(t *testing.T, handleCase testListenHandleCase) {
 	// create listener
 	shiftLevel, _ := message.LevelOf(handleCase.shiftLevel)
 	leveledPolicy := &config.LevelPolicy{
-		DiscardEnable:  handleCase.handleGoto == decider.GotoDiscard.String(),
-		DeadEnable:     handleCase.handleGoto == decider.GotoDead.String(),
-		PendingEnable:  handleCase.handleGoto == decider.GotoPending.String(),
+		DiscardEnable:  config.ToPointer(handleCase.handleGoto == decider.GotoDiscard.String()),
+		DeadEnable:     config.ToPointer(handleCase.handleGoto == decider.GotoDead.String()),
+		PendingEnable:  config.ToPointer(handleCase.handleGoto == decider.GotoPending.String()),
 		Pending:        testPolicy,
-		BlockingEnable: handleCase.handleGoto == decider.GotoBlocking.String(),
+		BlockingEnable: config.ToPointer(handleCase.handleGoto == decider.GotoBlocking.String()),
 		Blocking:       testPolicy,
-		RetryingEnable: handleCase.handleGoto == decider.GotoRetrying.String(),
+		RetryingEnable: config.ToPointer(handleCase.handleGoto == decider.GotoRetrying.String()),
 		Retrying:       testPolicy,
-		UpgradeEnable:  handleCase.handleGoto == decider.GotoUpgrade.String(),
+		UpgradeEnable:  config.ToPointer(handleCase.handleGoto == decider.GotoUpgrade.String()),
 		Upgrade:        &config.ShiftPolicy{Level: shiftLevel, ConnectInSyncEnable: true},
-		DegradeEnable:  handleCase.handleGoto == decider.GotoDegrade.String(),
+		DegradeEnable:  config.ToPointer(handleCase.handleGoto == decider.GotoDegrade.String()),
 		Degrade:        &config.ShiftPolicy{Level: shiftLevel, ConnectInSyncEnable: true},
-		ShiftEnable:    handleCase.handleGoto == decider.GotoShift.String(),
+		ShiftEnable:    config.ToPointer(handleCase.handleGoto == decider.GotoShift.String()),
 		Shift:          &config.ShiftPolicy{Level: shiftLevel, ConnectInSyncEnable: true},
-		TransferEnable: handleCase.handleGoto == decider.GotoTransfer.String(),
+		TransferEnable: config.ToPointer(handleCase.handleGoto == decider.GotoTransfer.String()),
 		Transfer:       &config.TransferPolicy{ConnectInSyncEnable: handleCase.handleGoto == decider.GotoTransfer.String()},
 	}
 	listener, err := client.CreateListener(config.ConsumerConfig{
@@ -247,7 +247,7 @@ func testListenHandleGoto(t *testing.T, handleCase testListenHandleCase) {
 		stats, err = manager.Stats(TransferredTopic)
 		assert.Nil(t, err)
 		assert.Equal(t, 1, stats.MsgInCounter)
-		assert.Equal(t, handleCase.expectedTransferdOutCount, stats.MsgOutCounter)
+		assert.Equal(t, handleCase.expectedTransferredOutCount, stats.MsgOutCounter)
 		if handleCase.handleGoto == decider.GotoPending.String() ||
 			handleCase.handleGoto == decider.GotoBlocking.String() ||
 			handleCase.handleGoto == decider.GotoRetrying.String() {
@@ -332,21 +332,21 @@ func TestListenHandle_All(t *testing.T) {
 		ReentrantDelay: 1,
 	}
 	leveledPolicy := &config.LevelPolicy{
-		DiscardEnable:  true,
-		DeadEnable:     true,
-		PendingEnable:  true,
+		DiscardEnable:  config.True(),
+		DeadEnable:     config.True(),
+		PendingEnable:  config.True(),
 		Pending:        testPolicy,
-		BlockingEnable: true,
+		BlockingEnable: config.True(),
 		Blocking:       testPolicy,
-		RetryingEnable: true,
+		RetryingEnable: config.True(),
 		Retrying:       testPolicy,
-		UpgradeEnable:  true,
+		UpgradeEnable:  config.True(),
 		Upgrade:        &config.ShiftPolicy{Level: upgradeLevel, ConnectInSyncEnable: true},
-		DegradeEnable:  true,
+		DegradeEnable:  config.True(),
 		Degrade:        &config.ShiftPolicy{Level: degradeLevel, ConnectInSyncEnable: true},
-		ShiftEnable:    true,
+		ShiftEnable:    config.True(),
 		Shift:          &config.ShiftPolicy{Level: shiftLevel, ConnectInSyncEnable: true},
-		TransferEnable: true,
+		TransferEnable: config.True(),
 		Transfer:       &config.TransferPolicy{ConnectInSyncEnable: true},
 	}
 	// create listener

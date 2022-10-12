@@ -120,11 +120,8 @@ func (v *validator) ValidateAndDefaultConsumerConfig(conf *ConsumerConfig) error
 			policy := conf.LevelPolicies[level]
 			// default consume weight for multi-level
 			if policy.ConsumeWeight == 0 {
-				if weight, ok2 := defaultLeveledWeights[level]; ok2 {
-					policy.ConsumeWeight = weight
-				} else {
-					policy.ConsumeWeight = defaultLeveledConsumeWeightMain
-				}
+				// default weight by default calculate algorithm
+				policy.ConsumeWeight = defaultLeveledWeightFunc(level)
 			}
 			// default and valid main multi-level policy
 			if err := v.validateAndDefaultPolicyProps4ExtraLevel(policy, conf.LevelPolicy); err != nil {
@@ -163,6 +160,37 @@ func (v *validator) validateAndDefaultEscapeHandler(conf *ConsumerConfig) error 
 }
 
 func (v *validator) validateAndDefaultPolicyProps4MainLevel(policy *LevelPolicy, mainLevel internal.TopicLevel) error {
+	// default status switches
+	if policy.BlockingEnable == nil {
+		policy.BlockingEnable = new(bool)
+	}
+	if policy.RetryingEnable == nil {
+		policy.RetryingEnable = new(bool)
+	}
+	if policy.PendingEnable == nil {
+		policy.PendingEnable = new(bool)
+	}
+	if policy.DeadEnable == nil {
+		policy.DeadEnable = new(bool)
+		*policy.DeadEnable = true
+	}
+	if policy.DiscardEnable == nil {
+		policy.DiscardEnable = new(bool)
+		*policy.DiscardEnable = true
+	}
+	// default shift/transfer switches
+	if policy.ShiftEnable == nil {
+		policy.ShiftEnable = new(bool)
+	}
+	if policy.UpgradeEnable == nil {
+		policy.UpgradeEnable = new(bool)
+	}
+	if policy.DegradeEnable == nil {
+		policy.DegradeEnable = new(bool)
+	}
+	if policy.TransferEnable == nil {
+		policy.TransferEnable = new(bool)
+	}
 	// default status Policy
 	if policy.Ready == nil {
 		policy.Ready = defaultStatusPolicyReady
@@ -170,55 +198,51 @@ func (v *validator) validateAndDefaultPolicyProps4MainLevel(policy *LevelPolicy,
 	if err := v.validateAndDefaultStatusPolicy(policy.Ready, defaultStatusPolicyReady); err != nil {
 		return err
 	}
-	policy.Ready.TransferLevel = mainLevel
 	// default and valid pending policy
-	if policy.PendingEnable {
+	if *policy.PendingEnable {
 		if policy.Pending == nil {
 			policy.Pending = defaultStatusPolicyPending
 		}
 		if err := v.validateAndDefaultStatusPolicy(policy.Pending, defaultStatusPolicyPending); err != nil {
 			return err
 		}
-		policy.Pending.TransferLevel = mainLevel
 	}
-	if policy.BlockingEnable {
+	if *policy.BlockingEnable {
 		if policy.Blocking == nil {
 			policy.Blocking = defaultStatusPolicyBlocking
 		}
 		if err := v.validateAndDefaultStatusPolicy(policy.Blocking, defaultStatusPolicyBlocking); err != nil {
 			return err
 		}
-		policy.Blocking.TransferLevel = mainLevel
 	}
-	if policy.RetryingEnable {
+	if *policy.RetryingEnable {
 		if policy.Retrying == nil {
 			policy.Retrying = defaultStatusPolicyRetrying
 		}
 		if err := v.validateAndDefaultStatusPolicy(policy.Retrying, defaultStatusPolicyRetrying); err != nil {
 			return err
 		}
-		policy.Retrying.TransferLevel = mainLevel
 	}
-	if policy.TransferEnable {
+	if *policy.TransferEnable {
 		if policy.Transfer == nil {
 			policy.Transfer = defaultTransferPolicy
 		}
 	}
 	// validate and default upgrade policy
-	if policy.UpgradeEnable {
-		if err := v.validateAndDefaultUpgradePolicy(message.L1, policy.Upgrade, defaultUpgradePolicy); err != nil {
+	if *policy.UpgradeEnable {
+		if err := v.validateAndDefaultUpgradePolicy(mainLevel, policy.Upgrade, defaultUpgradePolicy); err != nil {
 			return err
 		}
 	}
 	// validate and default degrade policy
-	if policy.DegradeEnable {
-		if err := v.validateAndDefaultDegradePolicy(message.L1, policy.Degrade, defaultDegradePolicy); err != nil {
+	if *policy.DegradeEnable {
+		if err := v.validateAndDefaultDegradePolicy(mainLevel, policy.Degrade, defaultDegradePolicy); err != nil {
 			return err
 		}
 	}
 	// validate and default shift policy
-	if policy.ShiftEnable {
-		if err := v.validateAndDefaultShiftPolicy(message.L1, policy.Shift, defaultShiftPolicy); err != nil {
+	if *policy.ShiftEnable {
+		if err := v.validateAndDefaultShiftPolicy(mainLevel, policy.Shift, defaultShiftPolicy); err != nil {
 			return err
 		}
 	}
@@ -226,6 +250,44 @@ func (v *validator) validateAndDefaultPolicyProps4MainLevel(policy *LevelPolicy,
 }
 
 func (v *validator) validateAndDefaultPolicyProps4ExtraLevel(policy *LevelPolicy, mainPolicy *LevelPolicy) error {
+	// default status switches
+	if policy.BlockingEnable == nil {
+		policy.BlockingEnable = new(bool)
+		*policy.BlockingEnable = *mainPolicy.BlockingEnable
+	}
+	if policy.RetryingEnable == nil {
+		policy.RetryingEnable = new(bool)
+		*policy.RetryingEnable = *mainPolicy.RetryingEnable
+	}
+	if policy.PendingEnable == nil {
+		policy.PendingEnable = new(bool)
+		*policy.PendingEnable = *mainPolicy.PendingEnable
+	}
+	if policy.DeadEnable == nil {
+		policy.DeadEnable = new(bool)
+		*policy.DeadEnable = *mainPolicy.DeadEnable
+	}
+	if policy.DiscardEnable == nil {
+		policy.DiscardEnable = new(bool)
+		*policy.DiscardEnable = *mainPolicy.DiscardEnable
+	}
+	// default shift/transfer switches
+	if policy.ShiftEnable == nil {
+		policy.ShiftEnable = new(bool)
+		*policy.ShiftEnable = *mainPolicy.ShiftEnable
+	}
+	if policy.UpgradeEnable == nil {
+		policy.UpgradeEnable = new(bool)
+		*policy.UpgradeEnable = *mainPolicy.UpgradeEnable
+	}
+	if policy.DegradeEnable == nil {
+		policy.DegradeEnable = new(bool)
+		*policy.DegradeEnable = *mainPolicy.DegradeEnable
+	}
+	if policy.TransferEnable == nil {
+		policy.TransferEnable = new(bool)
+		*policy.TransferEnable = *mainPolicy.TransferEnable
+	}
 	// default status Policy
 	if policy.Ready == nil {
 		policy.Ready = mainPolicy.Ready
@@ -234,67 +296,68 @@ func (v *validator) validateAndDefaultPolicyProps4ExtraLevel(policy *LevelPolicy
 		return err
 	}
 	// default and valid pending policy
-	if policy.PendingEnable {
+	if *policy.PendingEnable {
 		if policy.Pending == nil {
 			policy.Pending = mainPolicy.Pending
 		}
-		if err := v.validateAndDefaultStatusPolicy(policy.Pending, defaultStatusPolicyPending); err != nil {
+		if err := v.validateAndDefaultStatusPolicy(policy.Pending, mainPolicy.Pending); err != nil {
 			return err
 		}
 	}
-	if policy.BlockingEnable {
+	if *policy.BlockingEnable {
 		if policy.Blocking == nil {
 			policy.Blocking = mainPolicy.Blocking
 		}
-		if err := v.validateAndDefaultStatusPolicy(policy.Blocking, defaultStatusPolicyBlocking); err != nil {
+		if err := v.validateAndDefaultStatusPolicy(policy.Blocking, mainPolicy.Blocking); err != nil {
 			return err
 		}
 	}
-	if policy.RetryingEnable {
+	if *policy.RetryingEnable {
 		if policy.Retrying == nil {
 			policy.Retrying = mainPolicy.Retrying
 		}
-		if err := v.validateAndDefaultStatusPolicy(policy.Retrying, defaultStatusPolicyRetrying); err != nil {
+		if err := v.validateAndDefaultStatusPolicy(policy.Retrying, mainPolicy.Retrying); err != nil {
 			return err
 		}
 	}
-	if policy.TransferEnable {
+	if *policy.TransferEnable {
 		if policy.Transfer == nil {
 			policy.Transfer = mainPolicy.Transfer
 		}
 	}
 	// validate and default upgrade policy
-	if policy.UpgradeEnable {
+	if *policy.UpgradeEnable {
 		if policy.Upgrade == nil {
-			policy.Shift = mainPolicy.Upgrade
+			policy.Upgrade = mainPolicy.Upgrade
 		}
-		if err := v.validateAndDefaultUpgradePolicy(message.L1, policy.Upgrade, defaultUpgradePolicy); err != nil {
+		if err := v.validateAndDefaultUpgradePolicy(message.L1, policy.Upgrade, mainPolicy.Upgrade); err != nil {
 			return err
 		}
 	}
 	// validate and default degrade policy
-	if policy.DegradeEnable {
+	if *policy.DegradeEnable {
 		if policy.Degrade == nil {
-			policy.Shift = mainPolicy.Degrade
+			policy.Degrade = mainPolicy.Degrade
 		}
-		if err := v.validateAndDefaultDegradePolicy(message.L1, policy.Degrade, defaultDegradePolicy); err != nil {
+		if err := v.validateAndDefaultDegradePolicy(message.L1, policy.Degrade, mainPolicy.Degrade); err != nil {
 			return err
 		}
 	}
 	// validate and default shift policy
-	if policy.ShiftEnable {
+	if *policy.ShiftEnable {
 		if policy.Shift == nil {
 			policy.Shift = mainPolicy.Shift
 		}
-		if err := v.validateAndDefaultShiftPolicy(message.L1, policy.Shift, defaultShiftPolicy); err != nil {
+		if err := v.validateAndDefaultShiftPolicy(message.L1, policy.Shift, mainPolicy.Shift); err != nil {
 			return err
 		}
 	}
 	return nil
 }
 
-func (v *validator) validateAndDefaultShiftPolicy(consumeLevel internal.TopicLevel, configuredPolicy *ShiftPolicy, defaultPolicy *ShiftPolicy) error {
+func (v *validator) validateAndDefaultShiftPolicy(mainLevel internal.TopicLevel, configuredPolicy *ShiftPolicy, defaultPolicy *ShiftPolicy) error {
 	if configuredPolicy == nil {
+		configuredPolicy = &ShiftPolicy{}
 		configuredPolicy = defaultPolicy
 		return nil
 	}
@@ -306,29 +369,36 @@ func (v *validator) validateAndDefaultShiftPolicy(consumeLevel internal.TopicLev
 	}*/
 	if configuredPolicy.Level != "" {
 		if !message.Exists(configuredPolicy.Level) {
-			return errors.New(fmt.Sprintf("not supported topic level: %v for consume level: %v", configuredPolicy.Level, consumeLevel))
+			return errors.New(fmt.Sprintf("not supported topic level: %v for main level: %v", configuredPolicy.Level, mainLevel))
+		}
+		if configuredPolicy.Level == mainLevel {
+			return errors.New(fmt.Sprintf("destination level cannot be same with the main level: %v", mainLevel))
 		}
 	}
 	return nil
 }
 
-func (v *validator) validateAndDefaultUpgradePolicy(consumeLevel internal.TopicLevel, configuredPolicy *ShiftPolicy, defaultPolicy *ShiftPolicy) error {
-	v.validateAndDefaultShiftPolicy(consumeLevel, configuredPolicy, defaultPolicy)
+func (v *validator) validateAndDefaultUpgradePolicy(mainLevel internal.TopicLevel, configuredPolicy *ShiftPolicy, defaultPolicy *ShiftPolicy) error {
+	if err := v.validateAndDefaultShiftPolicy(mainLevel, configuredPolicy, defaultPolicy); err != nil {
+		return err
+	}
 	if configuredPolicy.Level != "" {
-		if configuredPolicy.Level.OrderOf() <= consumeLevel.OrderOf() {
-			return errors.New(fmt.Sprintf("upgrade level [%v] cannot be lower or equal than the consume level [%v]",
-				configuredPolicy.Level, consumeLevel))
+		if configuredPolicy.Level.OrderOf() <= mainLevel.OrderOf() {
+			return errors.New(fmt.Sprintf("upgrade level [%v] cannot be lower or equal than the main level [%v]",
+				configuredPolicy.Level, mainLevel))
 		}
 	}
 	return nil
 }
 
-func (v *validator) validateAndDefaultDegradePolicy(consumeLevel internal.TopicLevel, configuredPolicy *ShiftPolicy, defaultPolicy *ShiftPolicy) error {
-	v.validateAndDefaultShiftPolicy(consumeLevel, configuredPolicy, defaultPolicy)
+func (v *validator) validateAndDefaultDegradePolicy(mainLevel internal.TopicLevel, configuredPolicy *ShiftPolicy, defaultPolicy *ShiftPolicy) error {
+	if err := v.validateAndDefaultShiftPolicy(mainLevel, configuredPolicy, defaultPolicy); err != nil {
+		return err
+	}
 	if configuredPolicy.Level != "" {
-		if configuredPolicy.Level.OrderOf() >= consumeLevel.OrderOf() {
-			return errors.New(fmt.Sprintf("degrade level [%v] cannot be higher or equal than the consume level [%v]",
-				configuredPolicy.Level, consumeLevel))
+		if configuredPolicy.Level.OrderOf() >= mainLevel.OrderOf() {
+			return errors.New(fmt.Sprintf("degrade level [%v] cannot be higher or equal than the main level [%v]",
+				configuredPolicy.Level, mainLevel))
 		}
 	}
 	return nil
@@ -338,12 +408,27 @@ func (v *validator) ValidateAndDefaultProducerConfig(conf *ProducerConfig) error
 	if conf.Topic == "" {
 		return errors.New("topic is blank")
 	}
-	// default Transfer policy
-	if conf.TransferEnable {
-		if conf.Transfer == nil {
-			conf.Transfer = defaultTransferPolicy
-		}
+	// default status switches
+	if conf.DeadEnable == nil {
+		conf.DeadEnable = new(bool)
 	}
+	if conf.DiscardEnable == nil {
+		conf.DiscardEnable = new(bool)
+	}
+	// default shift/transfer switches
+	if conf.ShiftEnable == nil {
+		conf.ShiftEnable = new(bool)
+	}
+	if conf.UpgradeEnable == nil {
+		conf.UpgradeEnable = new(bool)
+	}
+	if conf.DegradeEnable == nil {
+		conf.DegradeEnable = new(bool)
+	}
+	if conf.TransferEnable == nil {
+		conf.TransferEnable = new(bool)
+	}
+
 	// default level
 	if conf.Level == "" {
 		conf.Level = message.L1
@@ -362,23 +447,46 @@ func (v *validator) ValidateAndDefaultProducerConfig(conf *ProducerConfig) error
 			conf.BackoffPolicy = backoffPolicy
 		}
 	}
-	//
+	// validate dead: default dead to D1
+	if *conf.DeadEnable {
+		if conf.Dead == nil {
+			conf.Dead = defaultDeadPolicy
+		}
+		if err := v.validateAndDefaultShiftPolicy(conf.Level, conf.Dead, defaultDeadPolicy); err != nil {
+			return err
+		}
+	}
 	// validate upgrade: default nothing
-	if conf.UpgradeEnable {
-		if err := v.validateAndDefaultUpgradePolicy(message.L1, conf.Upgrade, defaultUpgradePolicy); err != nil {
+	if *conf.UpgradeEnable {
+		if conf.Upgrade == nil {
+			conf.Upgrade = defaultUpgradePolicy
+		}
+		if err := v.validateAndDefaultUpgradePolicy(conf.Level, conf.Upgrade, defaultUpgradePolicy); err != nil {
 			return err
 		}
 	}
 	// validate degrade: default nothing
-	if conf.DegradeEnable {
-		if err := v.validateAndDefaultDegradePolicy(message.L1, conf.Degrade, defaultDegradePolicy); err != nil {
+	if *conf.DegradeEnable {
+		if conf.Degrade == nil {
+			conf.Degrade = defaultDegradePolicy
+		}
+		if err := v.validateAndDefaultDegradePolicy(conf.Level, conf.Degrade, defaultDegradePolicy); err != nil {
 			return err
 		}
 	}
 	// validate shift: default nothing
-	if conf.ShiftEnable {
-		if err := v.validateAndDefaultShiftPolicy(message.L1, conf.Shift, defaultShiftPolicy); err != nil {
+	if *conf.ShiftEnable {
+		if conf.Shift == nil {
+			conf.Shift = defaultShiftPolicy
+		}
+		if err := v.validateAndDefaultShiftPolicy(conf.Level, conf.Shift, defaultShiftPolicy); err != nil {
 			return err
+		}
+	}
+	// validate and default transfer
+	if *conf.TransferEnable {
+		if conf.Transfer == nil {
+			conf.Transfer = defaultTransferPolicy
 		}
 	}
 	return nil
@@ -414,10 +522,6 @@ func (v *validator) validateAndDefaultStatusPolicy(configuredPolicy *StatusPolic
 			configuredPolicy.BackoffPolicy = backoffPolicy
 		}
 	}
-	// default transfer level as main level (not current level)
-	if configuredPolicy.TransferLevel == "" {
-		configuredPolicy.TransferLevel = defaultPolicy.TransferLevel
-	}
 	return nil
 }
 
@@ -434,6 +538,9 @@ func (v *validator) validateAndDefaultConcurrencyPolicy(configuredPolicy *Concur
 	}
 	if configuredPolicy.KeepAliveTime <= 0 {
 		configuredPolicy.KeepAliveTime = defaultPolicy.KeepAliveTime
+	}
+	if configuredPolicy.PanicHandler == nil {
+		configuredPolicy.PanicHandler = defaultPolicy.PanicHandler
 	}
 	return nil
 }

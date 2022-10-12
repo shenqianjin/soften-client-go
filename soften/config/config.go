@@ -2,13 +2,14 @@ package config
 
 import (
 	"context"
-	"time"
 
 	"github.com/apache/pulsar-client-go/pulsar"
 	"github.com/apache/pulsar-client-go/pulsar/log"
 	"github.com/shenqianjin/soften-client-go/soften/internal"
 	"github.com/shenqianjin/soften-client-go/soften/message"
 )
+
+var DebugMode = true
 
 // ------ library configuration ------
 
@@ -19,8 +20,6 @@ type PulsarConfig struct {
 	Consumer  ConsumerConfig   `json:"consumer"`  // consumer instance configuration, it has higher priority than consumers.
 	Consumers []ConsumerConfig `json:"consumers"` // a list of consumer instances to support more than one consumer instances, either a consumer.
 }
-
-var DebugMode = false
 
 // ------ client configuration ------
 
@@ -60,19 +59,17 @@ type ProducerConfig struct {
 	BatchingMaxSize         uint  `json:"batching_max_size"`          // Optional:
 	BatcherBuilderType      int   `json:"batcher_builder_type"`       // Optional: batcher builcer type: 0 DefaultBatchBuilder; 1 KeyBasedBatchBuilder
 
-	DeadEnable     bool            `json:"dead_enable"`     // Optional:
-	DiscardEnable  bool            `json:"discard_enable"`  // Optional:
-	BlockingEnable bool            `json:"blocking_enable"` // Optional:
-	PendingEnable  bool            `json:"pending_enable"`  // Optional:
-	RetryingEnable bool            `json:"retrying_enable"` // Optional:
-	TransferEnable bool            `json:"route_enable"`    // Optional: 自定义路由开关
-	Transfer       *TransferPolicy `json:"Transfer"`        // Optional:
-	UpgradeEnable  bool            `json:"upgrade_enable"`  // Optional:
-	Upgrade        *ShiftPolicy    `json:"upgrade"`         // Optional: 主动升级队列级别
-	DegradeEnable  bool            `json:"degrade_enable"`  // Optional:
-	Degrade        *ShiftPolicy    `json:"degrade"`         // Optional:
-	ShiftEnable    bool            `json:"shift_enable"`    // Optional:
-	Shift          *ShiftPolicy    `json:"shift"`           // Optional:
+	DiscardEnable  *bool           `json:"discard_enable"` // Optional:
+	DeadEnable     *bool           `json:"dead_enable"`    // Optional:
+	Dead           *ShiftPolicy    `json:"dead"`           // Optional: fix dead to D1 currently
+	TransferEnable *bool           `json:"route_enable"`   // Optional: 自定义路由开关
+	Transfer       *TransferPolicy `json:"Transfer"`       // Optional:
+	UpgradeEnable  *bool           `json:"upgrade_enable"` // Optional:
+	Upgrade        *ShiftPolicy    `json:"upgrade"`        // Optional: 主动升级队列级别
+	DegradeEnable  *bool           `json:"degrade_enable"` // Optional:
+	Degrade        *ShiftPolicy    `json:"degrade"`        // Optional:
+	ShiftEnable    *bool           `json:"shift_enable"`   // Optional:
+	Shift          *ShiftPolicy    `json:"shift"`          // Optional:
 
 	HandleTimeout uint `json:"handle_timeout"` // Optional: 发送消息超时时间, Default: 30 seconds
 
@@ -96,10 +93,9 @@ type ConsumerConfig struct {
 	Type                        pulsar.SubscriptionType            `json:"type"`                          // Optional: 订阅类型: 0 Exclusive; 1 Shared; 2 Failover; 3 KeyShared
 	SubscriptionInitialPosition pulsar.SubscriptionInitialPosition `json:"subscription_initial_position"` // Optional: 订阅初始消费位置: 0 Latest; 1 Earliest
 	NackBackoffPolicy           pulsar.NackBackoffPolicy           `json:"-"`                             // Optional: Unrecommended, compatible with origin pulsar client
-	NackRedeliveryDelay         time.Duration                      `json:"nack_redelivery_delay"`         // Optional: Unrecommended, compatible with origin pulsar client
+	NackRedeliveryDelay         uint                               `json:"nack_redelivery_delay"`         // Optional: Unrecommended, compatible with origin pulsar client
 	RetryEnable                 bool                               `json:"retry_enable"`                  // Optional: Unrecommended, compatible with origin pulsar client
 	DLQ                         *DLQPolicy                         `json:"dlq"`                           // Optional: Unrecommended, compatible with origin pulsar client
-	ConsumeMaxTimes             int                                `json:"consume_max_times"`             // Optional: 最大消费次数
 	BalanceStrategy             internal.BalanceStrategy           `json:"balance_strategy"`              // Optional: 消费均衡策略
 	HandleTimeout               uint                               `json:"handle_timeout"`                // Optional: 处理消息超时时间 (default: 30 seconds)
 	EscapeHandler               EscapeHandler                      `json:"-"`                             // Optional: 逃逸消息处理器, 优先级高于 EscapeHandleType
@@ -116,6 +112,39 @@ type LevelPolicies map[internal.TopicLevel]*LevelPolicy
 
 // ------ helper structs ------
 
+// LevelPolicy defines different policies for different levels.
+// status/transfer policies default as the same with main level if missing.
+// upgrade/degrade policies must be specified one by one for each multi-level
+type LevelPolicy struct {
+	ConsumeWeight   uint `json:"consume_weight"`    // Optional: consume weight
+	ConsumeMaxTimes int  `json:"consume_max_times"` // Optional: 最大消费次数
+
+	UpgradeEnable  *bool           `json:"upgrade_enable"`  // Optional: 升级开关
+	Upgrade        *ShiftPolicy    `json:"upgrade"`         // Optional: 升级策略
+	DegradeEnable  *bool           `json:"degrade_enable"`  // Optional: 降级开关
+	Degrade        *ShiftPolicy    `json:"degrade"`         // Optional: 降级策略
+	ShiftEnable    *bool           `json:"shift_enable"`    // Optional: 变换级别开关
+	Shift          *ShiftPolicy    `json:"shift"`           // Optional: 变换级别策略
+	TransferEnable *bool           `json:"transfer_enable"` // Optional: PreReTransfer 检查开关, 默认false
+	Transfer       *TransferPolicy `json:"transfer"`        // Optional: Handle失败时的动态重路由
+
+	Ready          *StatusPolicy `json:"ready"`           // Optional: Ready 主题检查策略
+	BlockingEnable *bool         `json:"blocking_enable"` // Optional: Blocking 检查开关
+	Blocking       *StatusPolicy `json:"blocking"`        // Optional: Blocking 主题检查策略
+	PendingEnable  *bool         `json:"pending_enable"`  // Optional: Pending 检查开关
+	Pending        *StatusPolicy `json:"pending"`         // Optional: Pending 主题检查策略
+	RetryingEnable *bool         `json:"retrying_enable"` // Optional: Retrying 重试检查开关
+	Retrying       *StatusPolicy `json:"retrying"`        // Optional: Retrying 主题检查策略
+	DeadEnable     *bool         `json:"dead_enable"`     // Optional: 死信队列开关, 默认false; 如果所有校验器都没能校验通过, 应用代码需要自行Ack或者Nack
+	Dead           *StatusPolicy `json:"dead"`            // Optional: Dead 主题检查策略
+	DiscardEnable  *bool         `json:"discard_enable"`  // Optional: 丢弃消息开关, 默认false
+	Discard        *StatusPolicy `json:"discard"`         // Optional: Discard 主题检查策略
+}
+
+type ReadyPolicy struct {
+	ConsumeWeight uint `json:"consume_weight"` // Optional: 消费权重
+}
+
 // StatusPolicy 定义单状态的消费重入策略。
 // 消费权重: 按整形值记录。
 // 补偿策略:
@@ -129,63 +158,37 @@ type StatusPolicy struct {
 	BackoffPolicy     StatusBackoffPolicy `json:"-"`                   // Optional: 补偿策略, 优先级高于 BackoffDelays
 	ReentrantDelay    uint                `json:"reentrant_delay"`     // Optional: 重入延迟
 	ReentrantMaxTimes int                 `json:"reentrant_max_times"` // Optional: 重入次数上限
-	NackMaxDelay      int                 `json:"nack_max_delay"`      // Optional: Nack延迟上限
-	NackMaxTimes      int                 `json:"nack_max_times"`      // Optional: Nack次数上限
-
-	PublishBackoffMaxTimes uint          `json:"backoff_max_times"` // Optional: 发送失败默认重试次数
-	PublishBackoffDelays   []string      `json:"backoff_delays"`    // Optional: 失败重试延迟
-	PublishBackoffPolicy   BackoffPolicy `json:"-"`                 // Optional: 补偿策略, 优先级高于 BackoffDelays
-
-	TransferLevel internal.TopicLevel `json:"transfer_level"` // Optional: 消息中转等级: 默认为配置的消费主级别
-}
-
-// LevelPolicy defines different policies for different levels.
-// status/transfer policies default as the same with main level if missing.
-// upgrade/degrade policies must be specified one by one for each multi-level
-type LevelPolicy struct {
-	ConsumeWeight uint `json:"consume_weight"` // Optional: consume weight
-
-	UpgradeEnable bool         `json:"upgrade_enable"` // Optional: 升级开关
-	Upgrade       *ShiftPolicy `json:"upgrade"`        // Optional: 升级策略
-	DegradeEnable bool         `json:"degrade_enable"` // Optional: 降级开关
-	Degrade       *ShiftPolicy `json:"degrade"`        // Optional: 降级策略
-	ShiftEnable   bool         `json:"shift_enable"`   // Optional: 变换级别开关
-	Shift         *ShiftPolicy `json:"shift"`          // Optional: 变换级别策略
-
-	Ready          *StatusPolicy   `json:"ready"`           // Optional: Ready 主题检查策略
-	BlockingEnable bool            `json:"blocking_enable"` // Optional: Blocking 检查开关
-	Blocking       *StatusPolicy   `json:"blocking"`        // Optional: Blocking 主题检查策略
-	PendingEnable  bool            `json:"pending_enable"`  // Optional: Pending 检查开关
-	Pending        *StatusPolicy   `json:"pending"`         // Optional: Pending 主题检查策略
-	RetryingEnable bool            `json:"retrying_enable"` // Optional: Retrying 重试检查开关
-	Retrying       *StatusPolicy   `json:"retrying"`        // Optional: Retrying 主题检查策略
-	TransferEnable bool            `json:"transfer_enable"` // Optional: PreReTransfer 检查开关, 默认false
-	Transfer       *TransferPolicy `json:"transfer"`        // Optional: Handle失败时的动态重路由
-	DeadEnable     bool            `json:"dead_enable"`     // Optional: 死信队列开关, 默认false; 如果所有校验器都没能校验通过, 应用代码需要自行Ack或者Nack
-	Dead           *StatusPolicy   `json:"dead"`            // Optional: Dead 主题检查策略
-	DiscardEnable  bool            `json:"discard_enable"`  // Optional: 丢弃消息开关, 默认false
-	Discard        *StatusPolicy   `json:"discard"`         // Optional: Discard 主题检查策略
+	PublishPolicy     PublishPolicy       `json:"publish"`             // Optional: 发布策略
 }
 
 type TransferPolicy struct {
-	ConnectInSyncEnable bool   `json:"connect_in_sync_enable"` // Optional: 是否同步建立连接, 首次发送消息需阻塞等待客户端与服务端连接完成
-	Topic               string `json:"topic"`                  // Optional: 默认转移到的队列: 优先级比 GotoExtra参数中指定的低
-	ConsumeDelay        uint64 `json:"consume_delay"`          // Optional: 消费延迟(近似值: 通过1次或者多次重入实现, 不足1次重入延迟时当1次处理), 默认 0
-
-	BackoffMaxTimes uint          `json:"backoff_max_times"` // Optional: 发送失败默认重试次数
-	BackoffDelays   []string      `json:"backoff_delays"`    // Optional: 失败重试延迟
-	BackoffPolicy   BackoffPolicy `json:"-"`                 // Optional: 补偿策略, 优先级高于 BackoffDelays
+	ConnectInSyncEnable bool          `json:"connect_in_sync_enable"` // Optional: 是否同步建立连接, 首次发送消息需阻塞等待客户端与服务端连接完成
+	Topic               string        `json:"topic"`                  // Optional: 默认转移到的队列: 优先级比 GotoExtra参数中指定的低
+	ConsumeDelay        uint64        `json:"consume_delay"`          // Optional: 消费延迟(近似值: 通过1次或者多次重入实现, 不足1次重入延迟时当1次处理), 默认 0
+	CountMode           CountPassMode `json:"count_pass_mode"`        // Optional: 计数传递模式: 0 传递累计计数; 1 重置计数
+	PublishPolicy       PublishPolicy `json:"publish"`                // Optional: 发布策略
 }
 
 type ShiftPolicy struct {
 	ConnectInSyncEnable bool                `json:"connect_in_sync_enable"` // Optional: 是否同步建立连接, 首次发送消息需阻塞等待客户端与服务端连接完成
 	Level               internal.TopicLevel `json:"level"`                  // Optional: 默认升降级的级别: 优先级比 GotoExtra参数中指定的低
 	ConsumeDelay        uint64              `json:"consume_delay"`          // Optional: 消费延迟(近似值: 通过1次或者多次重入实现, 不足1次重入延迟时当1次处理), 默认 0
+	CountMode           CountPassMode       `json:"count_pass_mode"`        // Optional: 计数传递模式: 0 透传累计计数; 1 重置计数
+	PublishPolicy       PublishPolicy       `json:"publish"`                // Optional: 发布策略
+}
 
+type PublishPolicy struct {
 	BackoffMaxTimes uint          `json:"backoff_max_times"` // Optional: 发送失败默认重试次数
 	BackoffDelays   []string      `json:"backoff_delays"`    // Optional: 失败重试延迟
 	BackoffPolicy   BackoffPolicy `json:"-"`                 // Optional: 补偿策略, 优先级高于 BackoffDelays
 }
+
+type CountPassMode int
+
+const (
+	CountPassThrough CountPassMode = iota // 透传累计计数
+	CountPassNull                         // 重置计数
+)
 
 // DLQPolicy represents the configuration for the Dead Letter Queue multiStatusConsumeFacade policy. It referred to pulsar.DLQPolicy
 type DLQPolicy struct {
@@ -201,11 +204,18 @@ type DLQPolicy struct {
 }
 
 type ConcurrencyPolicy struct {
-	CorePoolSize    uint `json:"core_pool_size"`    // Optional: default 1
-	MaximumPoolSize uint `json:"maximum_pool_size"` // Optional: default 1
+	CorePoolSize    uint `json:"core_pool_size"`    // Optional: default 16
+	MaximumPoolSize uint `json:"maximum_pool_size"` // Optional: fixed same with CorePoolSize currently.
 	KeepAliveTime   uint `json:"keep_alive_time"`   // Optional: default 60(s)
 
 	PanicHandler func(interface{}) `json:"-"` // Optional, handle panics comes from executing message handler
+}
+
+type ConsumeLimit struct {
+	ConsumeMaxTimes  uint
+	PendingMaxTimes  uint
+	RetryingMaxTimes uint
+	BlockingMaxTimes uint
 }
 
 // ------ escape handle type ------

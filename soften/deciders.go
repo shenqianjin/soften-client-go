@@ -29,10 +29,8 @@ type internalConsumeDecider interface {
 type produceDecidersOptions struct {
 	groundTopic    string
 	level          internal.TopicLevel
-	BlockingEnable bool
-	PendingEnable  bool
-	RetryingEnable bool
 	DeadEnable     bool
+	Dead           *config.ShiftPolicy
 	DiscardEnable  bool
 	TransferEnable bool
 	Transfer       *config.TransferPolicy
@@ -59,38 +57,12 @@ func newProduceDeciders(p *producer, options produceDecidersOptions) (produceDec
 	}
 	if options.DeadEnable {
 		msgGoto := decider.GotoDead
-		deciderOpt := producerDeadDeciderOptions{groundTopic: options.groundTopic, level: options.level}
-		if d, err := newProduceDeadDecider(p, &deciderOpt, p.metricsProvider); err != nil {
+		deciderOpt := producerShiftDeciderOptions{groundTopic: options.groundTopic, level: options.level,
+			msgGoto: msgGoto, shift: options.Dead}
+		if d, err := newProducerShiftDecider(p, &deciderOpt, p.metricsProvider); err != nil {
 			return nil, err
 		} else {
 			deciders[msgGoto] = d
-		}
-	}
-	if options.BlockingEnable {
-		deciderOpt := producerStatusDeciderOptions{groundTopic: options.groundTopic, level: options.level,
-			msgStatus: message.StatusBlocking, msgGoto: decider.GotoBlocking}
-		if d, err := newProducerStatusDecider(p, &deciderOpt, p.metricsProvider); err != nil {
-			return nil, err
-		} else {
-			deciders[deciderOpt.msgGoto] = d
-		}
-	}
-	if options.PendingEnable {
-		deciderOpt := producerStatusDeciderOptions{groundTopic: options.groundTopic, level: options.level,
-			msgStatus: message.StatusPending, msgGoto: decider.GotoPending}
-		if d, err := newProducerStatusDecider(p, &deciderOpt, p.metricsProvider); err != nil {
-			return nil, err
-		} else {
-			deciders[deciderOpt.msgGoto] = d
-		}
-	}
-	if options.RetryingEnable {
-		deciderOpt := producerStatusDeciderOptions{groundTopic: options.groundTopic, level: options.level,
-			msgStatus: message.StatusRetrying, msgGoto: decider.GotoRetrying}
-		if d, err := newProducerStatusDecider(p, &deciderOpt, p.metricsProvider); err != nil {
-			return nil, err
-		} else {
-			deciders[deciderOpt.msgGoto] = d
 		}
 	}
 	if options.TransferEnable {
@@ -173,20 +145,21 @@ func newGeneralConsumeDeciders(cli *client, l *consumeListener, options generalC
 	}
 	handlers.doneDecider = doneDecider
 	if options.DiscardEnable {
-		options := finalStatusDeciderOptions{groundTopic: l.groundTopic, subscription: l.subscription, msgGoto: decider.GotoDiscard}
-		decider, err := newFinalStatusDecider(l.logger, options, l.metricsProvider)
-		if err != nil {
-			return nil, err
+		discardOptions := finalStatusDeciderOptions{groundTopic: l.groundTopic, subscription: l.subscription, msgGoto: decider.GotoDiscard}
+		d, err1 := newFinalStatusDecider(l.logger, discardOptions, l.metricsProvider)
+		if err1 != nil {
+			return nil, err1
 		}
-		handlers.discardDecider = decider
+		handlers.discardDecider = d
 	}
 	if options.DeadEnable {
-		deadOptions := deadDecideOptions{groundTopic: l.groundTopic, subscription: l.subscription}
-		decider, err := newDeadDecider(cli, deadOptions, l.metricsProvider)
-		if err != nil {
-			return nil, err
+		// dead 队列默认统一到L1级别
+		deadOptions := deadDecideOptions{groundTopic: l.groundTopic, level: message.L1, subscription: l.subscription}
+		d, err1 := newDeadDecider(cli, deadOptions, l.metricsProvider)
+		if err1 != nil {
+			return nil, err1
 		}
-		handlers.deadDecider = decider
+		handlers.deadDecider = d
 	}
 	if options.TransferEnable {
 		deciderOpt := transferDeciderOptions{groundTopic: l.groundTopic, level: options.Level, subscription: l.subscription,
@@ -248,16 +221,17 @@ func (hds generalConsumeDeciders) Close() {
 // ------ leveled consume handlers ------
 
 type leveledConsumeDeciders struct {
-	blockingDecider internalConsumeDecider // 状态处理器
-	pendingDecider  internalConsumeDecider // 状态处理器
-	retryingDecider internalConsumeDecider // 状态处理器
-	upgradeDecider  internalConsumeDecider // 状态处理器: 升级为NewReady
-	degradeDecider  internalConsumeDecider // 状态处理器: 升级为NewReady
+	blockingDecider *statusDecider         // 状态处理器
+	pendingDecider  *statusDecider         // 状态处理器
+	retryingDecider *statusDecider         // 状态处理器
+	upgradeDecider  internalConsumeDecider // 切换处理器: 升级为NewReady
+	degradeDecider  internalConsumeDecider // 切换处理器: 升级为NewReady
 }
 
 type leveledConsumeDeciderOptions struct {
 	Topic            string               // Business Topic
 	subscriptionName string               //
+	ConsumeMaxTimes  int                  //
 	Level            internal.TopicLevel  // level
 	BlockingEnable   bool                 // Blocking 检查开关
 	Blocking         *config.StatusPolicy // Blocking 主题检查策略
@@ -278,17 +252,19 @@ func newLeveledConsumeDeciders(cli *client, l *consumeListener, options leveledC
 	deciders := &leveledConsumeDeciders{}
 	if options.PendingEnable {
 		hdOptions := statusDeciderOptions{groundTopic: l.groundTopic, subscription: l.subscription,
-			level: options.Level, status: message.StatusPending, msgGoto: decider.GotoPending,
+			level: options.Level, consumeMaxTimes: options.ConsumeMaxTimes,
+			status: message.StatusPending, msgGoto: decider.GotoPending,
 			deaDecider: deadHandler}
-		decider, err := newStatusDecider(cli, options.Pending, hdOptions, l.metricsProvider)
+		d, err := newStatusDecider(cli, options.Pending, hdOptions, l.metricsProvider)
 		if err != nil {
 			return nil, err
 		}
-		deciders.pendingDecider = decider
+		deciders.pendingDecider = d
 	}
 	if options.BlockingEnable {
 		hdOptions := statusDeciderOptions{groundTopic: l.groundTopic, subscription: l.subscription,
-			level: options.Level, status: message.StatusBlocking, msgGoto: decider.GotoBlocking,
+			level: options.Level, consumeMaxTimes: options.ConsumeMaxTimes,
+			status: message.StatusBlocking, msgGoto: decider.GotoBlocking,
 			deaDecider: deadHandler}
 		hd, err := newStatusDecider(cli, options.Blocking, hdOptions, l.metricsProvider)
 		if err != nil {
@@ -298,13 +274,14 @@ func newLeveledConsumeDeciders(cli *client, l *consumeListener, options leveledC
 	}
 	if options.RetryingEnable {
 		hdOptions := statusDeciderOptions{groundTopic: l.groundTopic, subscription: l.subscription,
-			level: options.Level, status: message.StatusRetrying, msgGoto: decider.GotoRetrying,
+			level: options.Level, consumeMaxTimes: options.ConsumeMaxTimes,
+			status: message.StatusRetrying, msgGoto: decider.GotoRetrying,
 			deaDecider: deadHandler}
-		decider, err := newStatusDecider(cli, options.Retrying, hdOptions, l.metricsProvider)
+		d, err := newStatusDecider(cli, options.Retrying, hdOptions, l.metricsProvider)
 		if err != nil {
 			return nil, err
 		}
-		deciders.retryingDecider = decider
+		deciders.retryingDecider = d
 	}
 	return deciders, nil
 }

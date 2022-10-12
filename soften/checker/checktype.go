@@ -12,9 +12,6 @@ func (e *CheckType) String() string {
 
 const (
 	ProduceCheckTypeDiscard  = CheckType("Discard")
-	ProduceCheckTypePending  = CheckType("Pending")
-	ProduceCheckTypeBlocking = CheckType("Blocking")
-	ProduceCheckTypeRetrying = CheckType("Retrying")
 	ProduceCheckTypeDead     = CheckType("Dead")
 	ProduceCheckTypeUpgrade  = CheckType("Upgrade")
 	ProduceCheckTypeDegrade  = CheckType("Degrade")
@@ -25,23 +22,22 @@ const (
 func DefaultPrevSendCheckOrders() []CheckType {
 	values := []CheckType{ProduceCheckTypeDiscard, ProduceCheckTypeDead,
 		ProduceCheckTypeTransfer,
-		ProduceCheckTypeUpgrade, ProduceCheckTypeDegrade, ProduceCheckTypeShift,
-		ProduceCheckTypeBlocking, ProduceCheckTypePending, ProduceCheckTypeRetrying}
+		ProduceCheckTypeUpgrade, ProduceCheckTypeDegrade, ProduceCheckTypeShift}
 	return values
 }
 
 // ------ consume check type enums ------
 
 const (
-	CheckTypePrevDiscard  = CheckType("PrevDiscard")
-	CheckTypePrevDead     = CheckType("PrevDead")
-	CheckTypePrevPending  = CheckType("PrevPending")
-	CheckTypePrevBlocking = CheckType("PrevBlocking")
-	CheckTypePrevRetrying = CheckType("PrevRetrying")
-	CheckTypePrevUpgrade  = CheckType("PrevUpgrade")
-	CheckTypePrevDegrade  = CheckType("PrevDegrade")
-	CheckTypePrevShift    = CheckType("PrevShift")
-	CheckTypePrevTransfer = CheckType("PrevTransfer")
+	CheckTypePrevDiscard  = CheckType("PrevHandleDiscard")
+	CheckTypePrevDead     = CheckType("PrevHandleDead")
+	CheckTypePrevPending  = CheckType("PrevHandlePending")
+	CheckTypePrevBlocking = CheckType("PrevHandleBlocking")
+	CheckTypePrevRetrying = CheckType("PrevHandleRetrying")
+	CheckTypePrevUpgrade  = CheckType("PrevHandleUpgrade")
+	CheckTypePrevDegrade  = CheckType("PrevHandleDegrade")
+	CheckTypePrevShift    = CheckType("PrevHandleShift")
+	CheckTypePrevTransfer = CheckType("PrevHandleTransfer")
 
 	CheckTypePostDiscard  = CheckType("PostHandleDiscard")
 	CheckTypePostDead     = CheckType("PostHandleDead")

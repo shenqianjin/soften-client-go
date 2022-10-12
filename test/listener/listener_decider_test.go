@@ -154,19 +154,19 @@ func testListenDecide(t *testing.T, handleCase testListenDecideCase) {
 	upgradeLevel, _ := message.LevelOf(handleCase.upgradeLevel)
 	degradeLevel, _ := message.LevelOf(handleCase.degradeLevel)
 	leveledPolicy := &config.LevelPolicy{
-		DiscardEnable:  handleCase.handleGoto == decider.GotoDiscard.String(),
-		DeadEnable:     handleCase.handleGoto == decider.GotoDead.String(),
-		PendingEnable:  handleCase.handleGoto == decider.GotoPending.String(),
+		DiscardEnable:  config.ToPointer(handleCase.handleGoto == decider.GotoDiscard.String()),
+		DeadEnable:     config.ToPointer(handleCase.handleGoto == decider.GotoDead.String()),
+		PendingEnable:  config.ToPointer(handleCase.handleGoto == decider.GotoPending.String()),
 		Pending:        testPolicy,
-		BlockingEnable: handleCase.handleGoto == decider.GotoBlocking.String(),
+		BlockingEnable: config.ToPointer(handleCase.handleGoto == decider.GotoBlocking.String()),
 		Blocking:       testPolicy,
-		RetryingEnable: handleCase.handleGoto == decider.GotoRetrying.String(),
+		RetryingEnable: config.ToPointer(handleCase.handleGoto == decider.GotoRetrying.String()),
 		Retrying:       testPolicy,
-		UpgradeEnable:  handleCase.handleGoto == decider.GotoUpgrade.String(),
+		UpgradeEnable:  config.ToPointer(handleCase.handleGoto == decider.GotoUpgrade.String()),
 		Upgrade:        &config.ShiftPolicy{Level: upgradeLevel, ConnectInSyncEnable: true},
-		DegradeEnable:  handleCase.handleGoto == decider.GotoDegrade.String(),
+		DegradeEnable:  config.ToPointer(handleCase.handleGoto == decider.GotoDegrade.String()),
 		Degrade:        &config.ShiftPolicy{Level: degradeLevel, ConnectInSyncEnable: true},
-		TransferEnable: handleCase.handleGoto == decider.GotoTransfer.String(),
+		TransferEnable: config.ToPointer(handleCase.handleGoto == decider.GotoTransfer.String()),
 		Transfer:       &config.TransferPolicy{ConnectInSyncEnable: handleCase.handleGoto == decider.GotoTransfer.String()},
 	}
 	listener, err := client.CreateListener(config.ConsumerConfig{

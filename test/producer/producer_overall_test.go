@@ -35,7 +35,7 @@ func TestProduceOverall_Send3Msg_Transfer1MsgToL1(t *testing.T) {
 
 	producer, err := client.CreateProducer(config.ProducerConfig{
 		Topic:          topic,
-		TransferEnable: true,
+		TransferEnable: config.True(),
 		Transfer:       &config.TransferPolicy{ConnectInSyncEnable: true},
 	},
 		checker.PrevSendTransfer(func(ctx context.Context, msg *message.ProducerMessage) checker.CheckStatus {
@@ -83,7 +83,7 @@ func TestProduceOverall_SendAsync3Msg_Transfer1MsgToL1(t *testing.T) {
 
 	producer, err := client.CreateProducer(config.ProducerConfig{
 		Topic:          topic,
-		TransferEnable: true,
+		TransferEnable: config.True(),
 		Transfer:       &config.TransferPolicy{ConnectInSyncEnable: true},
 	},
 		checker.PrevSendTransfer(func(ctx context.Context, msg *message.ProducerMessage) checker.CheckStatus {

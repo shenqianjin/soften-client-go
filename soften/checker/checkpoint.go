@@ -95,18 +95,6 @@ func PrevSendDiscard(checker PrevSendCheckFunc) ProduceCheckpoint {
 	return ProduceCheckpoint{CheckType: ProduceCheckTypeDiscard, CheckFunc: checker}
 }
 
-func PrevSendPending(checker PrevSendCheckFunc) ProduceCheckpoint {
-	return ProduceCheckpoint{CheckType: ProduceCheckTypePending, CheckFunc: checker}
-}
-
-func PrevSendBlocking(checker PrevSendCheckFunc) ProduceCheckpoint {
-	return ProduceCheckpoint{CheckType: ProduceCheckTypeBlocking, CheckFunc: checker}
-}
-
-func PrevSendRetrying(checker PrevSendCheckFunc) ProduceCheckpoint {
-	return ProduceCheckpoint{CheckType: ProduceCheckTypeRetrying, CheckFunc: checker}
-}
-
 func PrevSendDead(checker PrevSendCheckFunc) ProduceCheckpoint {
 	return ProduceCheckpoint{CheckType: ProduceCheckTypeDead, CheckFunc: checker}
 }

@@ -57,7 +57,7 @@ func (d *producerDeadDecider) Decide(ctx context.Context, msg *pulsar.ProducerMe
 	}
 
 	// consume time info
-	message.Helper.InjectConsumeTime(&msg.Properties, checkStatus.GetGotoExtra().ConsumeTime)
+	message.Helper.InjectConsumeTime(msg.Properties, checkStatus.GetGotoExtra().ConsumeTime)
 
 	// use atomic bool to avoid race
 	isDone := uint32(0)
@@ -94,7 +94,7 @@ func (d *producerDeadDecider) DecideAsync(ctx context.Context, msg *pulsar.Produ
 	}
 
 	// consume time info
-	message.Helper.InjectConsumeTime(&msg.Properties, checkStatus.GetGotoExtra().ConsumeTime)
+	message.Helper.InjectConsumeTime(msg.Properties, checkStatus.GetGotoExtra().ConsumeTime)
 
 	// send
 	d.router.Chan() <- &RouteMessage{

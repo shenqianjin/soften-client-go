@@ -15,7 +15,6 @@ const (
 	StatusDead     = internal.MessageStatus("Dead")
 	StatusDone     = internal.MessageStatus("Done")
 	StatusDiscard  = internal.MessageStatus("Discard")
-	//statusNewReady = internal.MessageStatus("NewReady")
 )
 
 func StatusOf(status string) (internal.MessageStatus, error) {

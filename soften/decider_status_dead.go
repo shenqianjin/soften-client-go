@@ -14,8 +14,7 @@ import (
 type deadDecideOptions struct {
 	groundTopic  string
 	subscription string
-	//level            internal.TopicLevel
-	//TransferLevel    internal.TopicLevel
+	level        internal.TopicLevel
 }
 
 // deadDecider route messages to ${TOPIC}-${subscription}-DLQ 主题, 固定后缀，不允许定制
@@ -35,7 +34,7 @@ func newDeadDecider(client *client, options deadDecideOptions, metricsProvider *
 	}
 	subscriptionSuffix := "-" + options.subscription
 	rtOptions := routerOptions{
-		Topic:               options.groundTopic + message.L1.TopicSuffix() + subscriptionSuffix + message.StatusDead.TopicSuffix(),
+		Topic:               options.groundTopic + options.level.TopicSuffix() + subscriptionSuffix + message.StatusDead.TopicSuffix(),
 		connectInSyncEnable: true,
 	}
 	rt, err := newRouter(client.logger, client.Client, rtOptions)
@@ -57,14 +56,14 @@ func (d *deadDecider) Decide(msg consumerMessage, cheStatus checker.CheckStatus)
 		props[k] = v
 	}
 	// record origin information when re-Transfer first time
-	message.Helper.InjectOriginTopic(msg.Message, &props)
-	message.Helper.InjectOriginMessageId(msg.Message, &props)
-	message.Helper.InjectOriginPublishTime(msg.Message, &props)
-	message.Helper.InjectOriginLevel(msg.Message, &props)
-	message.Helper.InjectOriginStatus(msg.Message, &props)
+	message.Helper.InjectOriginTopic(msg.Message, props)
+	message.Helper.InjectOriginMessageId(msg.Message, props)
+	message.Helper.InjectOriginPublishTime(msg.Message, props)
+	message.Helper.InjectOriginLevel(msg.Message, props)
+	message.Helper.InjectOriginStatus(msg.Message, props)
 	// record previous level/status information
-	message.Helper.InjectPreviousLevel(msg.Message, &props)
-	message.Helper.InjectPreviousStatus(msg.Message, &props)
+	message.Helper.InjectPreviousLevel(msg.Message, props)
+	message.Helper.InjectPreviousStatus(msg.Message, props)
 
 	producerMsg := pulsar.ProducerMessage{
 		Payload:     msg.Payload(),
@@ -80,7 +79,7 @@ func (d *deadDecider) Decide(msg consumerMessage, cheStatus checker.CheckStatus)
 			msg.internalExtra.consumerMetrics.ConsumeMessageNacks.Inc()
 		} else {
 			d.logger.WithField("msgID", msg.ID()).Debugf("Succeed to send message to topic: %s", d.router.options.Topic)
-			msg.Consumer.Ack(msg)
+			msg.Ack()
 			msg.internalExtra.consumerMetrics.ConsumeMessageAcks.Inc()
 		}
 	}

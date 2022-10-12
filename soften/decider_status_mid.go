@@ -2,7 +2,6 @@ package soften
 
 import (
 	"errors"
-	"strconv"
 	"time"
 
 	"github.com/apache/pulsar-client-go/pulsar"
@@ -14,12 +13,13 @@ import (
 )
 
 type statusDeciderOptions struct {
-	groundTopic  string
-	subscription string
-	status       internal.MessageStatus // MessageStatus
-	msgGoto      internal.DecideGoto    // MessageStatus
-	deaDecider   internalConsumeDecider //
-	level        internal.TopicLevel
+	groundTopic     string
+	subscription    string
+	status          internal.MessageStatus // MessageStatus
+	msgGoto         internal.DecideGoto    // MessageStatus
+	deaDecider      internalConsumeDecider //
+	level           internal.TopicLevel
+	consumeMaxTimes int
 }
 
 // statusDecider routes messages to ${TOPIC}-${subscription}-${status} 主题, 固定后缀，不允许定制
@@ -40,7 +40,7 @@ func newStatusDecider(client *client, policy *config.StatusPolicy, options statu
 	}
 	subscriptionSuffix := "-" + options.subscription
 	rtOptions := routerOptions{
-		Topic:               options.groundTopic + policy.TransferLevel.TopicSuffix() + subscriptionSuffix + options.status.TopicSuffix(),
+		Topic:               options.groundTopic + options.level.TopicSuffix() + subscriptionSuffix + options.status.TopicSuffix(),
 		connectInSyncEnable: true,
 	}
 	rt, err := newRouter(client.logger, client.Client, rtOptions)
@@ -56,59 +56,71 @@ func (d *statusDecider) Decide(msg consumerMessage, cheStatus checker.CheckStatu
 	if !cheStatus.IsPassed() {
 		return false
 	}
-	statusReconsumeTimes := message.Parser.GetStatusConsumeTimes(d.options.status, msg.Message)
+	statusMessageCounter := message.Parser.GetStatusMessageCounter(d.options.status, msg.Message)
 	// check to dead if exceed max status reconsume times
-	if statusReconsumeTimes >= d.policy.ConsumeMaxTimes {
+	if d.policy.ConsumeMaxTimes > 0 && statusMessageCounter.ConsumeReckonTimes >= d.policy.ConsumeMaxTimes {
 		return d.tryDeadInternal(msg)
 	}
-	statusReentrantTimes := message.Parser.GetStatusReentrantTimes(d.options.status, msg.Message)
-	// check to dead if exceed max reentrant times
-	if statusReentrantTimes >= d.policy.ReentrantMaxTimes {
+	msgCounter := message.Parser.GetMessageCounter(msg.Message)
+	// check to dead if exceed max total reconsume times
+	if d.options.consumeMaxTimes > 0 && msgCounter.ConsumeReckonTimes >= d.options.consumeMaxTimes {
 		return d.tryDeadInternal(msg)
 	}
 	// check Nack for equal status
-	delay := d.policy.BackoffPolicy.Next(0, statusReconsumeTimes)
-	if delay == 0 {
-		delay = d.policy.ReentrantDelay // default a newStatus.reentrantDelay
-	} else if delay < d.policy.ReentrantDelay { // delay equals or larger than reentrant delay is the essential condition to switch status
-		msg.Consumer.NackLater(msg.Message, time.Duration(delay)*time.Second)
+	delay := d.policy.BackoffPolicy.Next(0, statusMessageCounter.ConsumeTimes)
+	if delay <= 0 {
+		// default delay as one reentrant delay
+		delay = d.policy.ReentrantDelay
+	} else if delay < d.policy.ReentrantDelay {
+		// TODO: Use Nack Later to reduce reentrant times in the future.
+		// delay equals or larger than reentrant delay is the essential condition to switch status
+		/*msg.Consumer.NackLater(msg.Message, time.Duration(delay)*time.Second)
 		msg.internalExtra.consumerMetrics.ConsumeMessageNacks.Inc()
-		return true
+		return true*/
+		// Why not Nack later currently?
+		// (1) no redelivery count if subscription type is Exclusive or Fail over. see: https://github.com/apache/pulsar/issues/15836
+		// (2) how to distinct Nack times is retrying, blocking or pending?
+		delay = d.policy.ReentrantDelay
 	}
 
-	// prepare to re-Transfer
+	// prepare to reentrant
 	props := make(map[string]string)
 	for k, v := range msg.Properties() {
 		props[k] = v
 	}
 	// record origin information when re-Transfer first time
-	message.Helper.InjectOriginTopic(msg.Message, &props)
-	message.Helper.InjectOriginMessageId(msg.Message, &props)
-	message.Helper.InjectOriginPublishTime(msg.Message, &props)
-	message.Helper.InjectOriginLevel(msg.Message, &props)
-	message.Helper.InjectOriginStatus(msg.Message, &props)
+	message.Helper.InjectOriginTopic(msg.Message, props)
+	message.Helper.InjectOriginMessageId(msg.Message, props)
+	message.Helper.InjectOriginPublishTime(msg.Message, props)
+	message.Helper.InjectOriginLevel(msg.Message, props)
+	message.Helper.InjectOriginStatus(msg.Message, props)
 	// status switch
 	currentStatus := message.Parser.GetCurrentStatus(msg.Message)
 	if currentStatus != d.options.status {
-		message.Helper.InjectPreviousLevel(msg.Message, &props)
-		message.Helper.InjectPreviousStatus(msg.Message, &props)
+		message.Helper.InjectPreviousLevel(msg.Message, props)
+		message.Helper.InjectPreviousStatus(msg.Message, props)
 	}
-	// total consume times on the message
-	xReconsumeTimes := message.Parser.GetReconsumeTimes(msg.Message)
-	xReconsumeTimes++
-	props[message.XPropertyReconsumeTimes] = strconv.Itoa(xReconsumeTimes) // initialize continuous consume times for the new msg
-	// reconsume time and reentrant time
+	// consume time and reentrant time
 	now := time.Now()
-	message.Helper.InjectConsumeTime(&props, now.Add(time.Duration(delay)*time.Second))
-	message.Helper.InjectReentrantTime(&props, now.Add(time.Duration(d.policy.ReentrantDelay)*time.Second))
-	// reconsume times for goto status
-	reentrantStartRedeliveryCount := message.Parser.GetReentrantStartRedeliveryCount(msg.Message)
-	statusReconsumeTimes += int(msg.RedeliveryCount() - reentrantStartRedeliveryCount + 1) // the subtraction is the nack times in current status
-	message.Helper.InjectStatusReconsumeTimes(d.options.status, statusReconsumeTimes, &props)
-	props[message.XPropertyReentrantStartRedeliveryCount] = strconv.FormatUint(uint64(msg.RedeliveryCount()), 10)
-	// reentrant times for goto status
-	statusReentrantTimes++
-	message.Helper.InjectStatusReentrantTimes(d.options.status, statusReentrantTimes, &props)
+	message.Helper.InjectConsumeTime(props, now.Add(time.Duration(delay)*time.Second))
+	// reentrant
+	return d.Reentrant(msg, props)
+}
+
+func (d *statusDecider) Reentrant(msg consumerMessage, props map[string]string) bool {
+	statusMsgCounter := message.Parser.GetStatusMessageCounter(d.options.status, msg.Message)
+	// check to dead if exceed max reentrant times
+	if d.policy.ReentrantMaxTimes > 0 && statusMsgCounter.PublishTimes >= d.policy.ReentrantMaxTimes {
+		return d.tryDeadInternal(msg)
+	}
+	message.Helper.InjectReentrantTime(props, time.Now().Add(time.Duration(d.policy.ReentrantDelay)*time.Second))
+	// increase status reentrant times
+	statusMsgCounter.PublishTimes++
+	message.Helper.InjectStatusMessageCounter(props, d.options.status, statusMsgCounter)
+	// increase total reentrant times
+	msgCounter := message.Parser.GetMessageCounter(msg.Message)
+	msgCounter.PublishTimes++
+	message.Helper.InjectMessageCounter(props, msgCounter)
 
 	producerMsg := pulsar.ProducerMessage{
 		Payload:     msg.Payload(),
@@ -124,7 +136,7 @@ func (d *statusDecider) Decide(msg consumerMessage, cheStatus checker.CheckStatu
 			msg.internalExtra.consumerMetrics.ConsumeMessageNacks.Inc()
 		} else {
 			d.logger.WithField("msgID", msg.ID()).Debugf("Succeed to send message to topic: %s", d.router.options.Topic)
-			msg.Consumer.Ack(msg)
+			msg.Ack()
 			msg.internalExtra.consumerMetrics.ConsumeMessageAcks.Inc()
 		}
 	}
@@ -139,12 +151,6 @@ func (d *statusDecider) tryDeadInternal(msg consumerMessage) bool {
 	if d.options.deaDecider != nil {
 		return d.options.deaDecider.Decide(msg, checker.CheckStatusPassed)
 	}
-
-	if true {
-		msg.Consumer.Ack(msg.Message)
-		return true
-	}
-
 	return false
 }
 

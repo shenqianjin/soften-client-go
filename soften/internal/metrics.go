@@ -56,6 +56,7 @@ type MetricsProvider struct {
 	consumerListenLatency             *prometheus.HistogramVec
 	consumerListenLatencyFromEvent    *prometheus.HistogramVec
 	consumerConsumeMessageAcks        *prometheus.CounterVec
+	consumerConsumeMessageAckErrs     *prometheus.CounterVec
 	consumerConsumeMessageNacks       *prometheus.CounterVec
 	consumerConsumeMessageEscape      *prometheus.CounterVec
 
@@ -244,6 +245,11 @@ func NewMetricsProvider(metricsLevel int, userDefinedLabels map[string]string) *
 	metrics.consumerConsumeMessageAcks = metrics.tryRegisterCounter(prometheus.NewCounterVec(prometheus.CounterOpts{
 		Name:        "soften_consumer_consume_messages_acks",
 		Help:        "Counter of message ack by consumers",
+		ConstLabels: constLabels,
+	}, listenerConsumerLabels))
+	metrics.consumerConsumeMessageAckErrs = metrics.tryRegisterCounter(prometheus.NewCounterVec(prometheus.CounterOpts{
+		Name:        "soften_consumer_consume_messages_ack_errs",
+		Help:        "Counter of message ack errors by consumers",
 		ConstLabels: constLabels,
 	}, listenerConsumerLabels))
 	metrics.consumerConsumeMessageNacks = metrics.tryRegisterCounter(prometheus.NewCounterVec(prometheus.CounterOpts{
@@ -513,6 +519,7 @@ func (v *MetricsProvider) GetListenerConsumerMetrics(groundTopic string, level T
 		ListenLatency:             v.consumerListenLatency.With(labels),
 		ListenLatencyFromEvent:    v.consumerListenLatencyFromEvent.With(labels),
 		ConsumeMessageAcks:        v.consumerConsumeMessageAcks.With(labels),
+		ConsumeMessageAckErrs:     v.consumerConsumeMessageAckErrs.With(labels),
 		ConsumeMessageNacks:       v.consumerConsumeMessageNacks.With(labels),
 		ConsumeMessageEscape:      v.consumerConsumeMessageEscape.With(labels),
 	})
@@ -525,8 +532,8 @@ func (v *MetricsProvider) GetListenerHandleMetrics(groundTopic string, level Top
 		"subscription": subscription, "topic": topic, "goto": msgGoto.String()}
 	key := v.convertLabelsToKey(labels)
 	metrics, _ := v.consumerHandleMetricsMap.LoadOrStore(key, &ListenerHandlerMetrics{
-		HandleLatency:        v.consumerHandleLatency.With(labels),
-		HandleReconsumeTimes: v.consumerHandleConsumes.With(labels),
+		HandleLatency:      v.consumerHandleLatency.With(labels),
+		HandleConsumeTimes: v.consumerHandleConsumes.With(labels),
 	})
 	return metrics.(*ListenerHandlerMetrics)
 }
@@ -642,13 +649,14 @@ type ListenerConsumerMetrics struct {
 	ListenLatency             prometheus.Observer // labels: topic, level, status
 	ListenLatencyFromEvent    prometheus.Observer // labels: topic, level, status
 	ConsumeMessageAcks        prometheus.Counter
+	ConsumeMessageAckErrs     prometheus.Counter
 	ConsumeMessageNacks       prometheus.Counter
 	ConsumeMessageEscape      prometheus.Counter
 }
 
 type ListenerHandlerMetrics struct {
-	HandleLatency        prometheus.Observer // labels: topics, levels, topic, level, status
-	HandleReconsumeTimes prometheus.Observer
+	HandleLatency      prometheus.Observer // labels: topics, levels, topic, level, status
+	HandleConsumeTimes prometheus.Observer
 }
 
 // ListenerMessagesMetrics composed these metrics related to transfer process:
