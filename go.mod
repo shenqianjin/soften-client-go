@@ -55,5 +55,3 @@ require (
 	google.golang.org/protobuf v1.26.0 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 )
-
-replace github.com/apache/pulsar-client-go v0.9.0 => github.com/shenqianjin/pulsar-client-go v0.8.1-0.20221018115513-477c3bc320f8
