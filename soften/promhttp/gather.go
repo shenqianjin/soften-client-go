@@ -1,7 +1,6 @@
 package promhttp
 
 import (
-	"fmt"
 	"strings"
 
 	"github.com/prometheus/client_golang/prometheus"
@@ -34,9 +33,6 @@ func (r *trimBucketGatherer) Gather() ([]*dto.MetricFamily, error) {
 			}
 			// trim bucket
 			start, end := r.calcTrimPosition(histogram.Bucket)
-			if *metric.Name == "soften_producer_publish_latency_from_PCheck" {
-				fmt.Println(*metric.Name, &metric)
-			}
 			if end-start < len(histogram.Bucket) { // trim as partial buckets
 				histogram.Bucket = histogram.Bucket[start:end]
 			}
