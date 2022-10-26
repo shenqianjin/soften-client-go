@@ -169,6 +169,10 @@ func (p *producer) formatDecidersOptions(conf *config.ProducerConfig) produceDec
 // Send sends a message
 func (p *producer) Send(ctx context.Context, msg *pulsar.ProducerMessage) (msgId pulsar.MessageID, err error) {
 	start := time.Now()
+	// init map if necessary
+	if msg.Properties == nil {
+		msg.Properties = make(map[string]string)
+	}
 	// do checkers
 	cMsg := &message.ProducerMessage{ProducerMessage: msg, LeveledMessage: &leveledMessage{level: p.level}}
 	for _, checkType := range p.prevCheckOrders {
@@ -213,6 +217,10 @@ func (p *producer) Send(ctx context.Context, msg *pulsar.ProducerMessage) (msgId
 func (p *producer) SendAsync(ctx context.Context, msg *pulsar.ProducerMessage,
 	callback func(pulsar.MessageID, *pulsar.ProducerMessage, error)) {
 	start := time.Now()
+	// init map if necessary
+	if msg.Properties == nil {
+		msg.Properties = make(map[string]string)
+	}
 	callbackNew := func(msgID pulsar.MessageID, msg *pulsar.ProducerMessage, err error) {
 		// backoff with synchronous send
 		for i := uint(0); err != nil && i < p.BackoffMaxTimes; i++ {
