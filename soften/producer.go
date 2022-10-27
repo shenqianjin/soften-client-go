@@ -12,6 +12,7 @@ import (
 	"github.com/shenqianjin/soften-client-go/soften/config"
 	"github.com/shenqianjin/soften-client-go/soften/internal"
 	"github.com/shenqianjin/soften-client-go/soften/message"
+	"github.com/shenqianjin/soften-client-go/soften/meta"
 )
 
 type Producer interface {
@@ -169,6 +170,7 @@ func (p *producer) formatDecidersOptions(conf *config.ProducerConfig) produceDec
 // Send sends a message
 func (p *producer) Send(ctx context.Context, msg *pulsar.ProducerMessage) (msgId pulsar.MessageID, err error) {
 	start := time.Now()
+	ctx = meta.AsMetas(ctx)
 	// init map if necessary
 	if msg.Properties == nil {
 		msg.Properties = make(map[string]string)
@@ -216,6 +218,7 @@ func (p *producer) Send(ctx context.Context, msg *pulsar.ProducerMessage) (msgId
 // SendAsync sends a message in asynchronous
 func (p *producer) SendAsync(ctx context.Context, msg *pulsar.ProducerMessage,
 	callback func(pulsar.MessageID, *pulsar.ProducerMessage, error)) {
+	ctx = meta.AsMetas(ctx)
 	start := time.Now()
 	// init map if necessary
 	if msg.Properties == nil {

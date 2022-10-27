@@ -345,7 +345,7 @@ func (l *consumeListener) internalStartInPool(ctx context.Context, handler handl
 
 			// submit task in blocking mode, err happens only if pool is closed.
 			// Namely, the 'err != nil' condition is never meet.
-			cCtx := meta.NewContext(context.Background())
+			cCtx := meta.AsMetas(context.Background())
 			if err := pool.Submit(func() { l.consume(cCtx, handler, msg) }); err != nil {
 				panic(fmt.Sprintf("submit msg failed. err: %v", err))
 			}
@@ -367,7 +367,7 @@ func (l *consumeListener) internalStartInParallel(ctx context.Context, handler h
 			concurrencyChan <- true
 			go func(msg consumerMessage) {
 				// setup meta context
-				cCtx := meta.NewContext(context.Background())
+				cCtx := meta.AsMetas(context.Background())
 				l.consume(cCtx, handler, msg)
 				<-concurrencyChan
 			}(msg)
