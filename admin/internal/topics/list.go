@@ -1,10 +1,13 @@
-package internal
+package topics
 
 import (
 	"errors"
 	"fmt"
 	"sort"
 	"strings"
+
+	"github.com/shenqianjin/soften-client-go/admin/internal"
+	"github.com/shenqianjin/soften-client-go/admin/internal/util"
 
 	"github.com/shenqianjin/soften-client-go/soften/admin"
 	"github.com/spf13/cobra"
@@ -19,7 +22,7 @@ type listArgs struct {
 	nonPartitionOnly bool
 }
 
-func NewListCommand(rtArgs rootArgs) *cobra.Command {
+func newListCommand(rtArgs internal.RootArgs) *cobra.Command {
 	cmdArgs := &listArgs{}
 	cmd := &cobra.Command{
 		Use:   "list ",
@@ -33,8 +36,8 @@ func NewListCommand(rtArgs rootArgs) *cobra.Command {
 
 	flags := cmd.Flags()
 	// parse partition
-	flags.BoolVarP(&cmdArgs.partitioned, "partitioned", "p", false, partitionedUsage)
-	flags.StringVarP(&cmdArgs.subscription, "subscription", "S", "", subscriptionUsage)
+	flags.BoolVarP(&cmdArgs.partitioned, "partitioned", "p", false, util.PartitionedUsage)
+	flags.StringVarP(&cmdArgs.subscription, "subscription", "S", "", util.SubscriptionUsage)
 	flags.BoolVarP(&cmdArgs.groundOnly, "ground-only", "g", false,
 		"exclude non-ground topics")
 	flags.BoolVarP(&cmdArgs.readyOnly, "ready-only", "r", false,
@@ -43,9 +46,9 @@ func NewListCommand(rtArgs rootArgs) *cobra.Command {
 	return cmd
 }
 
-func listTopics(rtArgs rootArgs, cmdArgs *listArgs) {
+func listTopics(rtArgs internal.RootArgs, cmdArgs *listArgs) {
 	topics, err := listTopicsByOptions(listOptions{
-		url:          rtArgs.url,
+		url:          rtArgs.Url,
 		groundTopic:  cmdArgs.groundTopic,
 		subscription: cmdArgs.subscription,
 
@@ -109,7 +112,7 @@ func listTopicsByOptions(options listOptions) ([]string, error) {
 	if options.groundOnly {
 		groundTopics := make([]string, 0)
 		for _, topic := range matchedTopics {
-			if !isPartitionedSubTopic(topic) && isL1Topic(topic) && isReadyTopic(topic) {
+			if !util.IsPartitionedSubTopic(topic) && util.IsL1Topic(topic) && util.IsReadyTopic(topic) {
 				groundTopics = append(groundTopics, topic)
 			}
 		}
@@ -120,7 +123,7 @@ func listTopicsByOptions(options listOptions) ([]string, error) {
 	if options.readyOnly {
 		readyTopics := make([]string, 0)
 		for _, topic := range matchedTopics {
-			if !isPartitionedSubTopic(topic) && isReadyTopic(topic) {
+			if !util.IsPartitionedSubTopic(topic) && util.IsReadyTopic(topic) {
 				readyTopics = append(readyTopics, topic)
 			}
 		}

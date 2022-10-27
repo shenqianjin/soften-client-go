@@ -1,4 +1,4 @@
-package internal
+package util
 
 import (
 	"strings"
@@ -7,27 +7,30 @@ import (
 )
 
 var (
-	levelUsage = "levels for your ground topic\n" +
+	LevelUsage = "levels for your ground topic\n" +
 		"separate with ',' if more than one\n" +
 		"levels supports [" + allLevels + "]"
 
-	statusUsage = "status for your ground topic on your specified levels\n" +
+	SingleLevelUsage = "single level for your ground topic\n" +
+		"level supports [" + allLevels + "]"
+
+	StatusUsage = "status for your ground topic on your specified levels\n" +
 		"separate with ',' if more than one\n" +
 		"supports [" + allStatuses + "]\n" +
 		"note that 'Dead' status defaults active on only ground (L1) level"
 
-	partitionsUsage4Create = "the number of partitions of your topic or topics\n" +
+	PartitionsUsage4Create = "the number of partitions of your topic or topics\n" +
 		"non-partitioned topic will be created if it is not specified or less than 1"
 
-	partitionsUsage4Update = "the number of partitions to update to on your topic or topics\n" +
+	PartitionsUsage4Update = "the number of partitions to update to on your topic or topics\n" +
 		"new partitions must more than the existing value"
 
-	partitionedUsage = "partitioned mode to process, or process non-partitioned"
+	PartitionedUsage = "partitioned mode to process, or process non-partitioned"
 
-	subscriptionUsage = "subscription name on the ground topic\n" +
+	SubscriptionUsage = "subscription name on the ground topic\n" +
 		"separate with ',' if more than one"
 
-	conditionsUsage = "conditions to execute\n" +
+	ConditionsUsage = "conditions to execute\n" +
 		"an expression is a one-liner that returns a bool value\n" +
 		"see https://github.com/antonmedv/expr/blob/master/docs/Language-Definition.md for grammar"
 )

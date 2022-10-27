@@ -5,23 +5,23 @@ import (
 	"github.com/spf13/cobra"
 )
 
-type rootArgs struct {
-	debug bool
-	url   string
+type RootArgs struct {
+	Debug bool
+	Url   string
 }
 
-func NewRootCmd() (*cobra.Command, rootArgs) {
-	cmdArgs := rootArgs{}
+func NewRootCmd() (*cobra.Command, RootArgs) {
+	cmdArgs := RootArgs{}
 	cmd := &cobra.Command{
 		PersistentPreRun: func(cmd *cobra.Command, args []string) {
-			config.DebugMode = cmdArgs.debug
+			config.DebugMode = cmdArgs.Debug
 		},
 		Use: "soften-admin",
 	}
 
 	// parser variables
 	flags := cmd.PersistentFlags()
-	flags.BoolVarP(&cmdArgs.debug, "debug", "d", false, "enable debug mode")
-	flags.StringVarP(&cmdArgs.url, "url", "u", "http://localhost:8080", "pulsar broker http url")
+	flags.BoolVarP(&cmdArgs.Debug, "debug", "d", false, "enable debug mode")
+	flags.StringVarP(&cmdArgs.Url, "url", "u", "http://localhost:8080", "pulsar broker http url")
 	return cmd, cmdArgs
 }

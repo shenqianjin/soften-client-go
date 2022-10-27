@@ -1,4 +1,4 @@
-package internal
+package util
 
 import (
 	"fmt"
@@ -89,7 +89,7 @@ func formatSubs(subStr string) (subs []string) {
 	return
 }
 
-func formatTopics(groundTopic string, levelStr, statusStr string, subscription string) []string {
+func FormatTopics(groundTopic string, levelStr, statusStr string, subscription string) []string {
 	topics := make([]string, 0)
 	levels := formatLevels(levelStr)
 	statuses := formatStatuses(statusStr)
@@ -148,7 +148,7 @@ func formatTopics(groundTopic string, levelStr, statusStr string, subscription s
 	return topics
 }
 
-func isL1Topic(topic string) bool {
+func IsL1Topic(topic string) bool {
 	if topic == "" {
 		panic("invalid topic name")
 	}
@@ -163,7 +163,7 @@ func isL1Topic(topic string) bool {
 	return true
 }
 
-func isReadyTopic(topic string) bool {
+func IsReadyTopic(topic string) bool {
 	if topic == "" {
 		panic("invalid topic name")
 	}
@@ -178,7 +178,7 @@ func isReadyTopic(topic string) bool {
 	return true
 }
 
-func isPartitionedSubTopic(topic string) bool {
+func IsPartitionedSubTopic(topic string) bool {
 	if topic == "" {
 		panic("invalid topic name")
 	}

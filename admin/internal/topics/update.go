@@ -1,8 +1,11 @@
-package internal
+package topics
 
 import (
 	"fmt"
 	"os"
+
+	"github.com/shenqianjin/soften-client-go/admin/internal"
+	"github.com/shenqianjin/soften-client-go/admin/internal/util"
 
 	"github.com/shenqianjin/soften-client-go/soften/admin"
 	"github.com/spf13/cobra"
@@ -16,7 +19,7 @@ type updateArgs struct {
 	partitions   uint
 }
 
-func NewUpdateCommand(rtArgs rootArgs) *cobra.Command {
+func newUpdateCommand(rtArgs internal.RootArgs) *cobra.Command {
 	cmdArgs := &updateArgs{}
 	cmd := &cobra.Command{
 		Use:   "update ",
@@ -28,30 +31,30 @@ func NewUpdateCommand(rtArgs rootArgs) *cobra.Command {
 		},
 	}
 	// parse levels
-	cmd.Flags().StringVarP(&cmdArgs.level, "level", "l", "", levelUsage)
+	cmd.Flags().StringVarP(&cmdArgs.level, "level", "l", "", util.LevelUsage)
 	// parse statuses
-	cmd.Flags().StringVarP(&cmdArgs.status, "status", "s", "", statusUsage)
-	cmd.Flags().StringVarP(&cmdArgs.subscription, "subscription", "S", "", subscriptionUsage)
-	cmd.Flags().UintVarP(&cmdArgs.partitions, "partitioned", "p", 0, partitionsUsage4Update)
+	cmd.Flags().StringVarP(&cmdArgs.status, "status", "s", "", util.StatusUsage)
+	cmd.Flags().StringVarP(&cmdArgs.subscription, "subscription", "S", "", util.SubscriptionUsage)
+	cmd.Flags().UintVarP(&cmdArgs.partitions, "partitioned", "p", 0, util.PartitionsUsage4Update)
 
 	return cmd
 }
 
-func updateTopics(rtArgs rootArgs, cmdArgs *updateArgs) {
+func updateTopics(rtArgs internal.RootArgs, cmdArgs *updateArgs) {
 	if cmdArgs.partitions <= 0 {
 		fmt.Println("please specify the partitions (with -p or --partitions options) " +
 			"and make sure it is more than the original value")
 		os.Exit(1)
 	}
-	manager := admin.NewTopicManager(rtArgs.url)
+	manager := admin.NewTopicManager(rtArgs.Url)
 
 	var topics []string
 	var err error
 	if cmdArgs.level != "" || cmdArgs.status != "" {
-		topics = formatTopics(cmdArgs.groundTopic, cmdArgs.level, cmdArgs.status, cmdArgs.subscription)
+		topics = util.FormatTopics(cmdArgs.groundTopic, cmdArgs.level, cmdArgs.status, cmdArgs.subscription)
 	} else {
 		topics, err = listAndCheckTopicsByOptions(listOptions{
-			url:          rtArgs.url,
+			url:          rtArgs.Url,
 			groundTopic:  cmdArgs.groundTopic,
 			subscription: cmdArgs.subscription,
 

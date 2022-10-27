@@ -1,7 +1,11 @@
-package internal
+package topics
 
 import (
 	"fmt"
+
+	"github.com/shenqianjin/soften-client-go/admin/internal"
+
+	"github.com/shenqianjin/soften-client-go/admin/internal/util"
 
 	"github.com/shenqianjin/soften-client-go/soften/admin"
 	"github.com/spf13/cobra"
@@ -15,7 +19,7 @@ type createArgs struct {
 	subscription string
 }
 
-func NewCreateCommand(rtArgs rootArgs) *cobra.Command {
+func newCreateCommand(rtArgs internal.RootArgs) *cobra.Command {
 	cmdArgs := createArgs{}
 	cmd := &cobra.Command{
 		Use:   "create ",
@@ -27,22 +31,22 @@ func NewCreateCommand(rtArgs rootArgs) *cobra.Command {
 		},
 	}
 	// parse levels
-	cmd.Flags().StringVarP(&cmdArgs.level, "level", "l", "L1", levelUsage)
+	cmd.Flags().StringVarP(&cmdArgs.level, "level", "l", "L1", util.LevelUsage)
 	// parse statuses
-	cmd.Flags().StringVarP(&cmdArgs.status, "status", "s", "Ready", statusUsage)
+	cmd.Flags().StringVarP(&cmdArgs.status, "status", "s", "Ready", util.StatusUsage)
 
 	flags := cmd.Flags()
 	// parse partition
-	flags.UintVarP(&cmdArgs.partitions, "partitions", "p", 0, partitionsUsage4Create)
-	flags.StringVarP(&cmdArgs.subscription, "subscription", "S", "", subscriptionUsage)
+	flags.UintVarP(&cmdArgs.partitions, "partitions", "p", 0, util.PartitionsUsage4Create)
+	flags.StringVarP(&cmdArgs.subscription, "subscription", "S", "", util.SubscriptionUsage)
 
 	return cmd
 }
 
-func createTopics(rtArgs rootArgs, cmdArgs *createArgs) {
-	manager := admin.NewTopicManager(rtArgs.url)
+func createTopics(rtArgs internal.RootArgs, cmdArgs *createArgs) {
+	manager := admin.NewTopicManager(rtArgs.Url)
 
-	topics := formatTopics(cmdArgs.groundTopic, cmdArgs.level, cmdArgs.status, cmdArgs.subscription)
+	topics := util.FormatTopics(cmdArgs.groundTopic, cmdArgs.level, cmdArgs.status, cmdArgs.subscription)
 	for _, topic := range topics {
 		var err error
 		if cmdArgs.partitions <= 0 {
