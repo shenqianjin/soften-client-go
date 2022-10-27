@@ -4,9 +4,15 @@ import (
 	"context"
 )
 
-const metasKey = "soften_metas"
+// metasKeyType is private and exclusive meta key type
+// DO NOT expose it out of current package
+type metasKeyType struct{}
 
 type metas map[any]any
+
+// constant
+
+var metasKey = metasKeyType{}
 
 func AsMetas(ctx context.Context) context.Context {
 	if isMetas(ctx) {
