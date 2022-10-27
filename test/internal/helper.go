@@ -25,6 +25,7 @@ var (
 	PrefixTestConsume      = "test-consume"
 	PrefixTestConsumeLimit = "test-consume-limit"
 	PrefixTestConsumeBatch = "test-consume-batch"
+	PrefixTestConsumeCheck = "test-consume-check"
 	PrefixTestListen       = "test-listen"
 
 	Size64 = 64

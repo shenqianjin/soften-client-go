@@ -383,14 +383,20 @@ func (l *consumeListener) consume(ctx context.Context, handlerFunc handler.Premi
 	// prev-check to handle in turn
 	for _, checkType := range l.prevCheckOrders {
 		if wpCheckpoint, ok := l.checkers[checkType]; ok && len(wpCheckpoint.checkChains) > 0 {
-			checkStatus := l.internalPrevCheck(ctx, wpCheckpoint, msg)
-			if handledDeferFunc := checkStatus.GetHandledDefer(); handledDeferFunc != nil {
-				defer handledDeferFunc()
+			var chkStatus checker.CheckStatus
+			for ci := 0; ci < len(wpCheckpoint.checkChains); ci++ {
+				chkStatus = l.internalPrevCheck(ctx, wpCheckpoint, ci, msg)
+				if handledDeferFunc := chkStatus.GetHandledDefer(); handledDeferFunc != nil {
+					defer handledDeferFunc()
+				}
+				if chkStatus != nil && chkStatus.IsPassed() {
+					break
+				}
 			}
-			if !checkStatus.IsPassed() {
+			if chkStatus == nil || !chkStatus.IsPassed() {
 				continue
 			}
-			if decided := l.internalDecideByPrevCheckType(msg, checkType, checkStatus); decided {
+			if decided := l.internalDecideByPrevCheckType(msg, checkType, chkStatus); decided {
 				// return to skip biz decider if check handle succeeded
 				return
 			}
@@ -423,14 +429,20 @@ func (l *consumeListener) consume(ctx context.Context, handlerFunc handler.Premi
 	}
 	for _, checkType := range postCheckTypesInTurn {
 		if wpCheckpoint, ok := l.checkers[checkType]; ok && len(wpCheckpoint.checkChains) > 0 {
-			checkStatus := l.internalPostCheck(ctx, wpCheckpoint, msg, bizHandleStatus.GetErr())
-			if handledDeferFunc := checkStatus.GetHandledDefer(); handledDeferFunc != nil {
-				defer handledDeferFunc()
+			var chkStatus checker.CheckStatus
+			for ci := 0; ci < len(wpCheckpoint.checkChains); ci++ {
+				chkStatus = l.internalPostCheck(ctx, wpCheckpoint, ci, msg, bizHandleStatus.GetErr())
+				if handledDeferFunc := chkStatus.GetHandledDefer(); handledDeferFunc != nil {
+					defer handledDeferFunc()
+				}
+				if chkStatus != nil && chkStatus.IsPassed() {
+					break
+				}
 			}
-			if !checkStatus.IsPassed() {
+			if chkStatus == nil || !chkStatus.IsPassed() {
 				continue
 			}
-			if decided := l.internalDecideByPostCheckType(msg, checkType, checkStatus); decided {
+			if decided := l.internalDecideByPostCheckType(msg, checkType, chkStatus); decided {
 				// return if check handle succeeded
 				return
 			}
@@ -447,16 +459,12 @@ func (l *consumeListener) consume(ctx context.Context, handlerFunc handler.Premi
 	return
 }
 
-func (l *consumeListener) internalPrevCheck(ctx context.Context, chain *consumeCheckpointChain, msg consumerMessage) checker.CheckStatus {
+func (l *consumeListener) internalPrevCheck(ctx context.Context, chain *consumeCheckpointChain, chainIndex int, msg consumerMessage) checker.CheckStatus {
 	// execute check chains
 	start := time.Now()
-	var checkStatus checker.CheckStatus = checker.CheckStatusRejected
-	for _, checkpoint := range chain.checkChains {
-		checkStatus = checkpoint.Prev(ctx, msg)
-		if checkStatus.IsPassed() {
-			break
-		}
-	}
+	checkpoint := chain.checkChains[chainIndex]
+	checkStatus := checkpoint.Prev(ctx, msg)
+
 	// observe metrics
 	latency := time.Now().Sub(start).Seconds()
 	metrics := l.metricsProvider.GetListenerCheckerMetrics(chain.options.groundTopic, msg.Level(), msg.Status(),
@@ -470,16 +478,12 @@ func (l *consumeListener) internalPrevCheck(ctx context.Context, chain *consumeC
 	return checkStatus
 }
 
-func (l *consumeListener) internalPostCheck(ctx context.Context, chain *consumeCheckpointChain, msg consumerMessage, err error) checker.CheckStatus {
+func (l *consumeListener) internalPostCheck(ctx context.Context, chain *consumeCheckpointChain, ci int, msg consumerMessage, err error) checker.CheckStatus {
 	// execute check chains
 	start := time.Now()
-	var checkStatus checker.CheckStatus = checker.CheckStatusRejected
-	for _, checkpoint := range chain.checkChains {
-		checkStatus = checkpoint.Post(ctx, msg, err)
-		if checkStatus.IsPassed() {
-			break
-		}
-	}
+	checkpoint := chain.checkChains[ci]
+	checkStatus := checkpoint.Post(ctx, msg, err)
+
 	// observe metrics
 	latency := time.Now().Sub(start).Seconds()
 	metrics := l.metricsProvider.GetListenerCheckerMetrics(chain.options.groundTopic, msg.Level(), msg.Status(),

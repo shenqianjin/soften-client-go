@@ -179,14 +179,20 @@ func (p *producer) Send(ctx context.Context, msg *pulsar.ProducerMessage) (msgId
 	cMsg := &message.ProducerMessage{ProducerMessage: msg, LeveledMessage: &leveledMessage{level: p.level}}
 	for _, checkType := range p.prevCheckOrders {
 		if wpCheckpoint, ok := p.checkers[checkType]; ok && len(wpCheckpoint.checkChains) > 0 {
-			checkStatus := p.internalCheck(ctx, wpCheckpoint, cMsg)
-			if handledDeferFunc := checkStatus.GetHandledDefer(); handledDeferFunc != nil {
-				defer handledDeferFunc()
+			var chkStatus checker.CheckStatus
+			for ci := 0; ci < len(wpCheckpoint.checkChains); ci++ {
+				chkStatus = p.internalCheck(ctx, wpCheckpoint, ci, cMsg)
+				if handledDeferFunc := chkStatus.GetHandledDefer(); handledDeferFunc != nil {
+					defer handledDeferFunc()
+				}
+				if chkStatus != nil && chkStatus.IsPassed() {
+					break
+				}
 			}
-			if !checkStatus.IsPassed() {
+			if chkStatus == nil || !chkStatus.IsPassed() {
 				continue
 			}
-			if mid, err, decided := p.internalSendDecideByCheckType(ctx, msg, checkType, checkStatus); decided {
+			if mid, err, decided := p.internalSendDecideByCheckType(ctx, msg, checkType, chkStatus); decided {
 				// return to skip biz decider if check handle succeeded
 				return mid, err
 			}
@@ -245,14 +251,20 @@ func (p *producer) SendAsync(ctx context.Context, msg *pulsar.ProducerMessage,
 	cMsg := &message.ProducerMessage{ProducerMessage: msg, LeveledMessage: &leveledMessage{level: p.level}}
 	for _, checkType := range p.prevCheckOrders {
 		if wpCheckpoint, ok := p.checkers[checkType]; ok && len(wpCheckpoint.checkChains) > 0 {
-			checkStatus := p.internalCheck(ctx, wpCheckpoint, cMsg)
-			if handledDeferFunc := checkStatus.GetHandledDefer(); handledDeferFunc != nil {
-				defer handledDeferFunc()
+			var chkStatus checker.CheckStatus
+			for ci := 0; ci < len(wpCheckpoint.checkChains); ci++ {
+				chkStatus = p.internalCheck(ctx, wpCheckpoint, ci, cMsg)
+				if handledDeferFunc := chkStatus.GetHandledDefer(); handledDeferFunc != nil {
+					defer handledDeferFunc()
+				}
+				if chkStatus != nil && chkStatus.IsPassed() {
+					break
+				}
 			}
-			if !checkStatus.IsPassed() {
+			if chkStatus == nil || !chkStatus.IsPassed() {
 				continue
 			}
-			if _, decided := p.internalSendAsyncDecideByCheckType(ctx, msg, checkType, checkStatus, callbackNew); decided {
+			if _, decided := p.internalSendAsyncDecideByCheckType(ctx, msg, checkType, chkStatus, callbackNew); decided {
 				// return to skip biz decider if check handle succeeded
 				return
 			}
@@ -267,16 +279,12 @@ func (p *producer) SendAsync(ctx context.Context, msg *pulsar.ProducerMessage,
 	return
 }
 
-func (p *producer) internalCheck(ctx context.Context, chain *produceCheckpointChain, msg *message.ProducerMessage) checker.CheckStatus {
+func (p *producer) internalCheck(ctx context.Context, chain *produceCheckpointChain, ci int, msg *message.ProducerMessage) checker.CheckStatus {
 	// execute check chains
 	start := time.Now()
-	var checkStatus checker.CheckStatus = checker.CheckStatusRejected
-	for _, checkpoint := range chain.checkChains {
-		checkStatus = checkpoint.CheckFunc(ctx, msg)
-		if checkStatus.IsPassed() {
-			break
-		}
-	}
+	checkpoint := chain.checkChains[ci]
+	checkStatus := checkpoint.CheckFunc(ctx, msg)
+
 	// observe metrics
 	latency := time.Now().Sub(start).Seconds()
 	metrics := p.metricsProvider.GetProducerCheckerMetrics(chain.options.groundTopic, chain.options.topic, chain.options.checkType.String())
