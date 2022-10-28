@@ -53,7 +53,7 @@ var (
 	// defaultStatusPolicyRetrying 默认Retrying状态的校验策略。
 	defaultStatusPolicyRetrying = &StatusPolicy{
 		ConsumeWeight:     defaultConsumeWeightRetrying,
-		ConsumeMaxTimes:   60 * 6,                       // 做多尝试60*6=360次, 6h小时内每分钟重试
+		ConsumeMaxTimes:   60 * 6,                       // 最多尝试60*6=360次, 6h小时内每分钟重试
 		BackoffDelays:     defaultRetryingBackoffDelays, // 前5次累计1分钟, 第6次开始每隔1分钟开始重试
 		BackoffPolicy:     nil,                          //
 		ReentrantDelay:    60,                           // 每1分钟进行一次重入
