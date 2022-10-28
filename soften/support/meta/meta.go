@@ -42,7 +42,7 @@ func PutMeta(ctx context.Context, key any, value any) bool {
 
 func getMetas(ctx context.Context) metas {
 	if val := ctx.Value(metasKey); val != nil {
-		if metaMap, ok := val.(map[any]any); ok {
+		if metaMap, ok := val.(metas); ok {
 			return metaMap
 		}
 	}

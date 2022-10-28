@@ -26,13 +26,15 @@ var (
 	DefaultNackMaxDelay      = 300 // 最大Nack延迟，默认5分钟
 
 	// Main 重试间隔策略策略: 累计 120s, 超过6次 每次按60s记
-	defaultMainBackoffDelays = []string{"3s", "5s", "8s", "14s", "30s", "60s"}
+	// defaultMainBackoffDelays = []string{"3s", "5s", "8s", "14s", "30s", "60s"}
 	// Retrying 重试间隔策略策略: 累计 20min, 超过9次 每次按600s记
-	defaultRetryingBackoffDelays = []string{"3s", "5s", "8s", "14s", "30s", "60s", "180s", "300s", "600s"}
-	// Retrying 重试间隔策略策略: 同 defaultRetryingBackoffDelays
+	// expected: []string{"3s", "5s", "8s", "14s", "30s", "60s", "180s", "300s", "600s"}
+	defaultRetryingBackoffDelays = []string{"3s", "5s", "8s", "14s", "30s", "60s"}
+	// Pending 重试间隔策略策略: 同 defaultRetryingBackoffDelays
 	defaultPendingBackoffDelays = defaultRetryingBackoffDelays
 	// Retrying 重试间隔策略策略: 累计 4h, 超过5次 每次按2h记
-	defaultBlockingBackoffDelays = []string{"600s", "1200s", "1800s", "3600s", "7200s"}
+	// expected: []string{"600s", "1200s", "1800s", "3600s", "7200s"}
+	defaultBlockingBackoffDelays = []string{"600s"}
 )
 
 // ------ default consume status policies ------
@@ -51,11 +53,11 @@ var (
 	// defaultStatusPolicyRetrying 默认Retrying状态的校验策略。
 	defaultStatusPolicyRetrying = &StatusPolicy{
 		ConsumeWeight:     defaultConsumeWeightRetrying,
-		ConsumeMaxTimes:   5 + 30,                       // 最多消费35次(5次Nack+30次重入), 21分钟内重试
+		ConsumeMaxTimes:   60 * 6,                       // 做多尝试60*6=360次, 6h小时内每分钟重试
 		BackoffDelays:     defaultRetryingBackoffDelays, // 前5次累计1分钟, 第6次开始每隔1分钟开始重试
 		BackoffPolicy:     nil,                          //
 		ReentrantDelay:    60,                           // 每1分钟进行一次重入
-		ReentrantMaxTimes: 30,                           // 最多重入30次
+		ReentrantMaxTimes: 0,                            // 最大重入次数不限制
 	}
 
 	// defaultStatusPolicyPending 默认Pending状态的校验策略。
@@ -71,7 +73,7 @@ var (
 	// defaultStatusPolicyBlocking 默认pending状态的校验策略。
 	defaultStatusPolicyBlocking = &StatusPolicy{
 		ConsumeWeight:     defaultConsumeWeightBlocking,
-		ConsumeMaxTimes:   15,                           // 最多消费15次, 1d内重试
+		ConsumeMaxTimes:   6 * 24 * 2,                   // 最多消费6 * 24 * 2=288次, 1h*24*2=2d内重试
 		BackoffDelays:     defaultBlockingBackoffDelays, // 前4次累计2h, 第5次开始每隔2h开始重试
 		BackoffPolicy:     nil,                          //
 		ReentrantDelay:    600,                          // 每10min进行一次重入

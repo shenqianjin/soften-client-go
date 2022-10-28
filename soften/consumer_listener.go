@@ -15,7 +15,7 @@ import (
 	"github.com/shenqianjin/soften-client-go/soften/handler"
 	"github.com/shenqianjin/soften-client-go/soften/internal"
 	"github.com/shenqianjin/soften-client-go/soften/message"
-	"github.com/shenqianjin/soften-client-go/soften/meta"
+	"github.com/shenqianjin/soften-client-go/soften/support/meta"
 )
 
 type Listener interface {
@@ -256,8 +256,6 @@ func (l *consumeListener) formatGeneralDecidersOptions(topic string, enables *in
 		Degrade:          conf.Degrade,
 		ShiftEnable:      enables.ShiftEnable,
 		Shift:            conf.Shift,
-		metricsTopics:    internal.TopicParser.FormatListAsAbbr(conf.Topics),
-		metricsLevels:    internal.TopicLevelParser.FormatList(conf.Levels),
 	}
 	return options
 }
@@ -277,8 +275,6 @@ func (l *consumeListener) formatLeveledDecidersOptions(topic string, level inter
 		Upgrade:          conf.Upgrade,
 		DegradeEnable:    enables.DegradeEnable,
 		Degrade:          conf.Degrade,
-		metricsTopics:    internal.TopicParser.FormatListAsAbbr(conf.Topics),
-		metricsLevels:    internal.TopicLevelParser.FormatList(conf.Levels),
 	}
 	return options
 }

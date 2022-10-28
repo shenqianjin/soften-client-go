@@ -12,7 +12,7 @@ import (
 	"github.com/shenqianjin/soften-client-go/soften/config"
 	"github.com/shenqianjin/soften-client-go/soften/internal"
 	"github.com/shenqianjin/soften-client-go/soften/message"
-	"github.com/shenqianjin/soften-client-go/soften/meta"
+	"github.com/shenqianjin/soften-client-go/soften/support/meta"
 )
 
 type Producer interface {

@@ -8,7 +8,7 @@ import (
 	"os/signal"
 	"strconv"
 
-	"github.com/shenqianjin/soften-client-go/soften/promhttp"
+	"github.com/shenqianjin/soften-client-go/soften/support/promhttp"
 	//"github.com/prometheus/client_golang/prometheus/promhttp"
 	log "github.com/sirupsen/logrus"
 )

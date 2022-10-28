@@ -5,7 +5,7 @@ import (
 	_ "net/http/pprof"
 	"os"
 
-	"github.com/shenqianjin/soften-client-go/soften/log"
+	"github.com/shenqianjin/soften-client-go/soften/support/log"
 	"github.com/sirupsen/logrus"
 )
 

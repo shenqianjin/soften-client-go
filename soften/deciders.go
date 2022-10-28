@@ -132,8 +132,6 @@ type generalConsumeDeciderOptions struct {
 	Degrade          *config.ShiftPolicy    //
 	ShiftEnable      bool                   //
 	Shift            *config.ShiftPolicy    //
-	metricsTopics    string                 // metrics topics
-	metricsLevels    string                 // metrics levels
 }
 
 func newGeneralConsumeDeciders(cli *client, l *consumeListener, options generalConsumeDeciderOptions) (*generalConsumeDeciders, error) {
@@ -243,8 +241,6 @@ type leveledConsumeDeciderOptions struct {
 	Upgrade          *config.ShiftPolicy  // 主动升级队列级别
 	DegradeEnable    bool                 // 主动降级
 	Degrade          *config.ShiftPolicy  // 主动升级队列级别
-	metricsTopics    string               // metrics topics
-	metricsLevels    string               // metrics levels
 }
 
 // newLeveledConsumeDeciders create handlers based on different levels.

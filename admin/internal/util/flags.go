@@ -11,9 +11,6 @@ var (
 		"separate with ',' if more than one\n" +
 		"levels supports [" + allLevels + "]"
 
-	SingleLevelUsage = "single level for your ground topic\n" +
-		"level supports [" + allLevels + "]"
-
 	StatusUsage = "status for your ground topic on your specified levels\n" +
 		"separate with ',' if more than one\n" +
 		"supports [" + allStatuses + "]\n" +
