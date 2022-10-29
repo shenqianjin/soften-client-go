@@ -37,8 +37,8 @@ func newListCommand(rtArgs *internal.RootArgs) *cobra.Command {
 	// parse partition
 	flags.BoolVarP(&cmdArgs.partitioned, "partitioned", "p", false, util.PartitionedUsage)
 	flags.StringVarP(&cmdArgs.subscription, "subscription", "S", "", util.SubscriptionUsage)
-	flags.BoolVarP(&cmdArgs.groundOnly, "ground-only", "g", false, "exclude non-ground topics")
-	flags.BoolVarP(&cmdArgs.readyOnly, "ready-only", "r", false, "exclude non-ready topics")
+	flags.BoolVarP(&cmdArgs.groundOnly, "ground-only", "g", false, "list L1 topics only")
+	flags.BoolVarP(&cmdArgs.readyOnly, "ready-only", "r", false, "list ready topics only")
 
 	return cmd
 }
@@ -95,6 +95,9 @@ func listTopicsByOptions(options listOptions) ([]string, error) {
 		queriedTopics, err = manager.PartitionedList(namespace)
 	} else {
 		queriedTopics, err = manager.List(namespace)
+	}
+	if err != nil {
+		logrus.Fatalln(err)
 	}
 
 	// match by ground topic (may namespace as well)

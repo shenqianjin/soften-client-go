@@ -1,12 +1,10 @@
 package main
 
 import (
-	"fmt"
-	"os"
-
 	"github.com/shenqianjin/soften-client-go/admin/internal"
 	"github.com/shenqianjin/soften-client-go/admin/internal/messages"
 	"github.com/shenqianjin/soften-client-go/admin/internal/topics"
+	"github.com/sirupsen/logrus"
 )
 
 func main() {
@@ -20,7 +18,6 @@ func main() {
 	// execute
 	err := rootCmd.Execute()
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "executing command error=%+v\n", err)
-		os.Exit(1)
+		logrus.Fatalf("executing command error=%+v\n", err)
 	}
 }

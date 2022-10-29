@@ -2,7 +2,6 @@ package topics
 
 import (
 	"errors"
-	"fmt"
 
 	"github.com/shenqianjin/soften-client-go/admin/internal"
 	"github.com/shenqianjin/soften-client-go/admin/internal/util"
@@ -63,15 +62,15 @@ func updateTopics(rtArgs internal.RootArgs, cmdArgs *updateArgs) {
 		})
 	}
 	if err != nil {
-		fmt.Printf("updated \"%s\" failed: %v\n", cmdArgs.groundTopic, err)
+		logrus.Fatalf("updated \"%s\" failed: %v\n", cmdArgs.groundTopic, err)
 	}
 	// update partitions
 	for _, topic := range topics {
 		err := manager.PartitionedUpdate(topic, cmdArgs.partitions)
 		if err != nil {
-			fmt.Printf("updated \"%s\" failed: %v\n", topic, err)
+			logrus.Fatalf("updated \"%s\" failed: %v\n", topic, err)
 		} else {
-			fmt.Printf("updated \"%s\" successfully, partitions is %v now\n", topic, cmdArgs.partitions)
+			logrus.Fatalf("updated \"%s\" successfully, partitions is %v now\n", topic, cmdArgs.partitions)
 		}
 	}
 }

@@ -1,13 +1,10 @@
 package topics
 
 import (
-	"fmt"
-
 	"github.com/shenqianjin/soften-client-go/admin/internal"
-
 	"github.com/shenqianjin/soften-client-go/admin/internal/util"
-
 	"github.com/shenqianjin/soften-client-go/soften/admin"
+	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 )
 
@@ -55,9 +52,9 @@ func createTopics(rtArgs internal.RootArgs, cmdArgs *createArgs) {
 			err = manager.PartitionedCreate(topic, cmdArgs.partitions)
 		}
 		if err != nil {
-			fmt.Printf("created \"%s\" failed: %v\n", topic, err)
+			logrus.Fatalf("created \"%s\" failed: %v\n", topic, err)
 		} else {
-			fmt.Printf("created \"%s\" successfully\n", topic)
+			logrus.Infof("created \"%s\" successfully\n", topic)
 		}
 	}
 }

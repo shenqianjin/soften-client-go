@@ -1,12 +1,10 @@
 package topics
 
 import (
-	"fmt"
-
 	"github.com/shenqianjin/soften-client-go/admin/internal"
 	"github.com/shenqianjin/soften-client-go/admin/internal/util"
-
 	"github.com/shenqianjin/soften-client-go/soften/admin"
+	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 )
 
@@ -61,7 +59,7 @@ func deleteTopics(rtArgs internal.RootArgs, cmdArgs *deleteArgs) {
 		})
 	}
 	if err != nil {
-		fmt.Printf("delete \"%s\" failed: %v\n", cmdArgs.groundTopic, err)
+		logrus.Fatalf("delete \"%s\" failed: %v\n", cmdArgs.groundTopic, err)
 	}
 	// delete one by one
 	for _, topic := range topics {
@@ -72,9 +70,9 @@ func deleteTopics(rtArgs internal.RootArgs, cmdArgs *deleteArgs) {
 			err = manager.Delete(topic)
 		}
 		if err != nil {
-			fmt.Printf("deleted \"%s\" failed: %v\n", topic, err)
+			logrus.Fatalf("deleted \"%s\" failed: %v\n", topic, err)
 		} else {
-			fmt.Printf("deleted \"%s\" successfully\n", topic)
+			logrus.Infof("deleted \"%s\" successfully\n", topic)
 		}
 	}
 }

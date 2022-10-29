@@ -1,13 +1,12 @@
 package util
 
 import (
-	"fmt"
-	"os"
 	"strconv"
 	"strings"
 
 	"github.com/shenqianjin/soften-client-go/soften/message"
 	"github.com/shenqianjin/soften-client-go/soften/support/util"
+	"github.com/sirupsen/logrus"
 )
 
 const (
@@ -30,8 +29,7 @@ func FormatTopics(groundTopic string, levelStr, statusStr string, subscription s
 				status == message.StatusBlocking ||
 				status == message.StatusRetrying ||
 				status == message.StatusDead {
-				fmt.Printf("Error: subscription is necessary to create %s status topic\n", s)
-				os.Exit(1)
+				logrus.Fatalf("Error: subscription is necessary to create %s status topic\n", s)
 			}
 		}
 	}
