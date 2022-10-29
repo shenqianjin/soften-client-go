@@ -16,10 +16,9 @@ type deleteArgs struct {
 	level        string
 	subscription string
 	partitioned  bool
-	all          bool
 }
 
-func newDeleteCommand(rtArgs internal.RootArgs) *cobra.Command {
+func newDeleteCommand(rtArgs *internal.RootArgs) *cobra.Command {
 	cmdArgs := &deleteArgs{}
 	cmd := &cobra.Command{
 		Use:   "delete ",
@@ -27,7 +26,7 @@ func newDeleteCommand(rtArgs internal.RootArgs) *cobra.Command {
 		Args:  cobra.MinimumNArgs(1),
 		Run: func(cmd *cobra.Command, args []string) {
 			cmdArgs.groundTopic = args[0]
-			deleteTopics(rtArgs, cmdArgs)
+			deleteTopics(*rtArgs, cmdArgs)
 		},
 	}
 	// parse levels
@@ -61,10 +60,10 @@ func deleteTopics(rtArgs internal.RootArgs, cmdArgs *deleteArgs) {
 			readyOnly:   false,
 		})
 	}
-
 	if err != nil {
 		fmt.Printf("delete \"%s\" failed: %v\n", cmdArgs.groundTopic, err)
 	}
+	// delete one by one
 	for _, topic := range topics {
 		var err error
 		if cmdArgs.partitioned {

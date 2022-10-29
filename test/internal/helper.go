@@ -22,6 +22,7 @@ var (
 
 	DefaultTopic           = "my-topic"
 	PrefixTestProduce      = "test-produce"
+	PrefixTestProduceBatch = "test-produce-batch"
 	PrefixTestConsume      = "test-consume"
 	PrefixTestConsumeLimit = "test-consume-limit"
 	PrefixTestConsumeBatch = "test-consume-batch"

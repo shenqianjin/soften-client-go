@@ -19,7 +19,7 @@ type createArgs struct {
 	subscription string
 }
 
-func newCreateCommand(rtArgs internal.RootArgs) *cobra.Command {
+func newCreateCommand(rtArgs *internal.RootArgs) *cobra.Command {
 	cmdArgs := createArgs{}
 	cmd := &cobra.Command{
 		Use:   "create ",
@@ -27,7 +27,7 @@ func newCreateCommand(rtArgs internal.RootArgs) *cobra.Command {
 		Args:  cobra.ExactArgs(1),
 		Run: func(cmd *cobra.Command, args []string) {
 			cmdArgs.groundTopic = args[0]
-			createTopics(rtArgs, &cmdArgs)
+			createTopics(*rtArgs, &cmdArgs)
 		},
 	}
 	// parse levels

@@ -1,13 +1,13 @@
 package topics
 
 import (
+	"errors"
 	"fmt"
-	"os"
 
 	"github.com/shenqianjin/soften-client-go/admin/internal"
 	"github.com/shenqianjin/soften-client-go/admin/internal/util"
-
 	"github.com/shenqianjin/soften-client-go/soften/admin"
+	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 )
 
@@ -19,7 +19,7 @@ type updateArgs struct {
 	partitions   uint
 }
 
-func newUpdateCommand(rtArgs internal.RootArgs) *cobra.Command {
+func newUpdateCommand(rtArgs *internal.RootArgs) *cobra.Command {
 	cmdArgs := &updateArgs{}
 	cmd := &cobra.Command{
 		Use:   "update ",
@@ -27,7 +27,7 @@ func newUpdateCommand(rtArgs internal.RootArgs) *cobra.Command {
 		Args:  cobra.MinimumNArgs(1),
 		Run: func(cmd *cobra.Command, args []string) {
 			cmdArgs.groundTopic = args[0]
-			updateTopics(rtArgs, cmdArgs)
+			updateTopics(*rtArgs, cmdArgs)
 		},
 	}
 	// parse levels
@@ -42,15 +42,14 @@ func newUpdateCommand(rtArgs internal.RootArgs) *cobra.Command {
 
 func updateTopics(rtArgs internal.RootArgs, cmdArgs *updateArgs) {
 	if cmdArgs.partitions <= 0 {
-		fmt.Println("please specify the partitions (with -p or --partitions options) " +
+		logrus.Fatal("please specify the partitions (with -p or --partitions options) " +
 			"and make sure it is more than the original value")
-		os.Exit(1)
 	}
 	manager := admin.NewTopicManager(rtArgs.Url)
 
 	var topics []string
 	var err error
-	if cmdArgs.level != "" || cmdArgs.status != "" {
+	if cmdArgs.level != "" || cmdArgs.status != "" || cmdArgs.subscription != "" {
 		topics = util.FormatTopics(cmdArgs.groundTopic, cmdArgs.level, cmdArgs.status, cmdArgs.subscription)
 	} else {
 		topics, err = listAndCheckTopicsByOptions(listOptions{
@@ -63,10 +62,10 @@ func updateTopics(rtArgs internal.RootArgs, cmdArgs *updateArgs) {
 			readyOnly:   false,
 		})
 	}
-
 	if err != nil {
 		fmt.Printf("updated \"%s\" failed: %v\n", cmdArgs.groundTopic, err)
 	}
+	// update partitions
 	for _, topic := range topics {
 		err := manager.PartitionedUpdate(topic, cmdArgs.partitions)
 		if err != nil {
@@ -75,4 +74,25 @@ func updateTopics(rtArgs internal.RootArgs, cmdArgs *updateArgs) {
 			fmt.Printf("updated \"%s\" successfully, partitions is %v now\n", topic, cmdArgs.partitions)
 		}
 	}
+}
+
+// ------ helpers ------
+
+func listAndCheckTopicsByOptions(options listOptions) ([]string, error) {
+	topics, err := listTopicsByOptions(options)
+	if err == nil && len(topics) == 0 {
+		newOptions := options
+		newOptions.partitioned = !options.partitioned
+		newTopics, err1 := listTopicsByOptions(newOptions)
+		if err1 == nil && len(newTopics) > 0 {
+			if options.partitioned {
+				err = errors.New("topic is not partitioned topic")
+			} else {
+				err = errors.New("topic is not non-partitioned topic")
+			}
+		} else {
+			err = errors.New("topic not existed")
+		}
+	}
+	return topics, err
 }

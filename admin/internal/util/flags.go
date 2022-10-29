@@ -29,7 +29,24 @@ var (
 
 	ConditionsUsage = "conditions to execute\n" +
 		"an expression is a one-liner that returns a bool value\n" +
+		"separate with ',' and equal to 'or' if more than one\n" +
 		"see https://github.com/antonmedv/expr/blob/master/docs/Language-Definition.md for grammar"
+
+	PrintProgressIterateIntervalUsage = "iterate interval to print progress"
+	PrintProgressRecallIntervalUsage  = "recall interval to print progress"
+	PrintModeUsage                    = "mode of print these matched messages\n" +
+		"0: print nothing; 1: print id, payload, publish time and event time; 2 print id only"
+
+	StartPublishTimeUsage = "start publish time to check\n" +
+		"it must be RFC3339Nano format '2006-01-02T15:04:05.999999999Z07:00'"
+
+	StartEventTimeUsage = "start event time to check\n" +
+		"processing will be ignored if the event time of messages is zero\n" +
+		"it must be RFC3339Nano format '2006-01-02T15:04:05.999999999Z07:00'"
+
+	BatchEnableUsage = "enable publish message in async, or default is send in sync"
+
+	PublishMaxTimesUsage = "publish max times to backoff is send/sendAsync failed. default 0 means to try infinitely"
 )
 
 var allLevels = func() string {

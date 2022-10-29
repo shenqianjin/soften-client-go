@@ -10,8 +10,8 @@ type RootArgs struct {
 	Url   string
 }
 
-func NewRootCmd() (*cobra.Command, RootArgs) {
-	cmdArgs := RootArgs{}
+func NewRootCmd() (*cobra.Command, *RootArgs) {
+	cmdArgs := &RootArgs{}
 	cmd := &cobra.Command{
 		PersistentPreRun: func(cmd *cobra.Command, args []string) {
 			config.DebugMode = cmdArgs.Debug

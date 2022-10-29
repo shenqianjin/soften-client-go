@@ -3,7 +3,10 @@ module github.com/shenqianjin/soften-client-go/admin
 go 1.19
 
 require (
+	github.com/antonmedv/expr v1.9.0
+	github.com/apache/pulsar-client-go v0.9.0
 	github.com/shenqianjin/soften-client-go v0.0.0
+	github.com/sirupsen/logrus v1.6.0
 	github.com/spf13/cobra v1.2.1
 )
 
@@ -12,7 +15,6 @@ require (
 	github.com/99designs/keyring v1.2.1 // indirect
 	github.com/AthenZ/athenz v1.10.39 // indirect
 	github.com/DataDog/zstd v1.5.0 // indirect
-	github.com/apache/pulsar-client-go v0.9.0 // indirect
 	github.com/ardielle/ardielle-go v1.5.2 // indirect
 	github.com/beorn7/perks v1.0.1 // indirect
 	github.com/cespare/xxhash/v2 v2.1.1 // indirect
@@ -36,7 +38,6 @@ require (
 	github.com/prometheus/client_model v0.2.0 // indirect
 	github.com/prometheus/common v0.26.0 // indirect
 	github.com/prometheus/procfs v0.6.0 // indirect
-	github.com/sirupsen/logrus v1.6.0 // indirect
 	github.com/spaolacci/murmur3 v1.1.0 // indirect
 	github.com/spf13/pflag v1.0.5 // indirect
 	go.uber.org/atomic v1.7.0 // indirect

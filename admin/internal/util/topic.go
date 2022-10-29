@@ -7,87 +7,12 @@ import (
 	"strings"
 
 	"github.com/shenqianjin/soften-client-go/soften/message"
+	"github.com/shenqianjin/soften-client-go/soften/support/util"
 )
 
 const (
-	publicTenant           = "public"
-	defaultNamespace       = "default"
 	partitionedTopicSuffix = "-partition-"
 )
-
-func formatTopic(topic string) string {
-	// The topic name can be in two different forms, one is fully qualified topic name,
-	// the other one is short topic name
-	if !strings.Contains(topic, "://") {
-		// The short topic name can be:
-		// - <topic>
-		// - <tenant>/<namespace>/<topic>
-		// - <tenant>/<cluster>/<namespace>/<topic>
-		parts := strings.Split(topic, "/")
-		if len(parts) == 3 || len(parts) == 4 {
-			topic = "persistent://" + topic
-		} else if len(parts) == 1 {
-			topic = "persistent://" + publicTenant + "/" + defaultNamespace + "/" + parts[0]
-		} else {
-			panic("Invalid short topic name '" + topic +
-				"', it should be in the format of <tenant>/<namespace>/<topic> or <topic>")
-		}
-	}
-	return topic
-}
-
-func getPartitionIndex(topic string) (int, error) {
-	if strings.Contains(topic, partitionedTopicSuffix) {
-		idx := strings.LastIndex(topic, "-") + 1
-		return strconv.Atoi(topic[idx:])
-	}
-	return -1, nil
-}
-
-func formatLevels(levelStr string) (levels []string) {
-	if levelStr == "" {
-		levels = []string{message.L1.String()}
-	} else {
-		segments := strings.Split(levelStr, ",")
-		for _, seg := range segments {
-			l := strings.TrimSpace(seg)
-			if _, err := message.LevelOf(l); err != nil {
-				panic(err)
-			}
-			levels = append(levels, l)
-		}
-	}
-	return levels
-}
-
-func formatStatuses(statusStr string) (statuses []string) {
-	if statusStr == "" {
-		statuses = []string{message.StatusReady.String()}
-	} else {
-		segments := strings.Split(statusStr, ",")
-		for _, seg := range segments {
-			s := strings.TrimSpace(seg)
-			if _, err := message.StatusOf(s); err != nil {
-				panic(err)
-			}
-			statuses = append(statuses, s)
-		}
-	}
-	return
-}
-
-func formatSubs(subStr string) (subs []string) {
-	if subStr == "" {
-		subs = []string{}
-	} else {
-		segments := strings.Split(subStr, ",")
-		for _, seg := range segments {
-			s := strings.TrimSpace(seg)
-			subs = append(subs, s)
-		}
-	}
-	return
-}
 
 func FormatTopics(groundTopic string, levelStr, statusStr string, subscription string) []string {
 	topics := make([]string, 0)
@@ -186,4 +111,65 @@ func IsPartitionedSubTopic(topic string) bool {
 		return index >= 0
 	}
 	return false
+}
+
+func formatLevels(levelStr string) (levels []string) {
+	if levelStr == "" {
+		levels = []string{message.L1.String()}
+	} else {
+		segments := strings.Split(levelStr, ",")
+		for _, seg := range segments {
+			l := strings.TrimSpace(seg)
+			if _, err := message.LevelOf(l); err != nil {
+				panic(err)
+			}
+			levels = append(levels, l)
+		}
+	}
+	return levels
+}
+
+func formatStatuses(statusStr string) (statuses []string) {
+	if statusStr == "" {
+		statuses = []string{message.StatusReady.String()}
+	} else {
+		segments := strings.Split(statusStr, ",")
+		for _, seg := range segments {
+			s := strings.TrimSpace(seg)
+			if _, err := message.StatusOf(s); err != nil {
+				panic(err)
+			}
+			statuses = append(statuses, s)
+		}
+	}
+	return
+}
+
+func formatSubs(subStr string) (subs []string) {
+	if subStr == "" {
+		subs = []string{}
+	} else {
+		segments := strings.Split(subStr, ",")
+		for _, seg := range segments {
+			s := strings.TrimSpace(seg)
+			subs = append(subs, s)
+		}
+	}
+	return
+}
+
+func formatTopic(topic string) string {
+	if parsedTopic, err := util.ParseTopicName(topic); err != nil {
+		panic(err)
+	} else {
+		return parsedTopic
+	}
+}
+
+func getPartitionIndex(topic string) (int, error) {
+	if strings.Contains(topic, partitionedTopicSuffix) {
+		idx := strings.LastIndex(topic, "-") + 1
+		return strconv.Atoi(topic[idx:])
+	}
+	return -1, nil
 }

@@ -5,7 +5,7 @@ import (
 	"github.com/spf13/cobra"
 )
 
-func NewModuleCmd(rootArgs internal.RootArgs) *cobra.Command {
+func NewModuleCmd(rootArgs *internal.RootArgs) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "topics ",
 		Short: "sub command to manage topics",

@@ -1,15 +1,14 @@
 package topics
 
 import (
-	"errors"
 	"fmt"
 	"sort"
 	"strings"
 
 	"github.com/shenqianjin/soften-client-go/admin/internal"
 	"github.com/shenqianjin/soften-client-go/admin/internal/util"
-
 	"github.com/shenqianjin/soften-client-go/soften/admin"
+	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 )
 
@@ -22,7 +21,7 @@ type listArgs struct {
 	nonPartitionOnly bool
 }
 
-func newListCommand(rtArgs internal.RootArgs) *cobra.Command {
+func newListCommand(rtArgs *internal.RootArgs) *cobra.Command {
 	cmdArgs := &listArgs{}
 	cmd := &cobra.Command{
 		Use:   "list ",
@@ -30,7 +29,7 @@ func newListCommand(rtArgs internal.RootArgs) *cobra.Command {
 		Args:  cobra.ExactArgs(1),
 		Run: func(cmd *cobra.Command, args []string) {
 			cmdArgs.groundTopic = args[0]
-			listTopics(rtArgs, cmdArgs)
+			listTopics(*rtArgs, cmdArgs)
 		},
 	}
 
@@ -38,10 +37,8 @@ func newListCommand(rtArgs internal.RootArgs) *cobra.Command {
 	// parse partition
 	flags.BoolVarP(&cmdArgs.partitioned, "partitioned", "p", false, util.PartitionedUsage)
 	flags.StringVarP(&cmdArgs.subscription, "subscription", "S", "", util.SubscriptionUsage)
-	flags.BoolVarP(&cmdArgs.groundOnly, "ground-only", "g", false,
-		"exclude non-ground topics")
-	flags.BoolVarP(&cmdArgs.readyOnly, "ready-only", "r", false,
-		"exclude non-ready topics")
+	flags.BoolVarP(&cmdArgs.groundOnly, "ground-only", "g", false, "exclude non-ground topics")
+	flags.BoolVarP(&cmdArgs.readyOnly, "ready-only", "r", false, "exclude non-ready topics")
 
 	return cmd
 }
@@ -58,7 +55,7 @@ func listTopics(rtArgs internal.RootArgs, cmdArgs *listArgs) {
 	})
 
 	if err != nil {
-		fmt.Printf("list \"%s\" failed: %v\n", cmdArgs.groundTopic, err)
+		logrus.Fatalf("list \"%s\" failed: %v\n", cmdArgs.groundTopic, err)
 	} else {
 		sort.Strings(topics)
 		for _, topic := range topics {
@@ -131,23 +128,4 @@ func listTopicsByOptions(options listOptions) ([]string, error) {
 	}
 
 	return matchedTopics, err
-}
-
-func listAndCheckTopicsByOptions(options listOptions) ([]string, error) {
-	topics, err := listTopicsByOptions(options)
-	if err == nil && len(topics) == 0 {
-		newOptions := options
-		newOptions.partitioned = !options.partitioned
-		newTopics, err1 := listTopicsByOptions(newOptions)
-		if err1 == nil && len(newTopics) > 0 {
-			if options.partitioned {
-				err = errors.New("topic is not partitioned topic")
-			} else {
-				err = errors.New("topic is not non-partitioned topic")
-			}
-		} else {
-			err = errors.New("topic not existed")
-		}
-	}
-	return topics, err
 }
