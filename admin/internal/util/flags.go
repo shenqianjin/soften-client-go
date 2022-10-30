@@ -27,6 +27,8 @@ var (
 	SubscriptionUsage = "subscription name on the ground topic\n" +
 		"separate with ',' if more than one"
 
+	SingleSubscriptionUsage = "subscription name on your topic\n"
+
 	ConditionsUsage = "conditions to execute\n" +
 		"an expression is a one-liner that returns a bool value\n" +
 		"separate with ',' and equal to 'or' if more than one\n" +

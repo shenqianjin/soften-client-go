@@ -44,7 +44,7 @@ func updateTopics(rtArgs internal.RootArgs, cmdArgs *updateArgs) {
 		logrus.Fatal("please specify the partitions (with -p or --partitions options) " +
 			"and make sure it is more than the original value")
 	}
-	manager := admin.NewTopicManager(rtArgs.Url)
+	manager := admin.NewPartitionedTopicManager(rtArgs.Url)
 
 	var topics []string
 	var err error
@@ -66,7 +66,7 @@ func updateTopics(rtArgs internal.RootArgs, cmdArgs *updateArgs) {
 	}
 	// update partitions
 	for _, topic := range topics {
-		err := manager.PartitionedUpdate(topic, cmdArgs.partitions)
+		err := manager.Update(topic, cmdArgs.partitions)
 		if err != nil {
 			logrus.Fatalf("updated \"%s\" failed: %v\n", topic, err)
 		} else {

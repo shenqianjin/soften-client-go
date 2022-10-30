@@ -23,7 +23,7 @@ func FormatTopics(groundTopic string, levelStr, statusStr string, subscription s
 		for _, s := range statuses {
 			status, err := message.StatusOf(s)
 			if err != nil {
-				panic(err)
+				logrus.Fatal(err)
 			}
 			if status == message.StatusPending ||
 				status == message.StatusBlocking ||
@@ -36,12 +36,12 @@ func FormatTopics(groundTopic string, levelStr, statusStr string, subscription s
 	for _, l := range levels {
 		level, err := message.LevelOf(l)
 		if err != nil {
-			panic(err)
+			logrus.Fatal(err)
 		}
 		for _, s := range statuses {
 			status, err := message.StatusOf(s)
 			if err != nil {
-				panic(err)
+				logrus.Fatal(err)
 			}
 			subRequired := false
 			if status == message.StatusDead {
@@ -73,7 +73,7 @@ func FormatTopics(groundTopic string, levelStr, statusStr string, subscription s
 
 func IsL1Topic(topic string) bool {
 	if topic == "" {
-		panic("invalid topic name")
+		logrus.Fatalf("invalid topic name")
 	}
 	for _, l := range message.LevelValues() {
 		if l == message.L1 {
@@ -88,7 +88,7 @@ func IsL1Topic(topic string) bool {
 
 func IsReadyTopic(topic string) bool {
 	if topic == "" {
-		panic("invalid topic name")
+		logrus.Fatal("invalid topic name")
 	}
 	for _, s := range message.StatusValues() {
 		if s == message.StatusReady {
@@ -103,7 +103,7 @@ func IsReadyTopic(topic string) bool {
 
 func IsPartitionedSubTopic(topic string) bool {
 	if topic == "" {
-		panic("invalid topic name")
+		logrus.Fatal("invalid topic name")
 	}
 	if index, err := getPartitionIndex(topic); err == nil {
 		return index >= 0
@@ -119,7 +119,7 @@ func formatLevels(levelStr string) (levels []string) {
 		for _, seg := range segments {
 			l := strings.TrimSpace(seg)
 			if _, err := message.LevelOf(l); err != nil {
-				panic(err)
+				logrus.Fatal(err)
 			}
 			levels = append(levels, l)
 		}
@@ -135,7 +135,7 @@ func formatStatuses(statusStr string) (statuses []string) {
 		for _, seg := range segments {
 			s := strings.TrimSpace(seg)
 			if _, err := message.StatusOf(s); err != nil {
-				panic(err)
+				logrus.Fatal(err)
 			}
 			statuses = append(statuses, s)
 		}
@@ -158,7 +158,8 @@ func formatSubs(subStr string) (subs []string) {
 
 func formatTopic(topic string) string {
 	if parsedTopic, err := util.ParseTopicName(topic); err != nil {
-		panic(err)
+		logrus.Fatal(err)
+		return "" // only for compile error
 	} else {
 		return parsedTopic
 	}

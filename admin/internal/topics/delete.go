@@ -34,14 +34,14 @@ func newDeleteCommand(rtArgs *internal.RootArgs) *cobra.Command {
 
 	flags := cmd.Flags()
 	// parse partition
-	flags.BoolVarP(&cmdArgs.partitioned, "partitioned", "p", false, util.PartitionedUsage)
+	//flags.BoolVarP(&cmdArgs.partitioned, "partitioned", "p", false, util.PartitionedUsage)
 	flags.StringVarP(&cmdArgs.subscription, "subscription", "S", "", util.SubscriptionUsage)
 
 	return cmd
 }
 
 func deleteTopics(rtArgs internal.RootArgs, cmdArgs *deleteArgs) {
-	manager := admin.NewTopicManager(rtArgs.Url)
+	manager := admin.NewRobustTopicManager(rtArgs.Url)
 
 	var topics []string
 	var err error
@@ -64,11 +64,7 @@ func deleteTopics(rtArgs internal.RootArgs, cmdArgs *deleteArgs) {
 	// delete one by one
 	for _, topic := range topics {
 		var err error
-		if cmdArgs.partitioned {
-			err = manager.PartitionedDelete(topic)
-		} else {
-			err = manager.Delete(topic)
-		}
+		err = manager.Delete(topic)
 		if err != nil {
 			logrus.Fatalf("deleted \"%s\" failed: %v\n", topic, err)
 		} else {

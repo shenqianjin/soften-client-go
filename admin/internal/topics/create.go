@@ -41,16 +41,12 @@ func newCreateCommand(rtArgs *internal.RootArgs) *cobra.Command {
 }
 
 func createTopics(rtArgs internal.RootArgs, cmdArgs *createArgs) {
-	manager := admin.NewTopicManager(rtArgs.Url)
+	manager := admin.NewRobustTopicManager(rtArgs.Url)
 
 	topics := util.FormatTopics(cmdArgs.groundTopic, cmdArgs.level, cmdArgs.status, cmdArgs.subscription)
 	for _, topic := range topics {
 		var err error
-		if cmdArgs.partitions <= 0 {
-			err = manager.Create(topic)
-		} else {
-			err = manager.PartitionedCreate(topic, cmdArgs.partitions)
-		}
+		err = manager.Create(topic, cmdArgs.partitions)
 		if err != nil {
 			logrus.Fatalf("created \"%s\" failed: %v\n", topic, err)
 		} else {

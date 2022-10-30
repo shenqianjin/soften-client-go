@@ -2,6 +2,7 @@ package internal
 
 import (
 	"github.com/shenqianjin/soften-client-go/soften/config"
+	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 )
 
@@ -11,10 +12,16 @@ type RootArgs struct {
 }
 
 func NewRootCmd() (*cobra.Command, *RootArgs) {
+	// init
+	initLogger()
+	// cmd
 	cmdArgs := &RootArgs{}
 	cmd := &cobra.Command{
 		PersistentPreRun: func(cmd *cobra.Command, args []string) {
 			config.DebugMode = cmdArgs.Debug
+			if cmdArgs.Debug {
+				logrus.SetLevel(logrus.DebugLevel)
+			}
 		},
 		Use: "soften-admin",
 	}
@@ -24,4 +31,14 @@ func NewRootCmd() (*cobra.Command, *RootArgs) {
 	flags.BoolVarP(&cmdArgs.Debug, "debug", "d", false, "enable debug mode")
 	flags.StringVarP(&cmdArgs.Url, "url", "u", "http://localhost:8080", "pulsar broker http url")
 	return cmd, cmdArgs
+}
+
+func initLogger() {
+	formatter := &logrus.TextFormatter{
+		FullTimestamp:          true,
+		TimestampFormat:        "2006-01-02T15:04:05.000000Z07:00",
+		DisableLevelTruncation: true,
+		PadLevelText:           true,
+	}
+	logrus.SetFormatter(formatter)
 }

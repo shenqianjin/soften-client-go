@@ -75,7 +75,7 @@ type listOptions struct {
 }
 
 func listTopicsByOptions(options listOptions) ([]string, error) {
-	manager := admin.NewTopicManager(options.url)
+	manager := admin.NewRobustTopicManager(options.url)
 
 	namespace := "public/default"
 	// remove schema
@@ -91,11 +91,7 @@ func listTopicsByOptions(options listOptions) ([]string, error) {
 	}
 	var queriedTopics []string
 	var err error
-	if options.partitioned {
-		queriedTopics, err = manager.PartitionedList(namespace)
-	} else {
-		queriedTopics, err = manager.List(namespace)
-	}
+	queriedTopics, err = manager.List(namespace)
 	if err != nil {
 		logrus.Fatalln(err)
 	}
