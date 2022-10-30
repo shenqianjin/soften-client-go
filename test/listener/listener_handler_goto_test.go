@@ -14,59 +14,61 @@ import (
 	"github.com/shenqianjin/soften-client-go/soften/decider"
 	"github.com/shenqianjin/soften-client-go/soften/handler"
 	"github.com/shenqianjin/soften-client-go/soften/message"
+	"github.com/shenqianjin/soften-client-go/soften/support/util"
 	"github.com/shenqianjin/soften-client-go/test/internal"
 	"github.com/stretchr/testify/assert"
 )
 
 type testListenHandleCase struct {
-	topic                       string
-	storedTopic                 string // produce to / consume from
-	transferredTopic            string // Handle to
-	expectedStoredOutCount      int    // should always 1
-	expectedTransferredOutCount int    // 1 for pending, blocking, retrying; 0 for upgrade, degrade, transfer
+	groundTopic                 string
+	consumeToLevel              string
+	consumeToStatus             string
+	expectedStoredOutCount      int // should always 1
+	expectedTransferredOutCount int // 1 for pending, blocking, retrying; 0 for upgrade, degrade, transfer
 	handleGoto                  string
 
-	// extra for upgrade/degrade/shift
-	shiftLevel string
+	// extra for upgrade/degrade/shift/transfer
+	shiftLevel      string
+	upgradeLevel    string
+	degradeLevel    string
+	transferToTopic string
 }
 
 func TestListenHandle_Done(t *testing.T) {
 	topic := internal.GenerateTestTopic(internal.PrefixTestListen)
 	HandleCase := testListenHandleCase{
-		topic:       topic,
-		storedTopic: topic,
+		groundTopic: topic,
 		handleGoto:  decider.GotoDone.String(),
 	}
 	testListenHandleGoto(t, HandleCase)
 }
 
 func TestListenHandle_Discard(t *testing.T) {
-	topic := internal.GenerateTestTopic(internal.PrefixTestListen)
+	groundTopic := internal.GenerateTestTopic(internal.PrefixTestListen)
 	HandleCase := testListenHandleCase{
-		topic:       topic,
-		storedTopic: topic,
+		groundTopic: groundTopic,
 		handleGoto:  decider.GotoDiscard.String(),
 	}
 	testListenHandleGoto(t, HandleCase)
 }
 
 func TestListenHandle_Dead(t *testing.T) {
-	topic := internal.GenerateTestTopic(internal.PrefixTestListen)
+	status := message.StatusDead
+	groundTopic := internal.GenerateTestTopic(internal.PrefixTestListen)
 	HandleCase := testListenHandleCase{
-		topic:            topic,
-		storedTopic:      topic,
-		transferredTopic: internal.FormatStatusTopic(topic, internal.TestSubscriptionName(), "", message.StatusDead.TopicSuffix()),
-		handleGoto:       decider.GotoDead.String(),
+		groundTopic:     groundTopic,
+		consumeToStatus: status.String(),
+		handleGoto:      decider.GotoDead.String(),
 	}
 	testListenHandleGoto(t, HandleCase)
 }
 
 func TestListenHandle_Pending(t *testing.T) {
-	topic := internal.GenerateTestTopic(internal.PrefixTestListen)
+	status := message.StatusPending
+	groundTopic := internal.GenerateTestTopic(internal.PrefixTestListen)
 	HandleCase := testListenHandleCase{
-		topic:                       topic,
-		storedTopic:                 topic,
-		transferredTopic:            internal.FormatStatusTopic(topic, internal.TestSubscriptionName(), "", message.StatusPending.TopicSuffix()),
+		groundTopic:                 groundTopic,
+		consumeToStatus:             status.String(),
 		handleGoto:                  decider.GotoPending.String(),
 		expectedTransferredOutCount: 1, // transfer the msg to pending queue, and then reconsume it
 	}
@@ -74,11 +76,11 @@ func TestListenHandle_Pending(t *testing.T) {
 }
 
 func TestListenHandle_Blocking(t *testing.T) {
-	topic := internal.GenerateTestTopic(internal.PrefixTestListen)
+	status := message.StatusBlocking
+	groundTopic := internal.GenerateTestTopic(internal.PrefixTestListen)
 	HandleCase := testListenHandleCase{
-		topic:                       topic,
-		storedTopic:                 topic,
-		transferredTopic:            internal.FormatStatusTopic(topic, internal.TestSubscriptionName(), "", message.StatusBlocking.TopicSuffix()),
+		groundTopic:                 groundTopic,
+		consumeToStatus:             status.String(),
 		handleGoto:                  decider.GotoBlocking.String(),
 		expectedTransferredOutCount: 1,
 	}
@@ -86,11 +88,11 @@ func TestListenHandle_Blocking(t *testing.T) {
 }
 
 func TestListenHandle_Retrying(t *testing.T) {
-	topic := internal.GenerateTestTopic(internal.PrefixTestListen)
+	status := message.StatusRetrying
+	groundTopic := internal.GenerateTestTopic(internal.PrefixTestListen)
 	HandleCase := testListenHandleCase{
-		topic:                       topic,
-		storedTopic:                 topic,
-		transferredTopic:            internal.FormatStatusTopic(topic, internal.TestSubscriptionName(), "", message.StatusRetrying.TopicSuffix()),
+		groundTopic:                 groundTopic,
+		consumeToStatus:             status.String(),
 		handleGoto:                  decider.GotoRetrying.String(),
 		expectedTransferredOutCount: 1,
 	}
@@ -99,72 +101,85 @@ func TestListenHandle_Retrying(t *testing.T) {
 
 func TestListenHandle_Upgrade(t *testing.T) {
 	upgradeLevel := message.L2
-	topic := internal.GenerateTestTopic(internal.PrefixTestListen)
+	groundTopic := internal.GenerateTestTopic(internal.PrefixTestListen)
 	HandleCase := testListenHandleCase{
-		topic:            topic,
-		storedTopic:      topic,
-		transferredTopic: topic + upgradeLevel.TopicSuffix(),
-		shiftLevel:       upgradeLevel.String(),
-		handleGoto:       decider.GotoUpgrade.String(),
+		groundTopic:    groundTopic,
+		consumeToLevel: upgradeLevel.String(),
+		upgradeLevel:   upgradeLevel.String(),
+		shiftLevel:     upgradeLevel.String(),
+		handleGoto:     decider.GotoUpgrade.String(),
 	}
 	testListenHandleGoto(t, HandleCase)
 }
 
 func TestListenHandle_Degrade(t *testing.T) {
 	degradeLevel := message.B2
-	topic := internal.GenerateTestTopic(internal.PrefixTestListen)
+	groundTopic := internal.GenerateTestTopic(internal.PrefixTestListen)
 	HandleCase := testListenHandleCase{
-		topic:            topic,
-		storedTopic:      topic,
-		transferredTopic: topic + degradeLevel.TopicSuffix(),
-		shiftLevel:       degradeLevel.String(),
-		handleGoto:       decider.GotoDegrade.String(),
+		groundTopic:    groundTopic,
+		consumeToLevel: degradeLevel.String(),
+		degradeLevel:   degradeLevel.String(),
+		shiftLevel:     degradeLevel.String(),
+		handleGoto:     decider.GotoDegrade.String(),
 	}
 	testListenHandleGoto(t, HandleCase)
 }
 
 func TestListenHandle_Shift(t *testing.T) {
 	shiftLevel := message.S1
-	topic := internal.GenerateTestTopic(internal.PrefixTestListen)
+	groundTopic := internal.GenerateTestTopic(internal.PrefixTestListen)
 	HandleCase := testListenHandleCase{
-		topic:            topic,
-		storedTopic:      topic,
-		transferredTopic: topic + shiftLevel.TopicSuffix(),
-		shiftLevel:       shiftLevel.String(),
-		handleGoto:       decider.GotoShift.String(),
+		groundTopic:    groundTopic,
+		consumeToLevel: shiftLevel.String(),
+		shiftLevel:     shiftLevel.String(),
+		handleGoto:     decider.GotoShift.String(),
 	}
 	testListenHandleGoto(t, HandleCase)
 }
 
 func TestListenHandle_Transfer(t *testing.T) {
-	topic := internal.GenerateTestTopic(internal.PrefixTestListen)
+	groundTopic := internal.GenerateTestTopic(internal.PrefixTestListen)
+	transferToTopic := groundTopic + "-OTHER"
 	HandleCase := testListenHandleCase{
-		topic:            topic,
-		storedTopic:      topic,
-		transferredTopic: topic + message.S2.TopicSuffix(),
-		handleGoto:       decider.GotoTransfer.String(),
+		groundTopic:     groundTopic,
+		transferToTopic: transferToTopic,
+		handleGoto:      decider.GotoTransfer.String(),
 	}
 	testListenHandleGoto(t, HandleCase)
 }
 
-func testListenHandleGoto(t *testing.T, handleCase testListenHandleCase) {
-	topic := handleCase.topic
-	storedTopic := handleCase.storedTopic
-	TransferredTopic := handleCase.transferredTopic
-	manager := admin.NewAdminManager(internal.DefaultPulsarHttpUrl)
-	// clean up groundTopic
-	internal.CleanUpTopic(t, manager, storedTopic)
-	internal.CleanUpTopic(t, manager, TransferredTopic)
-	defer func() {
-		internal.CleanUpTopic(t, manager, storedTopic)
-		internal.CleanUpTopic(t, manager, TransferredTopic)
-	}()
+func testListenHandleGoto(t *testing.T, testCase testListenHandleCase) {
+	groundTopic := testCase.groundTopic
+	manager := admin.NewRobustTopicManager(internal.DefaultPulsarHttpUrl)
+	// format topics
+	pTopics := make([]string, 0)
+	pTopics = append(pTopics, testCase.groundTopic)
+	cTopics := make([]string, 0)
+	if testCase.handleGoto == decider.GotoTransfer.String() {
+		cTopics = append(cTopics, testCase.transferToTopic)
+	} else if testCase.handleGoto == decider.GotoDiscard.String() {
+		// do nothing
+	} else if testCase.consumeToLevel != "" {
+		fTopics, err := util.FormatTopics(testCase.groundTopic, []string{testCase.consumeToLevel}, []string{message.StatusReady.String()}, "")
+		assert.Nil(t, err)
+		cTopics = append(cTopics, fTopics...)
+	} else if testCase.consumeToStatus != "" {
+		fTopics, err := util.FormatTopics(testCase.groundTopic, []string{message.L1.String()}, []string{testCase.consumeToStatus}, internal.TestSubscriptionName())
+		assert.Nil(t, err)
+		cTopics = append(cTopics, fTopics...)
+	}
+	topics := append(pTopics, cTopics...)
+	// clean up topic
+	internal.CleanUpTopics(t, manager, topics...)
+	defer internal.CleanUpTopics(t, manager, topics...)
+	// create topic if not found in case broker closes auto creation
+	internal.CreateTopicsIfNotFound(t, manager, topics, 0)
 	// create client
 	client := internal.NewClient(internal.DefaultPulsarUrl)
 	defer client.Close()
 	// create producer
 	producer, err := client.CreateProducer(config.ProducerConfig{
-		Topic: topic,
+		Topic: groundTopic,
 	})
 	if err != nil {
 		log.Fatal(err)
@@ -175,7 +190,7 @@ func testListenHandleGoto(t *testing.T, handleCase testListenHandleCase) {
 	assert.Nil(t, err)
 	fmt.Println("produced message: ", msgID)
 	// Handle send stats
-	stats, err := manager.Stats(storedTopic)
+	stats, err := manager.Stats(pTopics[0])
 	assert.Nil(t, err)
 	assert.Equal(t, 1, stats.MsgInCounter)
 
@@ -186,27 +201,27 @@ func testListenHandleGoto(t *testing.T, handleCase testListenHandleCase) {
 		ReentrantDelay: 1,
 	}
 	// create listener
-	shiftLevel, _ := message.LevelOf(handleCase.shiftLevel)
+	shiftLevel, _ := message.LevelOf(testCase.shiftLevel)
 	leveledPolicy := &config.LevelPolicy{
-		DiscardEnable:  config.ToPointer(handleCase.handleGoto == decider.GotoDiscard.String()),
-		DeadEnable:     config.ToPointer(handleCase.handleGoto == decider.GotoDead.String()),
-		PendingEnable:  config.ToPointer(handleCase.handleGoto == decider.GotoPending.String()),
+		DiscardEnable:  config.ToPointer(testCase.handleGoto == decider.GotoDiscard.String()),
+		DeadEnable:     config.ToPointer(testCase.handleGoto == decider.GotoDead.String()),
+		PendingEnable:  config.ToPointer(testCase.handleGoto == decider.GotoPending.String()),
 		Pending:        testPolicy,
-		BlockingEnable: config.ToPointer(handleCase.handleGoto == decider.GotoBlocking.String()),
+		BlockingEnable: config.ToPointer(testCase.handleGoto == decider.GotoBlocking.String()),
 		Blocking:       testPolicy,
-		RetryingEnable: config.ToPointer(handleCase.handleGoto == decider.GotoRetrying.String()),
+		RetryingEnable: config.ToPointer(testCase.handleGoto == decider.GotoRetrying.String()),
 		Retrying:       testPolicy,
-		UpgradeEnable:  config.ToPointer(handleCase.handleGoto == decider.GotoUpgrade.String()),
+		UpgradeEnable:  config.ToPointer(testCase.handleGoto == decider.GotoUpgrade.String()),
 		Upgrade:        &config.ShiftPolicy{Level: shiftLevel, ConnectInSyncEnable: true},
-		DegradeEnable:  config.ToPointer(handleCase.handleGoto == decider.GotoDegrade.String()),
+		DegradeEnable:  config.ToPointer(testCase.handleGoto == decider.GotoDegrade.String()),
 		Degrade:        &config.ShiftPolicy{Level: shiftLevel, ConnectInSyncEnable: true},
-		ShiftEnable:    config.ToPointer(handleCase.handleGoto == decider.GotoShift.String()),
+		ShiftEnable:    config.ToPointer(testCase.handleGoto == decider.GotoShift.String()),
 		Shift:          &config.ShiftPolicy{Level: shiftLevel, ConnectInSyncEnable: true},
-		TransferEnable: config.ToPointer(handleCase.handleGoto == decider.GotoTransfer.String()),
-		Transfer:       &config.TransferPolicy{ConnectInSyncEnable: handleCase.handleGoto == decider.GotoTransfer.String()},
+		TransferEnable: config.ToPointer(testCase.handleGoto == decider.GotoTransfer.String()),
+		Transfer:       &config.TransferPolicy{ConnectInSyncEnable: testCase.handleGoto == decider.GotoTransfer.String()},
 	}
 	listener, err := client.CreateListener(config.ConsumerConfig{
-		Topic:                       topic,
+		Topic:                       groundTopic,
 		SubscriptionName:            internal.TestSubscriptionName(),
 		SubscriptionInitialPosition: pulsar.SubscriptionPositionEarliest,
 		LevelPolicy:                 leveledPolicy,
@@ -219,11 +234,11 @@ func testListenHandleGoto(t *testing.T, handleCase testListenHandleCase) {
 	ctx, cancel := context.WithCancel(context.Background())
 	err = listener.StartPremium(ctx, func(ctx context.Context, msg message.Message) handler.HandleStatus {
 		fmt.Printf("consumed message size: %v, headers: %v\n", len(msg.Payload()), msg.Properties())
-		if handleGoto, err := decider.GotoOf(handleCase.handleGoto); err == nil {
+		if handleGoto, err := decider.GotoOf(testCase.handleGoto); err == nil {
 			if handleGoto == decider.GotoTransfer {
-				return handler.StatusTransfer.WithTopic(handleCase.transferredTopic)
+				return handler.StatusTransfer.WithTopic(testCase.transferToTopic)
 			}
-			if status, err := handler.StatusOf(handleCase.handleGoto); err == nil {
+			if status, err := handler.StatusOf(testCase.handleGoto); err == nil {
 				return status
 			}
 		}
@@ -236,21 +251,21 @@ func testListenHandleGoto(t *testing.T, handleCase testListenHandleCase) {
 	// wait for consuming the message
 	time.Sleep(100 * time.Millisecond)
 	// Handle stats
-	stats, err = manager.Stats(storedTopic)
+	stats, err = manager.Stats(pTopics[0])
 	assert.Nil(t, err)
 	assert.Equal(t, 1, stats.MsgOutCounter)
 	assert.Equal(t, stats.MsgOutCounter, stats.MsgInCounter)
 	// Handle transferred stats
-	if TransferredTopic != "" {
+	if len(cTopics) > 0 {
 		// wait for decide the message
 		time.Sleep(100 * time.Millisecond)
-		stats, err = manager.Stats(TransferredTopic)
+		stats, err = manager.Stats(cTopics[0])
 		assert.Nil(t, err)
 		assert.Equal(t, 1, stats.MsgInCounter)
-		assert.Equal(t, handleCase.expectedTransferredOutCount, stats.MsgOutCounter)
-		if handleCase.handleGoto == decider.GotoPending.String() ||
-			handleCase.handleGoto == decider.GotoBlocking.String() ||
-			handleCase.handleGoto == decider.GotoRetrying.String() {
+		assert.Equal(t, testCase.expectedTransferredOutCount, stats.MsgOutCounter)
+		if testCase.handleGoto == decider.GotoPending.String() ||
+			testCase.handleGoto == decider.GotoBlocking.String() ||
+			testCase.handleGoto == decider.GotoRetrying.String() {
 			for _, v := range stats.Subscriptions {
 				assert.Equal(t, 1, v.MsgBacklog)
 				break
@@ -267,8 +282,8 @@ func TestListenHandle_All(t *testing.T) {
 	shiftLevel := message.S1
 	groundTopic := internal.GenerateTestTopic(internal.PrefixTestListen)
 	statusTopicPrefix := internal.FormatStatusTopic(groundTopic, internal.TestSubscriptionName(), "", "")
-	transferTopic := groundTopic + message.S2.TopicSuffix()
-	decidedTopics := []string{
+	transferTopic := groundTopic + "-OTHER"
+	cTopics := []string{
 		"", // done
 		"", // discard
 		statusTopicPrefix + message.StatusDead.TopicSuffix(),     // dead
@@ -281,26 +296,19 @@ func TestListenHandle_All(t *testing.T) {
 		transferTopic,                                            // transfer
 	}
 	midConsumedTopics := []string{
-		decidedTopics[3],
-		decidedTopics[4],
-		decidedTopics[5],
+		cTopics[3],
+		cTopics[4],
+		cTopics[5],
 	}
-	manager := admin.NewAdminManager(internal.DefaultPulsarHttpUrl)
-	// clean up groundTopic
-	internal.CleanUpTopic(t, manager, groundTopic)
-	for _, decidedTopic := range decidedTopics {
-		if decidedTopic != "" {
-			internal.CleanUpTopic(t, manager, decidedTopic)
-		}
-	}
-	defer func() {
-		internal.CleanUpTopic(t, manager, groundTopic)
-		for _, decidedTopic := range decidedTopics {
-			if decidedTopic != "" {
-				internal.CleanUpTopic(t, manager, decidedTopic)
-			}
-		}
-	}()
+	manager := admin.NewRobustTopicManager(internal.DefaultPulsarHttpUrl)
+	// clean up topics
+	topics := make([]string, 0)
+	topics = append(topics, groundTopic)
+	topics = append(topics, cTopics...)
+	internal.CleanUpTopics(t, manager, topics...)
+	defer internal.CleanUpTopics(t, manager, topics...)
+	// create topic if not found in case broker closes auto creation
+	internal.CreateTopicsIfNotFound(t, manager, topics, 0)
 	// create client
 	client := internal.NewClient(internal.DefaultPulsarUrl)
 	defer client.Close()
@@ -313,7 +321,7 @@ func TestListenHandle_All(t *testing.T) {
 	}
 	defer producer.Close()
 	// send messages
-	for i := 0; i < len(decidedTopics); i++ {
+	for i := 0; i < len(cTopics); i++ {
 		msg := internal.GenerateProduceMessage(internal.Size64, "Index", strconv.Itoa(i))
 		mid, err := producer.Send(context.Background(), msg)
 		assert.Nil(t, err)
@@ -322,7 +330,7 @@ func TestListenHandle_All(t *testing.T) {
 	// check send stats
 	stats, err := manager.Stats(groundTopic)
 	assert.Nil(t, err)
-	assert.Equal(t, len(decidedTopics), stats.MsgInCounter)
+	assert.Equal(t, len(cTopics), stats.MsgInCounter)
 	assert.Equal(t, 0, stats.MsgOutCounter)
 
 	// ---------------
@@ -398,10 +406,10 @@ func TestListenHandle_All(t *testing.T) {
 	// check stats
 	stats, err = manager.Stats(groundTopic)
 	assert.Nil(t, err)
-	assert.Equal(t, len(decidedTopics), stats.MsgOutCounter)
+	assert.Equal(t, len(cTopics), stats.MsgOutCounter)
 	assert.Equal(t, stats.MsgOutCounter, stats.MsgInCounter)
 	// check decided stats
-	for _, decidedTopic := range decidedTopics {
+	for _, decidedTopic := range cTopics {
 		if decidedTopic == "" {
 			continue
 		}
