@@ -19,22 +19,21 @@ import (
 )
 
 func TestProduceOverall_Send3Msg_Transfer1MsgToL1(t *testing.T) {
-	topic := internal.GenerateTestTopic(internal.PrefixTestProduce)
-	transferredTopic := topic + "-L2"
-	manager := admin.NewAdminManager(internal.DefaultPulsarHttpUrl)
+	groundTopic := internal.GenerateTestTopic(internal.PrefixTestProduce)
+	transferredTopic := groundTopic + "-OTHER"
+	manager := admin.NewRobustTopicManager(internal.DefaultPulsarHttpUrl)
 
-	internal.CleanUpTopic(t, manager, topic)
-	internal.CleanUpTopic(t, manager, transferredTopic)
-	defer func() {
-		internal.CleanUpTopic(t, manager, topic)
-		internal.CleanUpTopic(t, manager, transferredTopic)
-	}()
+	// clean up topics
+	internal.CleanUpTopics(t, manager, groundTopic, transferredTopic)
+	defer internal.CleanUpTopics(t, manager, groundTopic, transferredTopic)
+	// create topic if not found in case broker closes auto creation
+	internal.CreateTopicsIfNotFound(t, manager, []string{groundTopic, transferredTopic}, 0)
 
 	client := internal.NewClient(internal.DefaultPulsarUrl)
 	defer client.Close()
 
 	producer, err := client.CreateProducer(config.ProducerConfig{
-		Topic:          topic,
+		Topic:          groundTopic,
 		TransferEnable: config.True(),
 		Transfer:       &config.TransferPolicy{ConnectInSyncEnable: true},
 	},
@@ -57,7 +56,7 @@ func TestProduceOverall_Send3Msg_Transfer1MsgToL1(t *testing.T) {
 		fmt.Println(msgID)
 	}
 
-	stats, err := manager.Stats(topic)
+	stats, err := manager.Stats(groundTopic)
 	assert.Nil(t, err)
 	assert.Equal(t, 2, stats.MsgInCounter)
 
@@ -67,22 +66,21 @@ func TestProduceOverall_Send3Msg_Transfer1MsgToL1(t *testing.T) {
 }
 
 func TestProduceOverall_SendAsync3Msg_Transfer1MsgToL1(t *testing.T) {
-	topic := internal.GenerateTestTopic(internal.PrefixTestProduce)
-	transferredTopic := topic + "-L2"
-	manager := admin.NewAdminManager(internal.DefaultPulsarHttpUrl)
+	groundTopic := internal.GenerateTestTopic(internal.PrefixTestProduce)
+	transferredTopic := groundTopic + "-OTHER"
+	manager := admin.NewRobustTopicManager(internal.DefaultPulsarHttpUrl)
 
-	internal.CleanUpTopic(t, manager, topic)
-	internal.CleanUpTopic(t, manager, transferredTopic)
-	defer func() {
-		internal.CleanUpTopic(t, manager, topic)
-		internal.CleanUpTopic(t, manager, transferredTopic)
-	}()
+	// clean up topics
+	internal.CleanUpTopics(t, manager, groundTopic, transferredTopic)
+	defer internal.CleanUpTopics(t, manager, groundTopic, transferredTopic)
+	// create topic if not found in case broker closes auto creation
+	internal.CreateTopicsIfNotFound(t, manager, []string{groundTopic, transferredTopic}, 0)
 
 	client := internal.NewClient(internal.DefaultPulsarUrl)
 	defer client.Close()
 
 	producer, err := client.CreateProducer(config.ProducerConfig{
-		Topic:          topic,
+		Topic:          groundTopic,
 		TransferEnable: config.True(),
 		Transfer:       &config.TransferPolicy{ConnectInSyncEnable: true},
 	},
@@ -110,7 +108,7 @@ func TestProduceOverall_SendAsync3Msg_Transfer1MsgToL1(t *testing.T) {
 	}
 	wg.Wait()
 
-	stats, err := manager.Stats(topic)
+	stats, err := manager.Stats(groundTopic)
 	assert.Nil(t, err)
 	assert.Equal(t, 2, stats.MsgInCounter)
 

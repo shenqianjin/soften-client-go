@@ -13,6 +13,7 @@ import (
 	"github.com/shenqianjin/soften-client-go/soften"
 	"github.com/shenqianjin/soften-client-go/soften/admin"
 	"github.com/shenqianjin/soften-client-go/soften/config"
+	"github.com/shenqianjin/soften-client-go/soften/support/util"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -52,6 +53,10 @@ func GenerateTestTopic(prefix string) string {
 
 func TestSubscriptionName() string {
 	return "testSub"
+}
+
+func TestSubscriptionPrefix() string {
+	return "-" + TestSubscriptionName()
 }
 
 func FormatStatusTopic(topic, subscription string, levelSuffix, statusSuffix string) string {
@@ -116,10 +121,48 @@ func GenerateProduceMessage(size int, kvs ...string) *pulsar.ProducerMessage {
 	}
 }
 
-func CleanUpTopic(t *testing.T, manager admin.TopicManager, storedTopic string) {
+func CleanUpTopics(t *testing.T, manager admin.RobustTopicManager, topics ...string) {
+	if len(topics) == 0 {
+		return
+	}
+	for _, topic := range topics {
+		CleanUpTopic(t, manager, topic)
+	}
+}
+
+func CleanUpTopic(t *testing.T, manager admin.RobustTopicManager, storedTopic string) {
 	if storedTopic == "" {
 		return
 	}
 	err := manager.Delete(storedTopic)
 	assert.True(t, err == nil || strings.Contains(err.Error(), "404 Not Found"), err)
+}
+
+type CreateTopicOptions struct {
+	Partitions   uint
+	Subscription string
+	Levels       []string
+	Statuses     []string
+}
+
+func CreateTopicIfNotFound(t *testing.T, manager admin.RobustTopicManager, groundTopic string, options CreateTopicOptions) {
+	topics, err := util.FormatTopics(groundTopic, options.Levels, options.Statuses, options.Subscription)
+	assert.Nil(t, err)
+	CreateTopicsIfNotFound(t, manager, topics, options.Partitions)
+
+}
+
+func CreateTopicsIfNotFound(t *testing.T, manager admin.RobustTopicManager, topics []string, partitions uint) {
+	for _, topic := range topics {
+		if topic == "" {
+			continue
+		}
+		_, err := manager.Stats(topic)
+		if err != nil && strings.Contains(err.Error(), "404 Not Found") {
+			err1 := manager.Create(topic, partitions)
+			assert.Nil(t, err1)
+			continue
+		}
+		assert.Nil(t, err)
+	}
 }

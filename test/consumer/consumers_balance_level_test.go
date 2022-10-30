@@ -12,6 +12,7 @@ import (
 	"github.com/shenqianjin/soften-client-go/soften/admin"
 	"github.com/shenqianjin/soften-client-go/soften/config"
 	"github.com/shenqianjin/soften-client-go/soften/message"
+	"github.com/shenqianjin/soften-client-go/soften/support/util"
 	"github.com/shenqianjin/soften-client-go/test/internal"
 	"github.com/stretchr/testify/assert"
 )
@@ -75,7 +76,7 @@ func testConsumerBalanceLevel(t *testing.T, testCase consumerBalanceCase) {
 	assert.True(t, len(testCase.consumeTypes) > 0)
 	assert.Equal(t, len(testCase.consumeTypes), len(testCase.weights))
 	assert.Equal(t, len(testCase.consumeTypes), len(testCase.totals))
-	tpc := internal.GenerateTestTopic(internal.PrefixTestConsume)
+	groundTopic := internal.GenerateTestTopic(internal.PrefixTestConsume)
 	consumeTypes := testCase.consumeTypes
 	totals := testCase.totals
 	expectedTotal := 0
@@ -83,36 +84,28 @@ func testConsumerBalanceLevel(t *testing.T, testCase consumerBalanceCase) {
 	for index, lvl := range testCase.consumeTypes {
 		expectedWeights[lvl] = testCase.weights[index]
 	}
-	producedTopics := make([]string, len(consumeTypes))
 	levels := make(message.Levels, len(consumeTypes))
 	for index, lvlStr := range consumeTypes {
 		lvl, err := message.LevelOf(lvlStr)
 		assert.Nil(t, err)
-		producedTopics[index] = tpc + lvl.TopicSuffix()
 		expectedTotal += totals[index]
 		levels[index] = lvl
 	}
 
-	manager := admin.NewAdminManager(internal.DefaultPulsarHttpUrl)
+	manager := admin.NewRobustTopicManager(internal.DefaultPulsarHttpUrl)
+	pTopics, err := util.FormatTopics(groundTopic, testCase.consumeTypes, []string{message.StatusReady.String()}, internal.TestSubscriptionName())
+	assert.Nil(t, err)
 	// clean up tpc
-	for _, producedTopic := range producedTopics {
-		if producedTopic != "" {
-			internal.CleanUpTopic(t, manager, producedTopic)
-		}
-	}
-	defer func() {
-		for _, producedTopic := range producedTopics {
-			if producedTopic != "" {
-				internal.CleanUpTopic(t, manager, producedTopic)
-			}
-		}
-	}()
+	internal.CleanUpTopics(t, manager, pTopics...)
+	defer internal.CleanUpTopics(t, manager, pTopics...)
+	// create topic if not found in case broker closes auto creation
+	internal.CreateTopicsIfNotFound(t, manager, pTopics, 0)
 	// create client
 	client := internal.NewClient(internal.DefaultPulsarUrl)
 	defer client.Close()
 	// create producer
-	producers := make([]soften.Producer, len(producedTopics))
-	for index, producedTopic := range producedTopics {
+	producers := make([]soften.Producer, len(pTopics))
+	for index, producedTopic := range pTopics {
 		producer, err := client.CreateProducer(config.ProducerConfig{
 			Topic: producedTopic,
 		})
@@ -145,7 +138,7 @@ func testConsumerBalanceLevel(t *testing.T, testCase consumerBalanceCase) {
 	wg.Wait()
 	for index, total := range totals {
 		// check send stats
-		stats, err := manager.Stats(producedTopics[index])
+		stats, err := manager.Stats(pTopics[index])
 		assert.Nil(t, err)
 		assert.Equal(t, total, stats.MsgInCounter)
 		assert.Equal(t, 0, stats.MsgOutCounter)
@@ -155,7 +148,7 @@ func testConsumerBalanceLevel(t *testing.T, testCase consumerBalanceCase) {
 
 	// create listener
 	consumerConf := config.ConsumerConfig{
-		Topic:                       tpc,
+		Topic:                       groundTopic,
 		SubscriptionName:            internal.TestSubscriptionName(),
 		SubscriptionInitialPosition: pulsar.SubscriptionPositionEarliest,
 		Concurrency: &config.ConcurrencyPolicy{
@@ -166,7 +159,7 @@ func testConsumerBalanceLevel(t *testing.T, testCase consumerBalanceCase) {
 	}
 	for _, lvl := range levels {
 		if w, ok := expectedWeights[lvl.String()]; ok {
-			consumerConf.LevelPolicies[lvl] = &config.LevelPolicy{ConsumeWeight: uint(w)}
+			consumerConf.LevelPolicies[lvl] = &config.LevelPolicy{ConsumeWeight: uint(w), DeadEnable: config.False()}
 		}
 	}
 	listener, err := client.CreateListener(consumerConf)
@@ -193,7 +186,7 @@ func testConsumerBalanceLevel(t *testing.T, testCase consumerBalanceCase) {
 	<-doneCh
 	time.Sleep(100 * time.Millisecond)
 	// check stats
-	for index, producedTopic := range producedTopics {
+	for index, producedTopic := range pTopics {
 		stats, err := manager.Stats(producedTopic)
 		assert.Nil(t, err, "produced tpc: ", index)
 		assert.Equal(t, testCase.totals[index], stats.MsgInCounter, "produced tpc: ", producedTopic)

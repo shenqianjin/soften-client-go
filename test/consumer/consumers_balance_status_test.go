@@ -15,6 +15,7 @@ import (
 	"github.com/shenqianjin/soften-client-go/soften/admin"
 	"github.com/shenqianjin/soften-client-go/soften/config"
 	"github.com/shenqianjin/soften-client-go/soften/message"
+	"github.com/shenqianjin/soften-client-go/soften/support/util"
 	"github.com/shenqianjin/soften-client-go/test/internal"
 	"github.com/stretchr/testify/assert"
 )
@@ -72,46 +73,36 @@ func testConsumerBalanceStatus(t *testing.T, testCase consumerBalanceCase) {
 	assert.True(t, len(testCase.consumeTypes) > 0)
 	assert.Equal(t, len(testCase.consumeTypes), len(testCase.weights))
 	assert.Equal(t, len(testCase.consumeTypes), len(testCase.totals))
-	topic := internal.GenerateTestTopic(internal.PrefixTestConsume)
-	consumeTypes := testCase.consumeTypes
+	groundTopic := internal.GenerateTestTopic(internal.PrefixTestConsume)
 	totals := testCase.totals
 	expectedTotal := 0
 	expectedWeights := make(map[string]int, len(testCase.consumeTypes))
 	for index, status := range testCase.consumeTypes {
 		expectedWeights[status] = testCase.weights[index]
 	}
-	producedTopics := make([]string, len(consumeTypes))
-	for index, status := range consumeTypes {
-		st, err := message.StatusOf(status)
+	enableMap := make(map[string]bool)
+	for index, status := range testCase.consumeTypes {
+		enableMap[status] = true
+		_, err := message.StatusOf(status)
 		assert.Nil(t, err)
-		if st == message.StatusReady {
-			producedTopics[index] = topic + st.TopicSuffix()
-		} else {
-			producedTopics[index] = topic + "-" + internal.TestSubscriptionName() + st.TopicSuffix()
-		}
 		expectedTotal += totals[index]
 	}
 
-	manager := admin.NewAdminManager(internal.DefaultPulsarHttpUrl)
+	manager := admin.NewRobustTopicManager(internal.DefaultPulsarHttpUrl)
+	pTopics, err := util.FormatTopics(groundTopic, []string{message.L1.String()}, testCase.consumeTypes, internal.TestSubscriptionName())
+	assert.Nil(t, err)
+
 	// clean up topic
-	for _, producedTopic := range producedTopics {
-		if producedTopic != "" {
-			internal.CleanUpTopic(t, manager, producedTopic)
-		}
-	}
-	defer func() {
-		for _, producedTopic := range producedTopics {
-			if producedTopic != "" {
-				internal.CleanUpTopic(t, manager, producedTopic)
-			}
-		}
-	}()
+	internal.CleanUpTopics(t, manager, pTopics...)
+	defer internal.CleanUpTopics(t, manager, pTopics...)
+	// create topic if not found in case broker closes auto creation
+	internal.CreateTopicsIfNotFound(t, manager, pTopics, 0)
 	// create client
 	client := internal.NewClient(internal.DefaultPulsarUrl)
 	defer client.Close()
 	// create producer
-	producers := make([]soften.Producer, len(producedTopics))
-	for index, producedTopic := range producedTopics {
+	producers := make([]soften.Producer, len(pTopics))
+	for index, producedTopic := range pTopics {
 		producer, err := client.CreateProducer(config.ProducerConfig{
 			Topic: producedTopic,
 		})
@@ -133,7 +124,7 @@ func testConsumerBalanceStatus(t *testing.T, testCase consumerBalanceCase) {
 		wg.Add(1)
 		go func(index int, total int) {
 			for count := 0; count < total; count++ {
-				msg := internal.GenerateProduceMessage(internal.Size64, "ConsumeType", consumeTypes[index])
+				msg := internal.GenerateProduceMessage(internal.Size64, "ConsumeType", testCase.consumeTypes[index])
 				mid, err := producers[index].Send(context.Background(), msg)
 				assert.Nil(t, err)
 				assert.True(t, mid.LedgerID() >= 0)
@@ -144,7 +135,7 @@ func testConsumerBalanceStatus(t *testing.T, testCase consumerBalanceCase) {
 	wg.Wait()
 	for index, total := range totals {
 		// check send stats
-		stats, err := manager.Stats(producedTopics[index])
+		stats, err := manager.Stats(pTopics[index])
 		assert.Nil(t, err)
 		assert.Equal(t, total, stats.MsgInCounter)
 		assert.Equal(t, 0, stats.MsgOutCounter)
@@ -157,13 +148,14 @@ func testConsumerBalanceStatus(t *testing.T, testCase consumerBalanceCase) {
 		ReentrantDelay: 1,
 	}
 	leveledPolicy := &config.LevelPolicy{
-		PendingEnable:  config.True(),
-		BlockingEnable: config.True(),
-		RetryingEnable: config.True(),
+		PendingEnable:  config.ToPointer(enableMap[message.StatusPending.String()]),
+		BlockingEnable: config.ToPointer(enableMap[message.StatusBlocking.String()]),
+		RetryingEnable: config.ToPointer(enableMap[message.StatusRetrying.String()]),
+		DeadEnable:     config.False(),
 	}
 	// create listener
 	consumerConf := config.ConsumerConfig{
-		Topic:                       topic,
+		Topic:                       groundTopic,
 		SubscriptionName:            internal.TestSubscriptionName(),
 		SubscriptionInitialPosition: pulsar.SubscriptionPositionEarliest,
 		LevelPolicy:                 leveledPolicy,
@@ -207,7 +199,7 @@ func testConsumerBalanceStatus(t *testing.T, testCase consumerBalanceCase) {
 	<-doneCh
 	time.Sleep(100 * time.Millisecond)
 	// check stats
-	for index, producedTopic := range producedTopics {
+	for index, producedTopic := range pTopics {
 		stats, err := manager.Stats(producedTopic)
 		assert.Nil(t, err, "produced topic: ", index)
 		assert.Equal(t, testCase.totals[index], stats.MsgInCounter, "produced topic: ", producedTopic)

@@ -14,28 +14,29 @@ import (
 	"github.com/shenqianjin/soften-client-go/soften/config"
 	"github.com/shenqianjin/soften-client-go/soften/decider"
 	"github.com/shenqianjin/soften-client-go/soften/message"
+	"github.com/shenqianjin/soften-client-go/soften/support/util"
 	"github.com/shenqianjin/soften-client-go/test/internal"
 	"github.com/stretchr/testify/assert"
 )
 
 type testListenCheckCase struct {
-	groundTopic               string
-	storedTopic               string // produce to / consume from
-	decidedTopic              string // check to
-	checkpoint                checker.ConsumeCheckpoint
-	expectedStoredOutCount    int // should always 1
-	expectedTransferdOutCount int // 1 for pending, blocking, retrying; 0 for upgrade, degrade, transfer
+	groundTopic                 string
+	consumeToLevel              string
+	consumeToStatus             string
+	checkpoint                  checker.ConsumeCheckpoint
+	expectedStoredOutCount      int // should always 1
+	expectedTransferredOutCount int // 1 for pending, blocking, retrying; 0 for upgrade, degrade, transfer
 
 	// extra for upgrade/degrade
-	upgradeLevel string
-	degradeLevel string
+	upgradeLevel    string
+	degradeLevel    string
+	transferToTopic string
 }
 
 func TestListenCheck_Prev_Discard(t *testing.T) {
-	topic := internal.GenerateTestTopic(internal.PrefixTestListen)
+	groundTopic := internal.GenerateTestTopic(internal.PrefixTestListen)
 	checkCase := testListenCheckCase{
-		groundTopic: topic,
-		storedTopic: topic,
+		groundTopic: groundTopic,
 		checkpoint: checker.PrevHandleDiscard(func(ctx context.Context, msg message.Message) checker.CheckStatus {
 			return checker.CheckStatusPassed
 		}),
@@ -44,11 +45,11 @@ func TestListenCheck_Prev_Discard(t *testing.T) {
 }
 
 func TestListenCheck_Prev_Dead(t *testing.T) {
-	topic := internal.GenerateTestTopic(internal.PrefixTestListen)
+	status := message.StatusDead
+	groundTopic := internal.GenerateTestTopic(internal.PrefixTestListen)
 	checkCase := testListenCheckCase{
-		groundTopic:  topic,
-		storedTopic:  topic,
-		decidedTopic: internal.FormatStatusTopic(topic, internal.TestSubscriptionName(), "", message.StatusDead.TopicSuffix()),
+		groundTopic:     groundTopic,
+		consumeToStatus: status.String(),
 		checkpoint: checker.PrevHandleDead(func(ctx context.Context, msg message.Message) checker.CheckStatus {
 			return checker.CheckStatusPassed
 		}),
@@ -57,55 +58,54 @@ func TestListenCheck_Prev_Dead(t *testing.T) {
 }
 
 func TestListenCheck_Prev_Pending(t *testing.T) {
-	topic := internal.GenerateTestTopic(internal.PrefixTestListen)
+	status := message.StatusPending
+	groundTopic := internal.GenerateTestTopic(internal.PrefixTestListen)
 	checkCase := testListenCheckCase{
-		groundTopic:  topic,
-		storedTopic:  topic,
-		decidedTopic: internal.FormatStatusTopic(topic, internal.TestSubscriptionName(), "", message.StatusPending.TopicSuffix()),
+		groundTopic:     groundTopic,
+		consumeToStatus: status.String(),
 		checkpoint: checker.PrevHandlePending(func(ctx context.Context, msg message.Message) checker.CheckStatus {
 			return checker.CheckStatusPassed
 		}),
-		expectedTransferdOutCount: 1, // transfer the msg to pending queue, and then reconsume it
+		expectedTransferredOutCount: 1, // transfer the msg to pending queue, and then reconsume it
 	}
 	testListenPrevCheckHandle(t, checkCase)
 }
 
 func TestListenCheck_Prev_Blocking(t *testing.T) {
-	topic := internal.GenerateTestTopic(internal.PrefixTestListen)
+	status := message.StatusBlocking
+	groundTopic := internal.GenerateTestTopic(internal.PrefixTestListen)
 	checkCase := testListenCheckCase{
-		groundTopic:  topic,
-		storedTopic:  topic,
-		decidedTopic: internal.FormatStatusTopic(topic, internal.TestSubscriptionName(), "", message.StatusBlocking.TopicSuffix()),
+		groundTopic:     groundTopic,
+		consumeToStatus: status.String(),
 		checkpoint: checker.PrevHandleBlocking(func(ctx context.Context, msg message.Message) checker.CheckStatus {
 			return checker.CheckStatusPassed
 		}),
-		expectedTransferdOutCount: 1,
+		expectedTransferredOutCount: 1,
 	}
 	testListenPrevCheckHandle(t, checkCase)
 }
 
 func TestListenCheck_Prev_Retrying(t *testing.T) {
-	topic := internal.GenerateTestTopic(internal.PrefixTestListen)
+	status := message.StatusRetrying
+	groundTopic := internal.GenerateTestTopic(internal.PrefixTestListen)
 	checkCase := testListenCheckCase{
-		groundTopic:  topic,
-		storedTopic:  topic,
-		decidedTopic: internal.FormatStatusTopic(topic, internal.TestSubscriptionName(), "", message.StatusRetrying.TopicSuffix()),
+		groundTopic:     groundTopic,
+		consumeToStatus: status.String(),
 		checkpoint: checker.PrevHandleRetrying(func(ctx context.Context, msg message.Message) checker.CheckStatus {
 			return checker.CheckStatusPassed
 		}),
-		expectedTransferdOutCount: 1,
+		expectedTransferredOutCount: 1,
 	}
 	testListenPrevCheckHandle(t, checkCase)
 }
 
 func TestListenCheck_Prev_Upgrade(t *testing.T) {
 	upgradeLevel := message.L2
-	topic := internal.GenerateTestTopic(internal.PrefixTestListen)
+	groundTopic := internal.GenerateTestTopic(internal.PrefixTestListen)
 	checkCase := testListenCheckCase{
-		groundTopic:  topic,
-		storedTopic:  topic,
-		decidedTopic: topic + upgradeLevel.TopicSuffix(),
-		upgradeLevel: upgradeLevel.String(),
+		groundTopic:    groundTopic,
+		consumeToLevel: upgradeLevel.String(),
+		upgradeLevel:   upgradeLevel.String(),
 		checkpoint: checker.PrevHandleUpgrade(func(ctx context.Context, msg message.Message) checker.CheckStatus {
 			if msg.Status() == message.StatusReady {
 				return checker.CheckStatusPassed
@@ -118,12 +118,11 @@ func TestListenCheck_Prev_Upgrade(t *testing.T) {
 
 func TestListenCheck_Prev_Degrade(t *testing.T) {
 	degradeLevel := message.B2
-	topic := internal.GenerateTestTopic(internal.PrefixTestListen)
+	groundTopic := internal.GenerateTestTopic(internal.PrefixTestListen)
 	checkCase := testListenCheckCase{
-		groundTopic:  topic,
-		storedTopic:  topic,
-		decidedTopic: topic + degradeLevel.TopicSuffix(),
-		degradeLevel: degradeLevel.String(),
+		groundTopic:    groundTopic,
+		consumeToLevel: degradeLevel.String(),
+		degradeLevel:   degradeLevel.String(),
 		checkpoint: checker.PrevHandleDegrade(func(ctx context.Context, msg message.Message) checker.CheckStatus {
 			if msg.Status() == message.StatusReady {
 				return checker.CheckStatusPassed
@@ -136,11 +135,10 @@ func TestListenCheck_Prev_Degrade(t *testing.T) {
 
 func TestListenCheck_Prev_Shift(t *testing.T) {
 	shiftLevel := message.B2
-	topic := internal.GenerateTestTopic(internal.PrefixTestListen)
+	groundTopic := internal.GenerateTestTopic(internal.PrefixTestListen)
 	checkCase := testListenCheckCase{
-		groundTopic:  topic,
-		storedTopic:  topic,
-		decidedTopic: topic + shiftLevel.TopicSuffix(),
+		groundTopic:    groundTopic,
+		consumeToLevel: shiftLevel.String(),
 		checkpoint: checker.PrevHandleShift(func(ctx context.Context, msg message.Message) checker.CheckStatus {
 			if msg.Status() == message.StatusReady {
 				return checker.CheckStatusPassed.WithGotoExtra(decider.GotoExtra{Level: shiftLevel})
@@ -152,15 +150,14 @@ func TestListenCheck_Prev_Shift(t *testing.T) {
 }
 
 func TestListenCheck_Prev_Transfer(t *testing.T) {
-	topic := internal.GenerateTestTopic(internal.PrefixTestListen)
-	transferredTopic := topic + message.L2.TopicSuffix()
+	groundTopic := internal.GenerateTestTopic(internal.PrefixTestListen)
+	transferToTopic := groundTopic + "-OTHER"
 	checkCase := testListenCheckCase{
-		groundTopic:  topic,
-		storedTopic:  topic,
-		decidedTopic: transferredTopic,
+		groundTopic:     groundTopic,
+		transferToTopic: transferToTopic,
 		checkpoint: checker.PrevHandleTransfer(func(ctx context.Context, msg message.Message) checker.CheckStatus {
 			if msg.Status() == message.StatusReady {
-				return checker.CheckStatusPassed.WithGotoExtra(decider.GotoExtra{Topic: transferredTopic})
+				return checker.CheckStatusPassed.WithGotoExtra(decider.GotoExtra{Topic: transferToTopic})
 			}
 			return checker.CheckStatusRejected
 		}),
@@ -168,24 +165,38 @@ func TestListenCheck_Prev_Transfer(t *testing.T) {
 	testListenPrevCheckHandle(t, checkCase)
 }
 
-func testListenPrevCheckHandle(t *testing.T, checkCase testListenCheckCase) {
-	topic := checkCase.groundTopic
-	storedTopic := checkCase.storedTopic
-	transferredTopic := checkCase.decidedTopic
-	manager := admin.NewAdminManager(internal.DefaultPulsarHttpUrl)
-	// clean up groundTopic
-	internal.CleanUpTopic(t, manager, storedTopic)
-	internal.CleanUpTopic(t, manager, transferredTopic)
-	defer func() {
-		internal.CleanUpTopic(t, manager, storedTopic)
-		internal.CleanUpTopic(t, manager, transferredTopic)
-	}()
+func testListenPrevCheckHandle(t *testing.T, testCase testListenCheckCase) {
+	groundTopic := testCase.groundTopic
+	manager := admin.NewRobustTopicManager(internal.DefaultPulsarHttpUrl)
+	// format topics
+	pTopics := make([]string, 0)
+	pTopics = append(pTopics, testCase.groundTopic)
+	cTopics := make([]string, 0)
+	if testCase.checkpoint.CheckType == checker.CheckTypePrevTransfer {
+		cTopics = append(cTopics, testCase.transferToTopic)
+	} else if testCase.checkpoint.CheckType == checker.CheckTypePrevDiscard {
+		// do nothing
+	} else if testCase.consumeToLevel != "" {
+		fTopics, err := util.FormatTopics(testCase.groundTopic, []string{testCase.consumeToLevel}, []string{message.StatusReady.String()}, "")
+		assert.Nil(t, err)
+		cTopics = append(cTopics, fTopics...)
+	} else if testCase.consumeToStatus != "" {
+		fTopics, err := util.FormatTopics(testCase.groundTopic, []string{message.L1.String()}, []string{testCase.consumeToStatus}, internal.TestSubscriptionName())
+		assert.Nil(t, err)
+		cTopics = append(cTopics, fTopics...)
+	}
+	topics := append(pTopics, cTopics...)
+	// clean up topic
+	internal.CleanUpTopics(t, manager, topics...)
+	defer internal.CleanUpTopics(t, manager, topics...)
+	// create topic if not found in case broker closes auto creation
+	internal.CreateTopicsIfNotFound(t, manager, topics, 0)
 	// create client
 	client := internal.NewClient(internal.DefaultPulsarUrl)
 	defer client.Close()
 	// create producer
 	producer, err := client.CreateProducer(config.ProducerConfig{
-		Topic: topic,
+		Topic: groundTopic,
 	})
 	if err != nil {
 		log.Fatal(err)
@@ -196,7 +207,7 @@ func testListenPrevCheckHandle(t *testing.T, checkCase testListenCheckCase) {
 	assert.Nil(t, err)
 	fmt.Println("produced message: ", msgID)
 	// check send stats
-	stats, err := manager.Stats(storedTopic)
+	stats, err := manager.Stats(pTopics[0])
 	assert.Nil(t, err)
 	assert.Equal(t, 1, stats.MsgInCounter)
 
@@ -206,33 +217,34 @@ func testListenPrevCheckHandle(t *testing.T, checkCase testListenCheckCase) {
 		BackoffDelays:  []string{"1s"},
 		ReentrantDelay: 1,
 	}
-	upgradeLevel, _ := message.LevelOf(checkCase.upgradeLevel)
-	degradeLevel, _ := message.LevelOf(checkCase.degradeLevel)
+	// create listener
+	upgradeLevel, _ := message.LevelOf(testCase.upgradeLevel)
+	degradeLevel, _ := message.LevelOf(testCase.degradeLevel)
 	leveledPolicy := &config.LevelPolicy{
-		DiscardEnable:  config.ToPointer(checkCase.checkpoint.CheckType == checker.CheckTypePrevDiscard),
-		DeadEnable:     config.ToPointer(checkCase.checkpoint.CheckType == checker.CheckTypePrevDead),
-		PendingEnable:  config.ToPointer(checkCase.checkpoint.CheckType == checker.CheckTypePrevPending),
+		DiscardEnable:  config.ToPointer(testCase.checkpoint.CheckType == checker.CheckTypePrevDiscard),
+		DeadEnable:     config.ToPointer(testCase.checkpoint.CheckType == checker.CheckTypePrevDead),
+		PendingEnable:  config.ToPointer(testCase.checkpoint.CheckType == checker.CheckTypePrevPending),
 		Pending:        testPolicy,
-		BlockingEnable: config.ToPointer(checkCase.checkpoint.CheckType == checker.CheckTypePrevBlocking),
+		BlockingEnable: config.ToPointer(testCase.checkpoint.CheckType == checker.CheckTypePrevBlocking),
 		Blocking:       testPolicy,
-		RetryingEnable: config.ToPointer(checkCase.checkpoint.CheckType == checker.CheckTypePrevRetrying),
+		RetryingEnable: config.ToPointer(testCase.checkpoint.CheckType == checker.CheckTypePrevRetrying),
 		Retrying:       testPolicy,
-		UpgradeEnable:  config.ToPointer(checkCase.checkpoint.CheckType == checker.CheckTypePrevUpgrade),
+		UpgradeEnable:  config.ToPointer(testCase.checkpoint.CheckType == checker.CheckTypePrevUpgrade),
 		Upgrade:        &config.ShiftPolicy{Level: upgradeLevel, ConnectInSyncEnable: true},
-		DegradeEnable:  config.ToPointer(checkCase.checkpoint.CheckType == checker.CheckTypePrevDegrade),
+		DegradeEnable:  config.ToPointer(testCase.checkpoint.CheckType == checker.CheckTypePrevDegrade),
 		Degrade:        &config.ShiftPolicy{Level: degradeLevel, ConnectInSyncEnable: true},
-		ShiftEnable:    config.ToPointer(checkCase.checkpoint.CheckType == checker.CheckTypePrevShift),
+		ShiftEnable:    config.ToPointer(testCase.checkpoint.CheckType == checker.CheckTypePrevShift),
 		Shift:          &config.ShiftPolicy{ConnectInSyncEnable: true},
-		TransferEnable: config.ToPointer(checkCase.checkpoint.CheckType == checker.CheckTypePrevTransfer),
-		Transfer:       &config.TransferPolicy{ConnectInSyncEnable: checkCase.checkpoint.CheckType == checker.CheckTypePrevTransfer},
+		TransferEnable: config.ToPointer(testCase.checkpoint.CheckType == checker.CheckTypePrevTransfer),
+		Transfer:       &config.TransferPolicy{ConnectInSyncEnable: testCase.checkpoint.CheckType == checker.CheckTypePrevTransfer},
 	}
 	// create listener
 	listener, err := client.CreateListener(config.ConsumerConfig{
-		Topic:                       topic,
+		Topic:                       groundTopic,
 		SubscriptionName:            internal.TestSubscriptionName(),
 		SubscriptionInitialPosition: pulsar.SubscriptionPositionEarliest,
 		LevelPolicy:                 leveledPolicy,
-	}, checkCase.checkpoint)
+	}, testCase.checkpoint)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -249,21 +261,21 @@ func testListenPrevCheckHandle(t *testing.T, checkCase testListenCheckCase) {
 	// wait for consuming the message
 	time.Sleep(100 * time.Millisecond)
 	// check stats
-	stats, err = manager.Stats(storedTopic)
+	stats, err = manager.Stats(pTopics[0])
 	assert.Nil(t, err)
 	assert.Equal(t, 1, stats.MsgOutCounter)
 	assert.Equal(t, stats.MsgOutCounter, stats.MsgInCounter)
 	// check transferred stats
-	if transferredTopic != "" {
+	if len(cTopics) > 0 {
 		// wait for decide the message
 		time.Sleep(100 * time.Millisecond)
-		stats, err = manager.Stats(transferredTopic)
+		stats, err = manager.Stats(cTopics[0])
 		assert.Nil(t, err)
 		assert.Equal(t, 1, stats.MsgInCounter)
-		assert.Equal(t, checkCase.expectedTransferdOutCount, stats.MsgOutCounter)
-		if checkCase.checkpoint.CheckType == checker.CheckTypePrevPending ||
-			checkCase.checkpoint.CheckType == checker.CheckTypePrevBlocking ||
-			checkCase.checkpoint.CheckType == checker.CheckTypePrevRetrying {
+		assert.Equal(t, testCase.expectedTransferredOutCount, stats.MsgOutCounter)
+		if testCase.checkpoint.CheckType == checker.CheckTypePrevPending ||
+			testCase.checkpoint.CheckType == checker.CheckTypePrevBlocking ||
+			testCase.checkpoint.CheckType == checker.CheckTypePrevRetrying {
 			for _, v := range stats.Subscriptions {
 				assert.Equal(t, 1, v.MsgBacklog)
 				break
@@ -280,8 +292,8 @@ func TestListenCheck_Prev_All(t *testing.T) {
 	shiftLevel := message.S1
 	groundTopic := internal.GenerateTestTopic(internal.PrefixTestListen)
 	statusTopicPrefix := internal.FormatStatusTopic(groundTopic, internal.TestSubscriptionName(), "", "")
-	transferredTopic := groundTopic + "-S2"
-	decidedTopics := []string{
+	transferTopic := groundTopic + "-OTHER"
+	cTopics := []string{
 		"", // done
 		"", // discard
 		statusTopicPrefix + message.StatusDead.TopicSuffix(),     // dead
@@ -291,29 +303,24 @@ func TestListenCheck_Prev_All(t *testing.T) {
 		groundTopic + upgradeLevel.TopicSuffix(),                 // degrade
 		groundTopic + degradeLevel.TopicSuffix(),                 // upgrade
 		groundTopic + shiftLevel.TopicSuffix(),                   // shift
-		transferredTopic,                                         // transfer
+		transferTopic,                                            // transfer
 	}
 	midConsumedTopics := []string{
-		decidedTopics[3],
-		decidedTopics[4],
-		decidedTopics[5],
+		cTopics[3],
+		cTopics[4],
+		cTopics[5],
 	}
-	manager := admin.NewAdminManager(internal.DefaultPulsarHttpUrl)
-	// clean up groundTopic
-	internal.CleanUpTopic(t, manager, groundTopic)
-	for _, decidedTopic := range decidedTopics {
-		if decidedTopic != "" {
-			internal.CleanUpTopic(t, manager, decidedTopic)
-		}
-	}
-	defer func() {
-		internal.CleanUpTopic(t, manager, groundTopic)
-		for _, decidedTopic := range decidedTopics {
-			if decidedTopic != "" {
-				internal.CleanUpTopic(t, manager, decidedTopic)
-			}
-		}
-	}()
+	manager := admin.NewRobustTopicManager(internal.DefaultPulsarHttpUrl)
+
+	// clean up topics
+	topics := make([]string, 0)
+	topics = append(topics, groundTopic)
+	topics = append(topics, cTopics...)
+	internal.CleanUpTopics(t, manager, topics...)
+	defer internal.CleanUpTopics(t, manager, topics...)
+	// create topic if not found in case broker closes auto creation
+	internal.CreateTopicsIfNotFound(t, manager, topics, 0)
+
 	// create client
 	client := internal.NewClient(internal.DefaultPulsarUrl)
 	defer client.Close()
@@ -326,7 +333,7 @@ func TestListenCheck_Prev_All(t *testing.T) {
 	}
 	defer producer.Close()
 	// send messages
-	for i := 0; i < len(decidedTopics); i++ {
+	for i := 0; i < len(cTopics); i++ {
 		msg := internal.GenerateProduceMessage(internal.Size64, "Index", strconv.Itoa(i))
 		mid, err := producer.Send(context.Background(), msg)
 		assert.Nil(t, err)
@@ -335,7 +342,7 @@ func TestListenCheck_Prev_All(t *testing.T) {
 	// check send stats
 	stats, err := manager.Stats(groundTopic)
 	assert.Nil(t, err)
-	assert.Equal(t, len(decidedTopics), stats.MsgInCounter)
+	assert.Equal(t, len(cTopics), stats.MsgInCounter)
 	assert.Equal(t, 0, stats.MsgOutCounter)
 
 	// ---------------
@@ -417,7 +424,7 @@ func TestListenCheck_Prev_All(t *testing.T) {
 	}), checker.PrevHandleTransfer(func(ctx context.Context, msg message.Message) checker.CheckStatus {
 		if index, ok := msg.Properties()["Index"]; ok && index == "9" {
 			if msg.Status() == message.StatusReady {
-				return checker.CheckStatusPassed.WithGotoExtra(decider.GotoExtra{Topic: transferredTopic})
+				return checker.CheckStatusPassed.WithGotoExtra(decider.GotoExtra{Topic: transferTopic})
 			}
 		}
 		return checker.CheckStatusRejected
@@ -440,10 +447,10 @@ func TestListenCheck_Prev_All(t *testing.T) {
 	// check stats
 	stats, err = manager.Stats(groundTopic)
 	assert.Nil(t, err)
-	assert.Equal(t, len(decidedTopics), stats.MsgOutCounter)
+	assert.Equal(t, len(cTopics), stats.MsgOutCounter)
 	assert.Equal(t, stats.MsgOutCounter, stats.MsgInCounter)
 	// check decided stats
-	for _, decidedTopic := range decidedTopics {
+	for _, decidedTopic := range cTopics {
 		if decidedTopic == "" {
 			continue
 		}

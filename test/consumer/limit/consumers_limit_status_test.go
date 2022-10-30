@@ -14,19 +14,21 @@ import (
 	"github.com/shenqianjin/soften-client-go/soften/decider"
 	"github.com/shenqianjin/soften-client-go/soften/handler"
 	"github.com/shenqianjin/soften-client-go/soften/message"
+	"github.com/shenqianjin/soften-client-go/soften/support/util"
 	"github.com/shenqianjin/soften-client-go/test/internal"
 	"github.com/stretchr/testify/assert"
 )
 
 type testConsumeLimitCase struct {
-	groundTopic                  string
-	level                        string
-	storedTopic                  string // produce to / consume from
-	transferredTopic             string // Handle to
-	deadTopic                    string //
-	handler                      handler.PremiumHandleFunc
-	handleGoto                   string
-	statusPolicy                 *config.StatusPolicy
+	groundTopic string
+	level       string
+
+	consumeToDeadFinal  bool
+	consumeToStatus     string
+	consumeHandler      handler.PremiumHandleFunc
+	consumeHandleGoto   string
+	consumeStatusPolicy *config.StatusPolicy
+
 	waitTime                     time.Duration
 	expectedStatusReentrantTimes int
 	expectedDeadMsgCount         int
@@ -50,14 +52,14 @@ func TestConsumeLimitL2_Retrying_Success(t *testing.T) {
 	HandleCase := testConsumeLimitCase{
 		groundTopic:                  topic,
 		level:                        level.String(),
-		storedTopic:                  topic + level.TopicSuffix(),
-		transferredTopic:             internal.FormatStatusTopic(topic, internal.TestSubscriptionName(), level.TopicSuffix(), message.StatusRetrying.TopicSuffix()),
-		deadTopic:                    internal.FormatStatusTopic(topic, internal.TestSubscriptionName(), "", message.StatusDead.TopicSuffix()),
-		statusPolicy:                 testPolicy,
+		consumeToDeadFinal:           true,
+		consumeToStatus:              message.StatusRetrying.String(),
+		consumeHandleGoto:            message.StatusRetrying.String(),
+		consumeStatusPolicy:          testPolicy,
 		expectedStatusReentrantTimes: expectedStatusReentrantTimes,
 		expectedDeadMsgCount:         0,
 		waitTime:                     waitTime,
-		handler: func(ctx context.Context, msg message.Message) handler.HandleStatus {
+		consumeHandler: func(ctx context.Context, msg message.Message) handler.HandleStatus {
 			tpc := msg.Topic()
 			index := strings.LastIndexAny(tpc, "/")
 			msgCounter := message.Parser.GetMessageCounter(msg)
@@ -68,7 +70,6 @@ func TestConsumeLimitL2_Retrying_Success(t *testing.T) {
 			}
 			return handler.StatusRetrying
 		},
-		handleGoto: message.StatusRetrying.String(),
 	}
 	testConsumeLimitGoto(t, HandleCase)
 }
@@ -90,14 +91,14 @@ func TestConsumeLimitL2_Retrying(t *testing.T) {
 	HandleCase := testConsumeLimitCase{
 		groundTopic:                  topic,
 		level:                        level.String(),
-		storedTopic:                  topic + level.TopicSuffix(),
-		transferredTopic:             internal.FormatStatusTopic(topic, internal.TestSubscriptionName(), level.TopicSuffix(), message.StatusRetrying.TopicSuffix()),
-		deadTopic:                    internal.FormatStatusTopic(topic, internal.TestSubscriptionName(), "", message.StatusDead.TopicSuffix()),
-		statusPolicy:                 testPolicy,
+		consumeToDeadFinal:           true,
+		consumeToStatus:              message.StatusRetrying.String(),
+		consumeHandleGoto:            message.StatusRetrying.String(),
+		consumeStatusPolicy:          testPolicy,
 		expectedStatusReentrantTimes: expectedStatusReentrantTimes,
 		expectedDeadMsgCount:         1,
 		waitTime:                     waitTime,
-		handler: func(ctx context.Context, msg message.Message) handler.HandleStatus {
+		consumeHandler: func(ctx context.Context, msg message.Message) handler.HandleStatus {
 			tpc := msg.Topic()
 			index := strings.LastIndexAny(tpc, "/")
 			msgCounter := message.Parser.GetMessageCounter(msg)
@@ -108,7 +109,6 @@ func TestConsumeLimitL2_Retrying(t *testing.T) {
 				statusMsgCounter.ToString(), msg.RedeliveryCount())
 			return handler.StatusRetrying
 		},
-		handleGoto: message.StatusRetrying.String(),
 	}
 	testConsumeLimitGoto(t, HandleCase)
 }
@@ -130,14 +130,14 @@ func TestConsumeLimitL2_Pending(t *testing.T) {
 	HandleCase := testConsumeLimitCase{
 		groundTopic:                  topic,
 		level:                        level.String(),
-		storedTopic:                  topic + level.TopicSuffix(),
-		transferredTopic:             internal.FormatStatusTopic(topic, internal.TestSubscriptionName(), level.TopicSuffix(), message.StatusPending.TopicSuffix()),
-		deadTopic:                    internal.FormatStatusTopic(topic, internal.TestSubscriptionName(), "", message.StatusDead.TopicSuffix()),
-		statusPolicy:                 testPolicy,
+		consumeToDeadFinal:           true,
+		consumeToStatus:              message.StatusPending.String(),
+		consumeHandleGoto:            decider.GotoPending.String(),
+		consumeStatusPolicy:          testPolicy,
 		expectedStatusReentrantTimes: expectedStatusReentrantTimes,
 		expectedDeadMsgCount:         1,
 		waitTime:                     waitTime,
-		handler: func(ctx context.Context, msg message.Message) handler.HandleStatus {
+		consumeHandler: func(ctx context.Context, msg message.Message) handler.HandleStatus {
 			tpc := msg.Topic()
 			index := strings.LastIndexAny(tpc, "/")
 			msgCounter := message.Parser.GetMessageCounter(msg)
@@ -145,7 +145,6 @@ func TestConsumeLimitL2_Pending(t *testing.T) {
 				time.Now().Format(time.RFC3339Nano), msg.Topic()[index:], msg.ID(), msgCounter.ToString(), msg.RedeliveryCount())
 			return handler.StatusPending
 		},
-		handleGoto: message.StatusPending.String(),
 	}
 	testConsumeLimitGoto(t, HandleCase)
 }
@@ -166,14 +165,14 @@ func TestConsumeLimitL2_Blocking(t *testing.T) {
 	HandleCase := testConsumeLimitCase{
 		groundTopic:                  topic,
 		level:                        level.String(),
-		storedTopic:                  topic + level.TopicSuffix(),
-		transferredTopic:             internal.FormatStatusTopic(topic, internal.TestSubscriptionName(), level.TopicSuffix(), message.StatusBlocking.TopicSuffix()),
-		deadTopic:                    internal.FormatStatusTopic(topic, internal.TestSubscriptionName(), "", message.StatusDead.TopicSuffix()),
-		statusPolicy:                 testPolicy,
+		consumeToDeadFinal:           true,
+		consumeToStatus:              message.StatusBlocking.String(),
+		consumeHandleGoto:            decider.GotoBlocking.String(),
+		consumeStatusPolicy:          testPolicy,
 		expectedStatusReentrantTimes: expectedStatusReentrantTimes,
 		expectedDeadMsgCount:         1,
 		waitTime:                     waitTime,
-		handler: func(ctx context.Context, msg message.Message) handler.HandleStatus {
+		consumeHandler: func(ctx context.Context, msg message.Message) handler.HandleStatus {
 			tpc := msg.Topic()
 			index := strings.LastIndexAny(tpc, "/")
 			msgCounter := message.Parser.GetMessageCounter(msg)
@@ -181,7 +180,6 @@ func TestConsumeLimitL2_Blocking(t *testing.T) {
 				time.Now().Format(time.RFC3339Nano), msg.Topic()[index:], msg.ID(), msgCounter, msg.RedeliveryCount())
 			return handler.StatusBlocking
 		},
-		handleGoto: message.StatusBlocking.String(),
 	}
 	testConsumeLimitGoto(t, HandleCase)
 }
@@ -196,17 +194,25 @@ func testConsumeLimitGoto(t *testing.T, handleCase testConsumeLimitCase) {
 			level = lvl
 		}
 	}
-	storedTopic := handleCase.storedTopic
-	transferredTopic := handleCase.transferredTopic
-	deadTopic := handleCase.deadTopic
-	manager := admin.NewAdminManager(internal.DefaultPulsarHttpUrl)
+	pTopics, err := util.FormatTopics(handleCase.groundTopic, []string{handleCase.level}, []string{message.StatusReady.String()}, "")
+	assert.Nil(t, err)
+	cTopics, err := util.FormatTopics(handleCase.groundTopic, []string{handleCase.level}, []string{handleCase.consumeToStatus}, internal.TestSubscriptionName())
+	assert.Nil(t, err)
+	if handleCase.consumeToDeadFinal {
+		dTopic, err1 := util.FormatDeadTopic(handleCase.groundTopic, internal.TestSubscriptionName())
+		assert.Nil(t, err1)
+		cTopics = append(cTopics, dTopic)
+	}
+	manager := admin.NewRobustTopicManager(internal.DefaultPulsarHttpUrl)
+
+	topics := append(pTopics, cTopics...)
 	// clean up groundTopic
-	internal.CleanUpTopic(t, manager, storedTopic)
-	internal.CleanUpTopic(t, manager, transferredTopic)
+	internal.CleanUpTopics(t, manager, topics...)
 	defer func() {
-		internal.CleanUpTopic(t, manager, storedTopic)
-		internal.CleanUpTopic(t, manager, transferredTopic)
+		internal.CleanUpTopics(t, manager, topics...)
 	}()
+	// create topic if not found in case broker closes auto creation
+	internal.CreateTopicsIfNotFound(t, manager, topics, 0)
 	// create client
 	client := internal.NewClient(internal.DefaultPulsarUrl)
 	defer client.Close()
@@ -224,7 +230,7 @@ func testConsumeLimitGoto(t *testing.T, handleCase testConsumeLimitCase) {
 	assert.Nil(t, err)
 	fmt.Println("produced message: ", msgID)
 	// Handle send stats
-	stats, err := manager.Stats(storedTopic)
+	stats, err := manager.Stats(pTopics[0])
 	assert.Nil(t, err)
 	assert.Equal(t, 1, stats.MsgInCounter)
 
@@ -232,19 +238,19 @@ func testConsumeLimitGoto(t *testing.T, handleCase testConsumeLimitCase) {
 
 	// create listener
 	leveledPolicy := &config.LevelPolicy{
-		DiscardEnable:  config.ToPointer(handleCase.handleGoto == decider.GotoDiscard.String()),
-		DeadEnable:     config.True(), // always set as true
-		PendingEnable:  config.ToPointer(handleCase.handleGoto == decider.GotoPending.String()),
-		Pending:        handleCase.statusPolicy,
-		BlockingEnable: config.ToPointer(handleCase.handleGoto == decider.GotoBlocking.String()),
-		Blocking:       handleCase.statusPolicy,
-		RetryingEnable: config.ToPointer(handleCase.handleGoto == decider.GotoRetrying.String()),
-		Retrying:       handleCase.statusPolicy,
+		DiscardEnable:  config.ToPointer(handleCase.consumeHandleGoto == decider.GotoDiscard.String()),
+		DeadEnable:     config.ToPointer(handleCase.consumeToDeadFinal),
+		PendingEnable:  config.ToPointer(handleCase.consumeHandleGoto == decider.GotoPending.String()),
+		Pending:        handleCase.consumeStatusPolicy,
+		BlockingEnable: config.ToPointer(handleCase.consumeHandleGoto == decider.GotoBlocking.String()),
+		Blocking:       handleCase.consumeStatusPolicy,
+		RetryingEnable: config.ToPointer(handleCase.consumeHandleGoto == decider.GotoRetrying.String()),
+		Retrying:       handleCase.consumeStatusPolicy,
 	}
 	listener, err := client.CreateListener(config.ConsumerConfig{
 		Topic:                       groundTopic,
-		Level:                       message.L1,
-		Levels:                      message.Levels{message.L1, level},
+		Level:                       level,
+		Levels:                      message.Levels{level},
 		SubscriptionName:            internal.TestSubscriptionName(),
 		SubscriptionInitialPosition: pulsar.SubscriptionPositionEarliest,
 		LevelPolicy:                 leveledPolicy,
@@ -257,34 +263,34 @@ func testConsumeLimitGoto(t *testing.T, handleCase testConsumeLimitCase) {
 	defer listener.Close()
 	// listener starts
 	ctx, cancel := context.WithCancel(context.Background())
-	err = listener.StartPremium(ctx, handleCase.handler)
+	err = listener.StartPremium(ctx, handleCase.consumeHandler)
 	if err != nil {
 		log.Fatal(err)
 	}
 	// wait for consuming the message
 	time.Sleep(handleCase.waitTime)
 	// Handle stats
-	stats, err = manager.Stats(storedTopic)
+	stats, err = manager.Stats(pTopics[0])
 	assert.Nil(t, err)
 	assert.Equal(t, 1, stats.MsgOutCounter)
 	assert.Equal(t, stats.MsgOutCounter, stats.MsgInCounter)
 	// Handle transferred stats
-	if transferredTopic != "" {
+	if len(cTopics) == 2 {
 		// wait for decide the message
 		time.Sleep(10000 * time.Millisecond)
-		stats, err = manager.Stats(transferredTopic)
+		stats, err = manager.Stats(cTopics[0])
 		assert.Nil(t, err)
 		assert.Equal(t, handleCase.expectedStatusReentrantTimes, stats.MsgInCounter)
 		assert.Equal(t, stats.MsgInCounter, stats.MsgOutCounter)
-		if handleCase.handleGoto == decider.GotoPending.String() ||
-			handleCase.handleGoto == decider.GotoBlocking.String() ||
-			handleCase.handleGoto == decider.GotoRetrying.String() {
+		if handleCase.consumeHandleGoto == decider.GotoPending.String() ||
+			handleCase.consumeHandleGoto == decider.GotoBlocking.String() ||
+			handleCase.consumeHandleGoto == decider.GotoRetrying.String() {
 			for _, v := range stats.Subscriptions {
 				assert.Equal(t, 0, v.MsgBacklog)
 				break
 			}
 		}
-		stats, err = manager.Stats(deadTopic)
+		stats, err = manager.Stats(cTopics[1])
 		assert.Nil(t, err)
 		assert.Equal(t, handleCase.expectedDeadMsgCount, stats.MsgInCounter)
 		assert.Equal(t, 0, stats.MsgOutCounter)

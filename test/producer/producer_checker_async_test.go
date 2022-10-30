@@ -14,14 +14,15 @@ import (
 	"github.com/shenqianjin/soften-client-go/soften/config"
 	"github.com/shenqianjin/soften-client-go/soften/decider"
 	"github.com/shenqianjin/soften-client-go/soften/message"
+	"github.com/shenqianjin/soften-client-go/soften/support/util"
 	"github.com/shenqianjin/soften-client-go/test/internal"
 	"github.com/stretchr/testify/assert"
 )
 
 func TestProduceCheck_Discard_BySendAsync(t *testing.T) {
-	topic := internal.GenerateTestTopic(internal.PrefixTestProduce)
+	groundTopic := internal.GenerateTestTopic(internal.PrefixTestProduce)
 	checkCase := testProduceCheckCase{
-		topic:               topic,
+		groundTopic:         groundTopic,
 		expectedStoredCount: 0,
 		checkpoint: checker.PrevSendDiscard(func(ctx context.Context, msg *message.ProducerMessage) checker.CheckStatus {
 			return checker.CheckStatusPassed
@@ -32,10 +33,10 @@ func TestProduceCheck_Discard_BySendAsync(t *testing.T) {
 
 func TestProduceCheck_Dead_BySendAsync(t *testing.T) {
 	deadLevel := message.D1
-	topic := internal.GenerateTestTopic(internal.PrefixTestProduce)
+	groundTopic := internal.GenerateTestTopic(internal.PrefixTestProduce)
 	checkCase := testProduceCheckCase{
-		topic:               topic,
-		storedTopic:         topic + deadLevel.TopicSuffix(),
+		groundTopic:         groundTopic,
+		produceToLevel:      deadLevel.String(),
 		expectedStoredCount: 1,
 		checkpoint: checker.PrevSendDead(func(ctx context.Context, msg *message.ProducerMessage) checker.CheckStatus {
 			return checker.CheckStatusPassed.WithGotoExtra(decider.GotoExtra{Level: deadLevel})
@@ -46,11 +47,11 @@ func TestProduceCheck_Dead_BySendAsync(t *testing.T) {
 
 func TestProduceCheck_Upgrade_BySendAsync(t *testing.T) {
 	upgradeLevel := message.L2
-	topic := internal.GenerateTestTopic(internal.PrefixTestProduce)
+	groundTopic := internal.GenerateTestTopic(internal.PrefixTestProduce)
 	checkCase := testProduceCheckCase{
-		topic:               topic,
-		storedTopic:         topic + upgradeLevel.TopicSuffix(),
-		upgradeLevel:        string(upgradeLevel),
+		groundTopic:         groundTopic,
+		produceToLevel:      upgradeLevel.String(),
+		upgradeLevel:        upgradeLevel.String(),
 		expectedStoredCount: 1,
 		checkpoint: checker.PrevSendUpgrade(func(ctx context.Context, msg *message.ProducerMessage) checker.CheckStatus {
 			return checker.CheckStatusPassed
@@ -61,11 +62,11 @@ func TestProduceCheck_Upgrade_BySendAsync(t *testing.T) {
 
 func TestProduceCheck_Degrade_BySendAsync(t *testing.T) {
 	degradeLevel := message.B2
-	topic := internal.GenerateTestTopic(internal.PrefixTestProduce)
+	groundTopic := internal.GenerateTestTopic(internal.PrefixTestProduce)
 	checkCase := testProduceCheckCase{
-		topic:               topic,
-		storedTopic:         topic + degradeLevel.TopicSuffix(),
-		degradeLevel:        string(degradeLevel),
+		groundTopic:         groundTopic,
+		produceToLevel:      degradeLevel.String(),
+		degradeLevel:        degradeLevel.String(),
 		expectedStoredCount: 1,
 		checkpoint: checker.PrevSendDegrade(func(ctx context.Context, msg *message.ProducerMessage) checker.CheckStatus {
 			return checker.CheckStatusPassed
@@ -76,11 +77,10 @@ func TestProduceCheck_Degrade_BySendAsync(t *testing.T) {
 
 func TestProduceCheck_Shift_BySendAsync(t *testing.T) {
 	shiftLevel := message.B2
-	topic := internal.GenerateTestTopic(internal.PrefixTestProduce)
-	transferredTopic := topic + shiftLevel.TopicSuffix()
+	groundTopic := internal.GenerateTestTopic(internal.PrefixTestProduce)
 	checkCase := testProduceCheckCase{
-		topic:               topic,
-		storedTopic:         transferredTopic,
+		groundTopic:         groundTopic,
+		produceToLevel:      shiftLevel.String(),
 		expectedStoredCount: 1,
 		checkpoint: checker.PrevSendShift(func(ctx context.Context, msg *message.ProducerMessage) checker.CheckStatus {
 			return checker.CheckStatusPassed.WithGotoExtra(decider.GotoExtra{Level: shiftLevel})
@@ -90,48 +90,57 @@ func TestProduceCheck_Shift_BySendAsync(t *testing.T) {
 }
 
 func TestProduceCheck_TransferToL2_BySendAsync(t *testing.T) {
-	topic := internal.GenerateTestTopic(internal.PrefixTestProduce)
-	transferredTopic := topic + "-L2"
+	groundTopic := internal.GenerateTestTopic(internal.PrefixTestProduce)
+	transferToTopic := groundTopic + "-OTHER"
 	checkCase := testProduceCheckCase{
-		topic:               topic,
-		storedTopic:         transferredTopic,
+		groundTopic:         groundTopic,
+		transferToTopic:     transferToTopic,
 		expectedStoredCount: 1,
 		checkpoint: checker.PrevSendTransfer(func(ctx context.Context, msg *message.ProducerMessage) checker.CheckStatus {
-			return checker.CheckStatusPassed.WithGotoExtra(decider.GotoExtra{Topic: transferredTopic})
+			return checker.CheckStatusPassed.WithGotoExtra(decider.GotoExtra{Topic: transferToTopic})
 		}),
 	}
 	testProduceCheckBySendAsync(t, checkCase)
 }
 
-func testProduceCheckBySendAsync(t *testing.T, checkCase testProduceCheckCase) {
-	if checkCase.storedTopic == "" {
-		checkCase.storedTopic = checkCase.topic
+func testProduceCheckBySendAsync(t *testing.T, testCase testProduceCheckCase) {
+	manager := admin.NewRobustTopicManager(internal.DefaultPulsarHttpUrl)
+	// format topics
+	pTopics := make([]string, 0)
+	pTopics = append(pTopics, testCase.groundTopic)
+	if testCase.checkpoint.CheckType == checker.ProduceCheckTypeTransfer {
+		pTopics = append(pTopics, testCase.transferToTopic)
+	} else if testCase.checkpoint.CheckType == checker.ProduceCheckTypeDiscard {
+		// do nothing
+	} else {
+		fTopics, err := util.FormatTopics(testCase.groundTopic, []string{testCase.produceToLevel}, []string{message.StatusReady.String()}, "")
+		assert.Nil(t, err)
+		pTopics = append(pTopics, fTopics...)
 	}
-	manager := admin.NewAdminManager(internal.DefaultPulsarHttpUrl)
-
-	internal.CleanUpTopic(t, manager, checkCase.storedTopic)
-	defer func() {
-		internal.CleanUpTopic(t, manager, checkCase.storedTopic)
-	}()
+	// clean up topic
+	internal.CleanUpTopics(t, manager, pTopics...)
+	defer internal.CleanUpTopics(t, manager, pTopics...)
+	// create topic if not found in case broker closes auto creation
+	internal.CreateTopicsIfNotFound(t, manager, pTopics, 0)
 
 	client := internal.NewClient(internal.DefaultPulsarUrl)
 	defer client.Close()
-	upgradeLevel, _ := message.LevelOf(checkCase.upgradeLevel)
-	degradeLevel, _ := message.LevelOf(checkCase.degradeLevel)
+	upgradeLevel, _ := message.LevelOf(testCase.upgradeLevel)
+	degradeLevel, _ := message.LevelOf(testCase.degradeLevel)
 	producer, err := client.CreateProducer(config.ProducerConfig{
-		Topic:          checkCase.topic,
-		DiscardEnable:  config.ToPointer(checkCase.checkpoint.CheckType == checker.ProduceCheckTypeDiscard),
-		DeadEnable:     config.ToPointer(checkCase.checkpoint.CheckType == checker.ProduceCheckTypeDead),
-		UpgradeEnable:  config.ToPointer(checkCase.checkpoint.CheckType == checker.ProduceCheckTypeUpgrade),
-		DegradeEnable:  config.ToPointer(checkCase.checkpoint.CheckType == checker.ProduceCheckTypeDegrade),
-		ShiftEnable:    config.ToPointer(checkCase.checkpoint.CheckType == checker.ProduceCheckTypeShift),
-		TransferEnable: config.ToPointer(checkCase.checkpoint.CheckType == checker.ProduceCheckTypeTransfer),
+		Topic:          testCase.groundTopic,
+		DiscardEnable:  config.ToPointer(testCase.checkpoint.CheckType == checker.ProduceCheckTypeDiscard),
+		DeadEnable:     config.ToPointer(testCase.checkpoint.CheckType == checker.ProduceCheckTypeDead),
+		UpgradeEnable:  config.ToPointer(testCase.checkpoint.CheckType == checker.ProduceCheckTypeUpgrade),
+		DegradeEnable:  config.ToPointer(testCase.checkpoint.CheckType == checker.ProduceCheckTypeDegrade),
+		ShiftEnable:    config.ToPointer(testCase.checkpoint.CheckType == checker.ProduceCheckTypeShift),
+		TransferEnable: config.ToPointer(testCase.checkpoint.CheckType == checker.ProduceCheckTypeTransfer),
 		Transfer:       &config.TransferPolicy{ConnectInSyncEnable: true},
 		Upgrade:        &config.ShiftPolicy{Level: upgradeLevel, ConnectInSyncEnable: true},
 		Degrade:        &config.ShiftPolicy{Level: degradeLevel, ConnectInSyncEnable: true},
 		Shift:          &config.ShiftPolicy{ConnectInSyncEnable: true},
 		Dead:           &config.ShiftPolicy{ConnectInSyncEnable: true},
-	}, checkCase.checkpoint)
+	}, testCase.checkpoint)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -147,9 +156,9 @@ func testProduceCheckBySendAsync(t *testing.T, checkCase testProduceCheckCase) {
 		})
 	wg.Wait()
 
-	stats, err := manager.Stats(checkCase.storedTopic)
+	stats, err := manager.Stats(pTopics[len(pTopics)-1])
 	assert.Nil(t, err)
-	assert.Equal(t, checkCase.expectedStoredCount, stats.MsgInCounter)
+	assert.Equal(t, testCase.expectedStoredCount, stats.MsgInCounter)
 }
 
 func TestProduceCheck_All_BySendAsync(t *testing.T) {
@@ -157,16 +166,16 @@ func TestProduceCheck_All_BySendAsync(t *testing.T) {
 	degradeLevel := message.B2
 	shiftLevel := message.L3
 	deadLevel := message.D1
-	topic := internal.GenerateTestTopic(internal.PrefixTestProduce)
-	transferredTopic := topic + message.S1.TopicSuffix()
-	storedTopics := []string{
-		topic,                              // ready
-		"",                                 // discard
-		topic + deadLevel.TopicSuffix(),    // dead
-		topic + upgradeLevel.TopicSuffix(), // upgrade
-		topic + degradeLevel.TopicSuffix(), // degrade
-		topic + shiftLevel.TopicSuffix(),   // shift
-		transferredTopic,                   //transfer
+	groundTopic := internal.GenerateTestTopic(internal.PrefixTestProduce)
+	transferredTopic := groundTopic + "-OTHER"
+	pTopics := []string{
+		groundTopic,                              // ready
+		"",                                       // discard
+		groundTopic + deadLevel.TopicSuffix(),    // dead
+		groundTopic + upgradeLevel.TopicSuffix(), // upgrade
+		groundTopic + degradeLevel.TopicSuffix(), // degrade
+		groundTopic + shiftLevel.TopicSuffix(),   // shift
+		transferredTopic,                         //transfer
 	}
 	checkpoints := []checker.ProduceCheckpoint{
 		// 0 为 ready
@@ -213,27 +222,18 @@ func TestProduceCheck_All_BySendAsync(t *testing.T) {
 			return checker.CheckStatusRejected
 		}),
 	}
-	manager := admin.NewAdminManager(internal.DefaultPulsarHttpUrl)
+	manager := admin.NewRobustTopicManager(internal.DefaultPulsarHttpUrl)
 
-	for _, storedTopic := range storedTopics {
-		if storedTopic == "" { // discard
-			continue
-		}
-		internal.CleanUpTopic(t, manager, storedTopic)
-	}
-	defer func() {
-		for _, storedTopic := range storedTopics {
-			if storedTopic == "" { // discard
-				continue
-			}
-			internal.CleanUpTopic(t, manager, storedTopic)
-		}
-	}()
+	// clean up topic
+	internal.CleanUpTopics(t, manager, pTopics...)
+	defer internal.CleanUpTopics(t, manager, pTopics...)
+	// create topic if not found in case broker closes auto creation
+	internal.CreateTopicsIfNotFound(t, manager, pTopics, 0)
 
 	client := internal.NewClient(internal.DefaultPulsarUrl)
 	defer client.Close()
 	producer, err := client.CreateProducer(config.ProducerConfig{
-		Topic:          topic,
+		Topic:          groundTopic,
 		TransferEnable: config.True(),
 		DiscardEnable:  config.True(),
 		DeadEnable:     config.True(),
@@ -252,7 +252,7 @@ func TestProduceCheck_All_BySendAsync(t *testing.T) {
 	defer producer.Close()
 
 	wg := sync.WaitGroup{}
-	for i := 0; i < len(storedTopics); i++ {
+	for i := 0; i < len(pTopics); i++ {
 		wg.Add(1)
 		msg := internal.GenerateProduceMessage(internal.Size64, "Index", strconv.Itoa(i))
 		producer.SendAsync(context.Background(), msg,
@@ -263,11 +263,11 @@ func TestProduceCheck_All_BySendAsync(t *testing.T) {
 		wg.Wait()
 	}
 
-	for index, storedTopic := range storedTopics {
+	for index, storedTopic := range pTopics {
 		expected := 1
 		if storedTopic == "" { // discard
 			expected = 1 // 发送discard消息之前, 发了一个ready消息, 所以这里依然expected 1
-			storedTopic = topic
+			storedTopic = groundTopic
 		}
 		stats, err := manager.Stats(storedTopic)
 		assert.Nil(t, err, "index = "+strconv.Itoa(index))

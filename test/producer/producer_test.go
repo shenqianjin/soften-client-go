@@ -13,42 +13,44 @@ import (
 )
 
 func TestSend_1Msg(t *testing.T) {
-	topic := internal.GenerateTestTopic(internal.PrefixTestProduce)
-	manager := admin.NewAdminManager(internal.DefaultPulsarHttpUrl)
+	groundTopic := internal.GenerateTestTopic(internal.PrefixTestProduce)
+	manager := admin.NewRobustTopicManager(internal.DefaultPulsarHttpUrl)
 
-	internal.CleanUpTopic(t, manager, topic)
-	defer func() {
-		internal.CleanUpTopic(t, manager, topic)
-	}()
+	// clean up topics
+	internal.CleanUpTopics(t, manager, groundTopic)
+	defer internal.CleanUpTopics(t, manager, groundTopic)
+	// create topic if not found in case broker closes auto creation
+	internal.CreateTopicsIfNotFound(t, manager, []string{groundTopic}, 0)
 
 	client := internal.NewClient(internal.DefaultPulsarUrl)
 	defer client.Close()
 
-	producer := internal.CreateProducer(client, topic)
+	producer := internal.CreateProducer(client, groundTopic)
 	defer producer.Close()
 
 	msgID, err := producer.Send(context.Background(), internal.GenerateProduceMessage(internal.Size1K))
 	assert.Nil(t, err)
 	fmt.Println(msgID)
 
-	stats, err := manager.Stats(topic)
+	stats, err := manager.Stats(groundTopic)
 	assert.Nil(t, err)
 	assert.Equal(t, 1, stats.MsgInCounter)
 }
 
 func TestSendAsync_1Msg(t *testing.T) {
-	topic := internal.GenerateTestTopic(internal.PrefixTestProduce)
-	manager := admin.NewAdminManager(internal.DefaultPulsarHttpUrl)
+	groundTopic := internal.GenerateTestTopic(internal.PrefixTestProduce)
+	manager := admin.NewRobustTopicManager(internal.DefaultPulsarHttpUrl)
 
-	internal.CleanUpTopic(t, manager, topic)
-	defer func() {
-		internal.CleanUpTopic(t, manager, topic)
-	}()
+	// clean up topics
+	internal.CleanUpTopics(t, manager, groundTopic)
+	defer internal.CleanUpTopics(t, manager, groundTopic)
+	// create topic if not found in case broker closes auto creation
+	internal.CreateTopicsIfNotFound(t, manager, []string{groundTopic}, 0)
 
 	client := internal.NewClient(internal.DefaultPulsarUrl)
 	defer client.Close()
 
-	producer := internal.CreateProducer(client, topic)
+	producer := internal.CreateProducer(client, groundTopic)
 	defer producer.Close()
 
 	wg := sync.WaitGroup{}
@@ -60,7 +62,7 @@ func TestSendAsync_1Msg(t *testing.T) {
 		})
 	wg.Wait()
 
-	stats, err := manager.Stats(topic)
+	stats, err := manager.Stats(groundTopic)
 	assert.Nil(t, err)
 	assert.Equal(t, 1, stats.MsgInCounter)
 }

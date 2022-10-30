@@ -17,20 +17,7 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-type testListenCheckCase struct {
-	groundTopic               string
-	storedTopic               string // produce to / consume from
-	decidedTopic              string // check to
-	checkpoint                checker.ConsumeCheckpoint
-	expectedStoredOutCount    int // should always 1
-	expectedTransferdOutCount int // 1 for pending, blocking, retrying; 0 for upgrade, degrade, transfer
-
-	// extra for upgrade/degrade
-	upgradeLevel string
-	degradeLevel string
-}
-
-func TestConsummeCheck_Prev_Pending_Defer(t *testing.T) {
+func TestConsumeCheck_Prev_Pending_Defer(t *testing.T) {
 	// checker
 	checkFunc := func(ctx context.Context, msg message.Message) checker.CheckStatus {
 		indexInfo := "index=" + msg.Properties()["Index"]
@@ -64,7 +51,7 @@ func TestConsummeCheck_Prev_Pending_Defer(t *testing.T) {
 	storedTopic := topic
 	transferredTopic := internal.FormatStatusTopic(topic, internal.TestSubscriptionName(), "", message.StatusPending.TopicSuffix())
 
-	manager := admin.NewAdminManager(internal.DefaultPulsarHttpUrl)
+	manager := admin.NewRobustTopicManager(internal.DefaultPulsarHttpUrl)
 	// clean up groundTopic
 	internal.CleanUpTopic(t, manager, storedTopic)
 	internal.CleanUpTopic(t, manager, transferredTopic)
@@ -72,6 +59,8 @@ func TestConsummeCheck_Prev_Pending_Defer(t *testing.T) {
 		internal.CleanUpTopic(t, manager, storedTopic)
 		internal.CleanUpTopic(t, manager, transferredTopic)
 	}()
+	// create topic if not found in case broker closes auto creation
+	internal.CreateTopicsIfNotFound(t, manager, []string{storedTopic, transferredTopic}, 0)
 	// create client
 	client := internal.NewClient(internal.DefaultPulsarUrl)
 	defer client.Close()
@@ -105,6 +94,7 @@ func TestConsummeCheck_Prev_Pending_Defer(t *testing.T) {
 	leveledPolicy := &config.LevelPolicy{
 		PendingEnable: config.True(),
 		Pending:       testPolicy,
+		DeadEnable:    config.False(),
 	}
 	// create listener
 	listener, err := client.CreateListener(config.ConsumerConfig{
