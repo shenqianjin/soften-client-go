@@ -127,8 +127,27 @@ func iterateInternalByReader(options iterateOptions,
 		firstHandledMsg: firstMatchedMsg, lastHandledMsg: lastHandledMsg}
 }
 
+type consumerIterateResult struct {
+	iterateResult
+
+	unmatchedHandled uint64
+
+	unmatchedFirstHandledMsg pulsar.Message
+	unmatchedLastHandledMsg  pulsar.Message
+}
+
+func (ir *consumerIterateResult) PrettyString() string {
+	var unmatchedHandleString string
+	if ir.firstHandledMsg != nil {
+		unmatchedHandleString = fmt.Sprintf("unmatched-handled: %v [%v - %v]", ir.unmatchedHandled, ir.unmatchedFirstHandledMsg.ID(), ir.unmatchedLastHandledMsg.ID())
+	} else {
+		unmatchedHandleString = fmt.Sprintf("unmatched-handled: %v", ir.matched)
+	}
+	return fmt.Sprintf("%s, %s", ir.iterateResult.PrettyString(), unmatchedHandleString)
+}
+
 func iterateInternalByConsumer(options iterateOptions, consumerOptions iterateConsumerOptions,
-	stopChan <-chan struct{}, handleFunc func(msg pulsar.ConsumerMessage) bool) iterateResult {
+	handleFunc func(msg pulsar.ConsumerMessage, matched bool) bool) consumerIterateResult {
 	// src client
 	client, err := pulsar.NewClient(pulsar.ClientOptions{URL: options.brokerUrl})
 	if err != nil {
@@ -152,10 +171,13 @@ func iterateInternalByConsumer(options iterateOptions, consumerOptions iterateCo
 	iterated := atomic.Uint64{}
 	hit := atomic.Uint64{}
 	handled := atomic.Uint64{}
+	unmatchedHandled := atomic.Uint64{}
 	var firstMatchedMsg pulsar.Message
 	var lastMatchedMsg pulsar.Message
 	var firstHandledMsg pulsar.Message
 	var lastHandledMsg pulsar.Message
+	var unmatchedFirstHandledMsg pulsar.Message
+	var unmatchedLastHandledMsg pulsar.Message
 	lastIterateTime := time.Time{}
 	lastMatchTime := time.Time{}
 	ticker := time.Tick(time.Second)
@@ -176,6 +198,13 @@ func iterateInternalByConsumer(options iterateOptions, consumerOptions iterateCo
 				conditions:       options.conditions,
 				startEventTime:   options.startEventTime,
 				startPublishTime: options.startPublishTime}) {
+				if handleFunc(msg, false) {
+					unmatchedHandled.Add(1)
+					if unmatchedFirstHandledMsg == nil {
+						unmatchedFirstHandledMsg = msg
+					}
+					unmatchedLastHandledMsg = msg
+				}
 				continue
 			}
 			hit.Add(1)
@@ -186,7 +215,7 @@ func iterateInternalByConsumer(options iterateOptions, consumerOptions iterateCo
 			lastMatchTime = time.Now()
 
 			// handle
-			if handleFunc(msg) {
+			if handleFunc(msg, true) {
 				handled.Add(1)
 				if firstHandledMsg == nil {
 					firstHandledMsg = msg
@@ -203,10 +232,13 @@ func iterateInternalByConsumer(options iterateOptions, consumerOptions iterateCo
 				logrus.Debugf("break as it it over matched timeout since last matched")
 				break
 			}
-		case <-stopChan:
-			break
 		}
 	}
-	return iterateResult{iterated: iterated.Load(), matched: hit.Load(), handled: handled.Load(),
-		lastMatchedMsg: lastMatchedMsg, lastHandledMsg: lastHandledMsg}
+	return consumerIterateResult{
+		iterateResult: iterateResult{iterated: iterated.Load(), matched: hit.Load(), handled: handled.Load(),
+			lastMatchedMsg: lastMatchedMsg, lastHandledMsg: lastHandledMsg},
+		unmatchedHandled:         unmatchedHandled.Load(),
+		unmatchedFirstHandledMsg: unmatchedFirstHandledMsg,
+		unmatchedLastHandledMsg:  unmatchedLastHandledMsg,
+	}
 }

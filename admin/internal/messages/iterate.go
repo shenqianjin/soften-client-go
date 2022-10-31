@@ -17,7 +17,7 @@ func newIterateCommand(rtArgs *internal.RootArgs, mdlArgs *messagesArgs) *cobra.
 	cmdArgs := &iterateArgs{}
 	cmd := &cobra.Command{
 		Use:   "iterate ",
-		Short: "iterate soften topic or topics",
+		Short: "iterate messages from a source topic and print matched ones with conditions",
 		Args:  cobra.MinimumNArgs(1),
 		Run: func(cmd *cobra.Command, args []string) {
 			mdlArgs.topic = args[0]

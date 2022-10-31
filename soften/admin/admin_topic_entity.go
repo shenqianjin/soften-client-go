@@ -165,5 +165,9 @@ type InternalStatsCompactedLedger struct {
 }
 
 type PartitionedTopicStatsMetadata struct {
+	Metadata PartitionedStatsMetadata `json:"metadata"`
+}
+
+type PartitionedStatsMetadata struct {
 	Partitions int `json:"partitions"`
 }

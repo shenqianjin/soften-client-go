@@ -24,7 +24,7 @@ func newRecallCommand(rtArgs *internal.RootArgs, mdlArgs *messagesArgs) *cobra.C
 	cmdArgs := &recallArgs{}
 	cmd := &cobra.Command{
 		Use:   "recall ",
-		Short: "delete soften topic or topics",
+		Short: "recall messages from a source topic (DQL generally and not only) to anther topic",
 		Args:  cobra.MinimumNArgs(2),
 		Run: func(cmd *cobra.Command, args []string) {
 			mdlArgs.topic = args[0]
@@ -44,7 +44,7 @@ func recallMessages(rtArgs *internal.RootArgs, mdlArgs *messagesArgs, cmdArgs *r
 	// parse vars
 	parsedMdlVars := parseAndValidateMessagesVars(rtArgs, mdlArgs)
 	// check src/dest topics
-	manager := admin.NewNonPartitionedTopicManager(rtArgs.Url)
+	manager := admin.NewRobustTopicManager(rtArgs.Url)
 	if _, err := manager.Stats(cmdArgs.destTopic); err != nil {
 		logrus.Fatalf("invalid destination topic: %v, err: %v\n", cmdArgs.destTopic, err)
 	}

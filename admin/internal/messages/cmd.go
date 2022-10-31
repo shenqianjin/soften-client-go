@@ -37,6 +37,7 @@ func NewModuleCmd(rootArgs *internal.RootArgs) *cobra.Command {
 	// add action commands
 	cmd.AddCommand(newRecallCommand(rootArgs, moduleArgs))
 	cmd.AddCommand(newIterateCommand(rootArgs, moduleArgs))
+	cmd.AddCommand(newTidyCommand(rootArgs, moduleArgs))
 
 	return cmd
 }
@@ -60,7 +61,7 @@ func parseAndValidateMessagesVars(rtArgs *internal.RootArgs, mdlArgs *messagesAr
 	// compile conditions
 	conditions := parseAndCompileConditions(mdlArgs.condition)
 	// check src topics
-	manager := admin.NewNonPartitionedTopicManager(rtArgs.Url)
+	manager := admin.NewRobustTopicManager(rtArgs.Url)
 	if _, err := manager.Stats(mdlArgs.topic); err != nil {
 		logrus.Fatalf("invalid source topic: %v, err: %v\n", mdlArgs.topic, err)
 	}
