@@ -40,11 +40,17 @@ var (
 		"0: print nothing; 1: print id, payload, publish time and event time; 2 print id only"
 
 	StartPublishTimeUsage = "start publish time to check\n" +
-		"it must be RFC3339Nano format '2006-01-02T15:04:05.999999999Z07:00'"
+		"it must be RFC3339Nano format '2006-01-02T15:04:05.999999999Z07:00' or 'now'"
+
+	EndPublishTimeUsage = "end publish time to check\n" +
+		"it must be RFC3339Nano format '2006-01-02T15:04:05.999999999Z07:00' or 'now'"
 
 	StartEventTimeUsage = "start event time to check\n" +
 		"processing will be ignored if the event time of messages is zero\n" +
-		"it must be RFC3339Nano format '2006-01-02T15:04:05.999999999Z07:00'"
+		"it must be RFC3339Nano format '2006-01-02T15:04:05.999999999Z07:00' or 'now'"
+
+	EndEventTimeUsage = "end event time to check\n" +
+		"it must be RFC3339Nano format '2006-01-02T15:04:05.999999999Z07:00' or 'now'"
 
 	BatchEnableUsage = "enable publish message in async, or default is send in sync"
 

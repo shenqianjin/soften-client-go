@@ -26,9 +26,12 @@ type iterateOptions struct {
 }
 
 type iterateConsumerOptions struct {
-	subscription   string
+	subscription string
+	// end conditions
 	iterateTimeout uint32
 	matchTimeout   uint32
+	endPublishTime time.Time
+	endEventTime   time.Time
 }
 
 type iterateResult struct {
@@ -138,10 +141,10 @@ type consumerIterateResult struct {
 
 func (ir *consumerIterateResult) PrettyString() string {
 	var unmatchedHandleString string
-	if ir.firstHandledMsg != nil {
+	if ir.unmatchedFirstHandledMsg != nil {
 		unmatchedHandleString = fmt.Sprintf("unmatched-handled: %v [%v - %v]", ir.unmatchedHandled, ir.unmatchedFirstHandledMsg.ID(), ir.unmatchedLastHandledMsg.ID())
 	} else {
-		unmatchedHandleString = fmt.Sprintf("unmatched-handled: %v", ir.matched)
+		unmatchedHandleString = fmt.Sprintf("unmatched-handled: %v", ir.unmatchedHandled)
 	}
 	return fmt.Sprintf("%s, %s", ir.iterateResult.PrettyString(), unmatchedHandleString)
 }
@@ -181,10 +184,27 @@ func iterateInternalByConsumer(options iterateOptions, consumerOptions iterateCo
 	lastIterateTime := time.Time{}
 	lastMatchTime := time.Time{}
 	ticker := time.Tick(time.Second)
+	iterateDone := false
 	for {
 		select {
 		case msg := <-consumer.Chan():
 			logrus.Debugf("started to iterate src mid: %v", msg.ID())
+			// check end
+			if !consumerOptions.endPublishTime.IsZero() {
+				if !msg.PublishTime().Before(consumerOptions.endPublishTime) {
+					logrus.Debugf("break as detected msg publish time is equal or after the end publish time option")
+					iterateDone = true
+					break
+				}
+			}
+			if !consumerOptions.endEventTime.IsZero() && !msg.EventTime().IsZero() {
+				if !msg.EventTime().Before(consumerOptions.endEventTime) {
+					logrus.Debugf("break as detected msg event time is equal or after the end event time option")
+					iterateDone = true
+					break
+				}
+			}
+			// iterator
 			iterated.Add(1)
 			iteratedVal := iterated.Load()
 			lastIterateTime = time.Now()
@@ -226,12 +246,17 @@ func iterateInternalByConsumer(options iterateOptions, consumerOptions iterateCo
 		case <-ticker:
 			if consumerOptions.iterateTimeout > 0 && time.Now().Sub(lastIterateTime).Seconds() > float64(consumerOptions.iterateTimeout) {
 				logrus.Debugf("break as it it over iterate timeout since last iteartion")
+				iterateDone = true
 				break
 			}
 			if consumerOptions.matchTimeout > 0 && time.Now().Sub(lastMatchTime).Seconds() > float64(consumerOptions.matchTimeout) {
 				logrus.Debugf("break as it it over matched timeout since last matched")
+				iterateDone = true
 				break
 			}
+		}
+		if iterateDone {
+			break
 		}
 	}
 	return consumerIterateResult{
