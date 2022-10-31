@@ -13,6 +13,7 @@ import (
 	"github.com/shenqianjin/soften-client-go/soften/config"
 	"github.com/shenqianjin/soften-client-go/soften/decider"
 	"github.com/shenqianjin/soften-client-go/soften/message"
+	"github.com/shenqianjin/soften-client-go/soften/support/util"
 	"github.com/shenqianjin/soften-client-go/test/internal"
 	"github.com/stretchr/testify/assert"
 )
@@ -34,25 +35,29 @@ func TestListen_1Msg_Blocking(t *testing.T) {
 }
 
 func testListenBySingleStatus(t *testing.T, status string) {
-	topic := internal.GenerateTestTopic(internal.PrefixTestListen)
-	storedTopic := topic
-	if status != string(message.StatusReady) {
-		st, err := message.StatusOf(status)
+	groundTopic := internal.GenerateTestTopic(internal.PrefixTestListen)
+
+	pTopics := make([]string, 0)
+	pTopics = append(pTopics, groundTopic)
+	if status != message.StatusReady.String() {
+		fTopics, err := util.FormatTopics(groundTopic, []string{message.L1.String()}, []string{status}, internal.TestSubscriptionName())
 		assert.Nil(t, err)
-		storedTopic = internal.FormatStatusTopic(topic, internal.TestSubscriptionName(), "", st.TopicSuffix())
+		pTopics = append(pTopics, fTopics...)
 	}
-	manager := admin.NewAdminManager(internal.DefaultPulsarHttpUrl)
-	// clean up topic
-	internal.CleanUpTopic(t, manager, storedTopic)
-	defer func() {
-		internal.CleanUpTopic(t, manager, storedTopic)
-	}()
+	manager := admin.NewRobustTopicManager(internal.DefaultPulsarHttpUrl)
+
+	// clean up testTopic
+	internal.CleanUpTopics(t, manager, pTopics...)
+	defer internal.CleanUpTopics(t, manager, pTopics...)
+	// create topic if not found in case broker closes auto creation
+	internal.CreateTopicsIfNotFound(t, manager, pTopics, 0)
+
 	// create client
 	client := internal.NewClient(internal.DefaultPulsarUrl)
 	defer client.Close()
 	// create producer
 	producer, err := client.CreateProducer(config.ProducerConfig{
-		Topic:          topic,
+		Topic:          groundTopic,
 		TransferEnable: config.True(),
 		Transfer:       &config.TransferPolicy{ConnectInSyncEnable: true},
 	}, checker.PrevSendTransfer(func(ctx context.Context, msg *message.ProducerMessage) checker.CheckStatus {
@@ -70,12 +75,12 @@ func testListenBySingleStatus(t *testing.T, status string) {
 	if status == string(message.StatusReady) {
 		msgID, err = producer.Send(context.Background(), internal.GenerateProduceMessage(internal.Size1K))
 	} else {
-		msgID, err = producer.Send(context.Background(), internal.GenerateProduceMessage(internal.Size1K, "routeTopic", storedTopic))
+		msgID, err = producer.Send(context.Background(), internal.GenerateProduceMessage(internal.Size1K, "routeTopic", pTopics[len(pTopics)-1]))
 	}
 	assert.Nil(t, err)
 	fmt.Println("produced message: ", msgID)
 	// check send stats
-	stats, err := manager.Stats(storedTopic)
+	stats, err := manager.Stats(pTopics[len(pTopics)-1])
 	assert.Nil(t, err)
 	assert.Equal(t, 1, stats.MsgInCounter)
 
@@ -84,10 +89,11 @@ func testListenBySingleStatus(t *testing.T, status string) {
 		RetryingEnable: config.ToPointer(string(message.StatusRetrying) == status), // enable retrying if matches
 		PendingEnable:  config.ToPointer(string(message.StatusPending) == status),  // enable pending if matches
 		BlockingEnable: config.ToPointer(string(message.StatusBlocking) == status), // enable blocking if matches
+		DeadEnable:     config.ToPointer(string(message.StatusDead) == status),
 	}
 	// create listener
 	listener := internal.CreateListener(client, config.ConsumerConfig{
-		Topic:                       topic,
+		Topic:                       groundTopic,
 		SubscriptionName:            internal.TestSubscriptionName(),
 		SubscriptionInitialPosition: pulsar.SubscriptionPositionEarliest,
 		LevelPolicy:                 leveledPolicy,
@@ -105,7 +111,7 @@ func testListenBySingleStatus(t *testing.T, status string) {
 	// wait for consuming the message
 	time.Sleep(50 * time.Millisecond)
 	// check stats
-	stats, err = manager.Stats(storedTopic)
+	stats, err = manager.Stats(pTopics[len(pTopics)-1])
 	assert.Nil(t, err)
 	assert.Equal(t, 1, stats.MsgOutCounter)
 	assert.Equal(t, stats.MsgOutCounter, stats.MsgInCounter)
@@ -114,36 +120,25 @@ func testListenBySingleStatus(t *testing.T, status string) {
 }
 
 func TestListen_4Msg_Ready_Retrying_Pending_Blocking(t *testing.T) {
-	topic := internal.GenerateTestTopic(internal.PrefixTestListen)
+	groundTopic := internal.GenerateTestTopic(internal.PrefixTestListen)
 	// format topics
 	statuses := []string{string(message.StatusReady), string(message.StatusRetrying), string(message.StatusPending), string(message.StatusBlocking)}
-	storedTopics := make([]string, len(statuses))
-	for index, status := range statuses {
-		statusTopic := topic
-		if status != string(message.StatusReady) {
-			st, err := message.StatusOf(status)
-			assert.Nil(t, err)
-			statusTopic = internal.FormatStatusTopic(topic, internal.TestSubscriptionName(), "", st.TopicSuffix())
-		}
-		storedTopics[index] = statusTopic
-	}
+	pTopics, err := util.FormatTopics(groundTopic, []string{message.L1.String()}, statuses, internal.TestSubscriptionName())
+	assert.Nil(t, err)
+	manager := admin.NewRobustTopicManager(internal.DefaultPulsarHttpUrl)
 
-	manager := admin.NewAdminManager(internal.DefaultPulsarHttpUrl)
-	// clean up topic
-	for _, storedTopic := range storedTopics {
-		internal.CleanUpTopic(t, manager, storedTopic)
-	}
-	defer func() {
-		for _, storedTopic := range storedTopics {
-			internal.CleanUpTopic(t, manager, storedTopic)
-		}
-	}()
+	// clean up testTopic
+	internal.CleanUpTopics(t, manager, pTopics...)
+	defer internal.CleanUpTopics(t, manager, pTopics...)
+	// create topic if not found in case broker closes auto creation
+	internal.CreateTopicsIfNotFound(t, manager, pTopics, 0)
+
 	// create client
 	client := internal.NewClient(internal.DefaultPulsarUrl)
 	defer client.Close()
 	// create producer
 	producer, err := client.CreateProducer(config.ProducerConfig{
-		Topic:          topic,
+		Topic:          groundTopic,
 		TransferEnable: config.True(),
 		Transfer:       &config.TransferPolicy{ConnectInSyncEnable: true},
 	}, checker.PrevSendTransfer(func(ctx context.Context, msg *message.ProducerMessage) checker.CheckStatus {
@@ -157,13 +152,9 @@ func TestListen_4Msg_Ready_Retrying_Pending_Blocking(t *testing.T) {
 	}
 	defer producer.Close()
 	// send messages
-	for _, storedTopic := range storedTopics {
+	for _, storedTopic := range pTopics {
 		var msgID pulsar.MessageID
-		if storedTopic == topic { // ready status
-			msgID, err = producer.Send(context.Background(), internal.GenerateProduceMessage(internal.Size1K))
-		} else {
-			msgID, err = producer.Send(context.Background(), internal.GenerateProduceMessage(internal.Size1K, "routeTopic", storedTopic))
-		}
+		msgID, err = producer.Send(context.Background(), internal.GenerateProduceMessage(internal.Size1K, "routeTopic", storedTopic))
 		assert.Nil(t, err)
 		fmt.Println("produced message: ", msgID)
 		// check send stats
@@ -178,10 +169,11 @@ func TestListen_4Msg_Ready_Retrying_Pending_Blocking(t *testing.T) {
 		RetryingEnable: config.True(), // enable retrying if matches
 		PendingEnable:  config.True(), // enable pending if matches
 		BlockingEnable: config.True(), // enable blocking if matches
+		DeadEnable:     config.False(),
 	}
 	// create listener
 	listener := internal.CreateListener(client, config.ConsumerConfig{
-		Topic:                       topic,
+		Topic:                       groundTopic,
 		SubscriptionName:            internal.TestSubscriptionName(),
 		SubscriptionInitialPosition: pulsar.SubscriptionPositionEarliest,
 		LevelPolicy:                 leveledPolicy,
@@ -199,7 +191,7 @@ func TestListen_4Msg_Ready_Retrying_Pending_Blocking(t *testing.T) {
 	// wait for consuming the message
 	time.Sleep(100 * time.Millisecond)
 	// check stats
-	for _, storedTopic := range storedTopics {
+	for _, storedTopic := range pTopics {
 		stats, err := manager.Stats(storedTopic)
 		assert.Nil(t, err)
 		assert.Equal(t, 1, stats.MsgOutCounter)

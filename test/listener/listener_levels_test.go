@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"log"
-	"strings"
 	"testing"
 	"time"
 
@@ -14,6 +13,7 @@ import (
 	"github.com/shenqianjin/soften-client-go/soften/config"
 	"github.com/shenqianjin/soften-client-go/soften/decider"
 	"github.com/shenqianjin/soften-client-go/soften/message"
+	"github.com/shenqianjin/soften-client-go/soften/support/util"
 	"github.com/shenqianjin/soften-client-go/test/internal"
 	"github.com/stretchr/testify/assert"
 )
@@ -55,33 +55,30 @@ func TestListen_7Msg_AllLevels(t *testing.T) {
 }
 
 func testListenByMultiLevels(t *testing.T, levels message.Levels) {
-	testTopic := internal.GenerateTestTopic(internal.PrefixTestListen)
+	groundTopic := internal.GenerateTestTopic(internal.PrefixTestListen)
 	// format topics
-	storedTopics := make([]string, len(levels))
-	for index, level := range levels {
-		storedTopic := testTopic
-		if level != message.L1 {
-			storedTopic = testTopic + "-" + strings.ToUpper(level.String())
-		}
-		storedTopics[index] = storedTopic
+	lvls := make([]string, 0)
+	for _, level := range levels {
+		lvls = append(lvls, level.String())
 	}
+	fTopics, err := util.FormatTopics(groundTopic, lvls, []string{message.StatusReady.String()}, "")
+	assert.Nil(t, err)
+	pTopics := []string{groundTopic} // L1 first
+	pTopics = append(pTopics, fTopics...)
+	manager := admin.NewRobustTopicManager(internal.DefaultPulsarHttpUrl)
 
-	manager := admin.NewAdminManager(internal.DefaultPulsarHttpUrl)
 	// clean up testTopic
-	for _, storedTopic := range storedTopics {
-		internal.CleanUpTopic(t, manager, storedTopic)
-	}
-	defer func() {
-		for _, storedTopic := range storedTopics {
-			internal.CleanUpTopic(t, manager, storedTopic)
-		}
-	}()
+	internal.CleanUpTopics(t, manager, pTopics...)
+	defer internal.CleanUpTopics(t, manager, pTopics...)
+	// create topic if not found in case broker closes auto creation
+	internal.CreateTopicsIfNotFound(t, manager, pTopics, 0)
+
 	// create client
 	client := internal.NewClient(internal.DefaultPulsarUrl)
 	defer client.Close()
 	// create producer
 	producer, err := client.CreateProducer(config.ProducerConfig{
-		Topic:          testTopic,
+		Topic:          groundTopic,
 		TransferEnable: config.True(),
 		Transfer:       &config.TransferPolicy{ConnectInSyncEnable: true},
 	}, checker.PrevSendTransfer(func(ctx context.Context, msg *message.ProducerMessage) checker.CheckStatus {
@@ -96,7 +93,7 @@ func testListenByMultiLevels(t *testing.T, levels message.Levels) {
 	defer producer.Close()
 	// send messages
 	for index, level := range levels {
-		storedTopic := storedTopics[index]
+		storedTopic := pTopics[index+1]
 		var msgID pulsar.MessageID
 		if level == message.L1 { // ready level
 			msgID, err = producer.Send(context.Background(), internal.GenerateProduceMessage(internal.Size1K))
@@ -115,10 +112,11 @@ func testListenByMultiLevels(t *testing.T, levels message.Levels) {
 
 	// create listener
 	listener := internal.CreateListener(client, config.ConsumerConfig{
-		Topic:                       testTopic,
+		Topic:                       groundTopic,
 		SubscriptionName:            internal.TestSubscriptionName(),
 		SubscriptionInitialPosition: pulsar.SubscriptionPositionEarliest,
 		Levels:                      levels,
+		LevelPolicy:                 &config.LevelPolicy{DeadEnable: config.False()},
 	})
 	defer listener.Close()
 	// listener starts
@@ -133,7 +131,7 @@ func testListenByMultiLevels(t *testing.T, levels message.Levels) {
 	// wait for consuming the message
 	time.Sleep(100 * time.Millisecond)
 	// check stats
-	for _, storedTopic := range storedTopics {
+	for _, storedTopic := range pTopics[1:] {
 		stats, err := manager.Stats(storedTopic)
 		assert.Nil(t, err)
 		assert.Equal(t, 1, stats.MsgOutCounter)
