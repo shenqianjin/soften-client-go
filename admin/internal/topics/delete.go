@@ -20,9 +20,16 @@ type deleteArgs struct {
 func newDeleteCommand(rtArgs *internal.RootArgs, mdlArgs *topicsArgs) *cobra.Command {
 	cmdArgs := &deleteArgs{}
 	cmd := &cobra.Command{
-		Use:   "delete ",
-		Short: "Delete soften topic or topics.",
-		Args:  cobra.MinimumNArgs(1),
+		Use: "delete ",
+		Short: "Delete soften topic or topics by ground topic.\n" +
+			"\n" +
+			"Exact 1 argument like the below format is necessary: \n" +
+			"  <schema>://<tenant>/<namespace>/<topic>\n" +
+			"  <tenant>/<namespace>/<topic>\n" +
+			"  <topic>",
+		Example: "(1) soften-admin topics delete public/default/test\n" +
+			"(2) soften-admin topics delete persistent://business/finance/equity -A",
+		Args: cobra.MinimumNArgs(1),
 		Run: func(cmd *cobra.Command, args []string) {
 			cmdArgs.groundTopic = args[0]
 			deleteTopics(rtArgs, mdlArgs, cmdArgs)
@@ -36,14 +43,19 @@ func newDeleteCommand(rtArgs *internal.RootArgs, mdlArgs *topicsArgs) *cobra.Com
 }
 
 func deleteTopics(rtArgs *internal.RootArgs, mdlArgs *topicsArgs, cmdArgs *deleteArgs) {
+	namespaceTopic, err := util.ParseNamespaceTopic(cmdArgs.groundTopic)
+	if err != nil {
+		logrus.Fatalf("list \"%s\" failed: %v\n", cmdArgs.groundTopic, err)
+	} else if namespaceTopic.ShortTopic == "" {
+		logrus.Fatalf("list \"%s\" failed: %v\n", cmdArgs.groundTopic, "not found topic")
+	}
 	var topics []string
-	var err error
 	if cmdArgs.all {
 		// query topics from broker
 		topics, err = queryTopicsFromBrokerByOptions(queryOptions{
-			url:         rtArgs.Url,
-			groundTopic: cmdArgs.groundTopic,
-			partitioned: cmdArgs.partitioned,
+			url:            rtArgs.Url,
+			namespaceTopic: *namespaceTopic,
+			partitioned:    cmdArgs.partitioned,
 		})
 		if err == nil && len(topics) == 0 {
 			err = errors.New("topic not existed")
@@ -55,7 +67,7 @@ func deleteTopics(rtArgs *internal.RootArgs, mdlArgs *topicsArgs, cmdArgs *delet
 		// filter by options
 		if mdlArgs.level != "" || mdlArgs.status != "" || mdlArgs.subscription != "" {
 			matchedTopics := make([]string, 0)
-			expectedTopics := util.FormatTopics(cmdArgs.groundTopic, mdlArgs.level, mdlArgs.status, mdlArgs.subscription)
+			expectedTopics := util.FormatTopics(namespaceTopic.FullName, mdlArgs.level, mdlArgs.status, mdlArgs.subscription)
 			for _, t := range expectedTopics {
 				if slices.Contains(topics, t) {
 					matchedTopics = append(matchedTopics, t)
@@ -68,6 +80,9 @@ func deleteTopics(rtArgs *internal.RootArgs, mdlArgs *topicsArgs, cmdArgs *delet
 		logrus.Fatalf("delete \"%s\" failed: %v\n", cmdArgs.groundTopic, err)
 	}
 
+	if len(topics) == 0 {
+		logrus.Warn("Not Found")
+	}
 	// delete one by one
 	manager := admin.NewRobustTopicManager(rtArgs.Url)
 	for _, topic := range topics {

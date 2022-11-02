@@ -40,7 +40,7 @@ var (
 	PrintProgressIterateIntervalUsage = "iterate interval to print progress"
 	PrintProgressRecallIntervalUsage  = "recall interval to print progress"
 	PrintModeUsage                    = "mode of print these matched messages\n" +
-		"0: print nothing; 1: print id, payload, publish time and event time; 2 print id only"
+		"0: print nothing; 1 print id only; 2: print id, payload, publish time and event time; "
 
 	StartPublishTimeUsage = "start publish time to check\n" +
 		"it must be RFC3339Nano format '2006-01-02T15:04:05.999999999Z07:00' or 'now'"

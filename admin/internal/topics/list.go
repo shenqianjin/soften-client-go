@@ -14,19 +14,27 @@ import (
 )
 
 type listArgs struct {
-	groundTopic string
-	partitioned bool
-	all         bool
+	namespaceOrTopic string
+	partitioned      bool
+	all              bool
 }
 
 func newListCommand(rtArgs *internal.RootArgs, mdlArgs *topicsArgs) *cobra.Command {
 	cmdArgs := &listArgs{}
 	cmd := &cobra.Command{
-		Use:   "list ",
-		Short: "List soften topic or topics (namespace or ground topic).",
-		Args:  cobra.ExactArgs(1),
+		Use: "list ",
+		Short: "List soften topic or topics by namespace or ground topic.\n" +
+			"\n" +
+			"Exact 1 argument like the below format is necessary: \n" +
+			"  <schema>://<tenant>/<namespace>/<topic>\n" +
+			"  <schema>://<tenant>/<namespace>\n" +
+			"  <tenant>/<namespace>/<topic>\n" +
+			"  <topic>",
+		Example: "(1) soften-admin topics list public/default\n" +
+			"(2) soften-admin topics list persistent://business/finance/equity -P",
+		Args: cobra.ExactArgs(1),
 		Run: func(cmd *cobra.Command, args []string) {
-			cmdArgs.groundTopic = args[0]
+			cmdArgs.namespaceOrTopic = args[0]
 			listTopics(rtArgs, mdlArgs, cmdArgs)
 		},
 	}
@@ -40,19 +48,23 @@ func newListCommand(rtArgs *internal.RootArgs, mdlArgs *topicsArgs) *cobra.Comma
 }
 
 func listTopics(rtArgs *internal.RootArgs, mdlArgs *topicsArgs, cmdArgs *listArgs) {
+	namespaceTopic, err := util.ParseNamespaceTopic(cmdArgs.namespaceOrTopic)
+	if err != nil {
+		logrus.Fatalf("list \"%s\" failed: %v\n", cmdArgs.namespaceOrTopic, err)
+	}
 	topics, err := queryTopicsFromBrokerByOptions(queryOptions{
-		url:         rtArgs.Url,
-		groundTopic: cmdArgs.groundTopic,
-		partitioned: cmdArgs.partitioned,
+		url:            rtArgs.Url,
+		namespaceTopic: *namespaceTopic,
+		partitioned:    cmdArgs.partitioned,
 	})
 	if err != nil {
-		logrus.Fatalf("list \"%s\" failed: %v\n", cmdArgs.groundTopic, err)
+		logrus.Fatalf("list \"%s\" failed: %v\n", cmdArgs.namespaceOrTopic, err)
 	}
 	// filter by options
-	if !cmdArgs.all {
+	if !cmdArgs.all && namespaceTopic.ShortTopic != "" {
 		if mdlArgs.level != "" || mdlArgs.status != "" || mdlArgs.subscription != "" {
 			matchedTopics := make([]string, 0)
-			expectedTopics := util.FormatTopics(cmdArgs.groundTopic, mdlArgs.level, mdlArgs.status, mdlArgs.subscription)
+			expectedTopics := util.FormatTopics(namespaceTopic.FullName, mdlArgs.level, mdlArgs.status, mdlArgs.subscription)
 			for _, t := range expectedTopics {
 				if slices.Contains(topics, t) {
 					matchedTopics = append(matchedTopics, t)
@@ -62,6 +74,9 @@ func listTopics(rtArgs *internal.RootArgs, mdlArgs *topicsArgs, cmdArgs *listArg
 		}
 	}
 
+	if len(topics) == 0 {
+		logrus.Warn("Not Found")
+	}
 	sort.Strings(topics)
 	for _, topic := range topics {
 		fmt.Println(topic)
@@ -69,32 +84,19 @@ func listTopics(rtArgs *internal.RootArgs, mdlArgs *topicsArgs, cmdArgs *listArg
 }
 
 type queryOptions struct {
-	url string
-
-	groundTopic string
-	partitioned bool
+	url            string
+	namespaceTopic util.NamespaceTopic
+	partitioned    bool
 }
 
 func queryTopicsFromBrokerByOptions(options queryOptions) ([]string, error) {
-	namespace := "public/default"
-	// remove schema
-	if ti := strings.Index(options.groundTopic, "://"); ti > 0 {
-		namespace = options.groundTopic[ti+3:]
-	}
-	// remove raw topic name
-	if strings.Contains(namespace, "/") {
-		segments := strings.Split(namespace, "/")
-		if len(segments) > 2 {
-			namespace = strings.Join(segments[0:1], "/")
-		}
-	}
 	// query topics from broker
 	var queriedTopics []string
 	var err error
 	if options.partitioned {
-		queriedTopics, err = admin.NewPartitionedTopicManager(options.url).List(namespace)
+		queriedTopics, err = admin.NewPartitionedTopicManager(options.url).List(options.namespaceTopic.Namespace)
 	} else {
-		queriedTopics, err = admin.NewNonPartitionedTopicManager(options.url).List(namespace)
+		queriedTopics, err = admin.NewNonPartitionedTopicManager(options.url).List(options.namespaceTopic.Namespace)
 	}
 	if err != nil {
 		logrus.Fatalln(err)
@@ -103,7 +105,7 @@ func queryTopicsFromBrokerByOptions(options queryOptions) ([]string, error) {
 	// match by ground topic (may namespace as well)
 	matchedTopics := make([]string, 0)
 	for _, topic := range queriedTopics {
-		if strings.Contains(topic, options.groundTopic) {
+		if strings.HasPrefix(topic, options.namespaceTopic.FullName) {
 			matchedTopics = append(matchedTopics, topic)
 		}
 	}

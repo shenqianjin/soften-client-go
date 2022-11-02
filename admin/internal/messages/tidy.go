@@ -35,8 +35,16 @@ func newTidyCommand(rtArgs *internal.RootArgs, mdlArgs *messagesArgs) *cobra.Com
 	cmd := &cobra.Command{
 		Use: "tidy ",
 		Short: "Tidy messages of an topic by discarding or transferring.\n" +
-			"Matched ones can be transferred to another topic or discarded.\n" +
-			"So does unmatched ones.",
+			"Matched ones with condition can be transferred to another topic or discarded.\n" +
+			"So does unmatched ones.\n" +
+			"\n" +
+			"Exact 1 argument like the below format is necessary: \n" +
+			"  <schema>://<tenant>/<namespace>/<topic>\n" +
+			"  <tenant>/<namespace>/<topic>\n" +
+			"  <topic>",
+		Example: "(1) soften-admin messages tidy test -c \"age != nil && age <= 10\"\n" +
+			"(2) soften-admin messages tidy public/default/test -c \"age != nil && age <= 10\"\n" +
+			"(3) soften-admin messages tidy persistent://business/finance/equity -c \"age != nil && age <= 10\"",
 		Args: cobra.MinimumNArgs(1),
 		Run: func(cmd *cobra.Command, args []string) {
 			mdlArgs.topic = args[0]

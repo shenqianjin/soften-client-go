@@ -23,9 +23,18 @@ type recallArgs struct {
 func newRecallCommand(rtArgs *internal.RootArgs, mdlArgs *messagesArgs) *cobra.Command {
 	cmdArgs := &recallArgs{}
 	cmd := &cobra.Command{
-		Use:   "recall ",
-		Short: "Recall messages of a source topic (DQL generally but not only) to anther one.",
-		Args:  cobra.MinimumNArgs(2),
+		Use: "recall ",
+		Short: "Iterate messages of a source topic (DQL generally but not only) and then\n" +
+			"Recall matched ones with condition to anther one topic.\n" +
+			"\n" +
+			"Exact 1 argument like the below format is necessary: \n" +
+			"  <schema>://<tenant>/<namespace>/<topic>\n" +
+			"  <tenant>/<namespace>/<topic>\n" +
+			"  <topic>",
+		Example: "(1) soften-admin messages recall test -c \"age != nil && age <= 10\"\n" +
+			"(2) soften-admin messages recall public/default/test -c \"age != nil && age <= 10\"\n" +
+			"(3) soften-admin messages recall persistent://business/finance/equity -c \"age != nil && age <= 10\"",
+		Args: cobra.MinimumNArgs(2),
 		Run: func(cmd *cobra.Command, args []string) {
 			mdlArgs.topic = args[0]
 			cmdArgs.destTopic = args[1]

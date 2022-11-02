@@ -1,6 +1,8 @@
 package util
 
 import (
+	"errors"
+	"fmt"
 	"strconv"
 	"strings"
 
@@ -12,6 +14,55 @@ import (
 const (
 	partitionedTopicSuffix = "-partition-"
 )
+
+type NamespaceTopic struct {
+	Namespace      string
+	shortNamespace string
+	ShortTopic     string
+	FullName       string
+}
+
+func ParseNamespaceTopic(namespaceOrTopic string) (*NamespaceTopic, error) {
+	if namespaceOrTopic == "" {
+		return nil, errors.New("empty namespace or topic is invalid")
+	}
+	schema := "persistent"
+	// remove schema
+	if ti := strings.Index(namespaceOrTopic, "://"); ti > 0 {
+		schema = namespaceOrTopic[0:ti]
+		namespaceOrTopic = namespaceOrTopic[ti+3:]
+	}
+	// parse topic and namespace
+	shortTopic := ""
+	namespace := ""
+	shortNamespace := ""
+	segments := strings.Split(namespaceOrTopic, "/")
+	switch len(segments) {
+	case 1:
+		namespace = "public/default"
+		shortNamespace = "default"
+		shortTopic = namespaceOrTopic
+	case 2:
+		namespace = namespaceOrTopic
+		shortNamespace = segments[1]
+	case 3:
+		namespace = strings.Join(segments[0:2], "/")
+		shortNamespace = segments[1]
+		shortTopic = segments[2]
+	default:
+		return nil, errors.New(fmt.Sprintf("invalid namespace or topic name: %v", namespace))
+	}
+	nt := &NamespaceTopic{
+		Namespace:      namespace,
+		shortNamespace: shortNamespace,
+		ShortTopic:     shortTopic,
+		FullName:       schema + "://" + namespace,
+	}
+	if shortTopic != "" {
+		nt.FullName = nt.FullName + "/" + shortTopic
+	}
+	return nt, nil
+}
 
 func FormatTopics(groundTopic string, levelStr, statusStr string, subscription string) []string {
 	topics := make([]string, 0)

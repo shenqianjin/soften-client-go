@@ -13,41 +13,6 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-func formatMessage4Print(msg pulsar.Message) string {
-	if msg == nil {
-		return "unknown"
-	}
-	return formatMessage(msg).String()
-}
-
-func formatMessage(msg pulsar.Message) *prettyMessage {
-	pm := &prettyMessage{
-		mid:         msg.ID(),
-		payload:     string(msg.Payload()),
-		properties:  msg.Properties(),
-		publishTime: msg.PublishTime(),
-		eventTime:   msg.EventTime(),
-	}
-	return pm
-}
-
-type prettyMessage struct {
-	mid         pulsar.MessageID
-	payload     string
-	properties  map[string]string
-	publishTime time.Time
-	eventTime   time.Time
-}
-
-func (msg *prettyMessage) String() string {
-	if bytes, err := json.Marshal(msg); err != nil {
-		logrus.Fatal(err)
-		return ""
-	} else {
-		return string(bytes)
-	}
-}
-
 func parseTimeString(timeStr string, optionName string) time.Time {
 	t := time.Time{}
 	if timeStr == "" {

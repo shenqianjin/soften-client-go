@@ -16,9 +16,17 @@ type iterateArgs struct {
 func newIterateCommand(rtArgs *internal.RootArgs, mdlArgs *messagesArgs) *cobra.Command {
 	cmdArgs := &iterateArgs{}
 	cmd := &cobra.Command{
-		Use:   "iterate ",
-		Short: "Iterate messages of a source topic and print matched ones with conditions.",
-		Args:  cobra.MinimumNArgs(1),
+		Use: "iterate ",
+		Short: "Iterate messages of a source topic and print matched ones with conditions.\n" +
+			"\n" +
+			"Exact 1 argument like the below format is necessary: \n" +
+			"  <schema>://<tenant>/<namespace>/<topic>\n" +
+			"  <tenant>/<namespace>/<topic>\n" +
+			"  <topic>",
+		Example: "(1) soften-admin messages iterate test -c \"age != nil && age <= 10\"\n" +
+			"(2) soften-admin messages iterate public/default/test -c \"age != nil && age <= 10\"\n" +
+			"(3) soften-admin messages iterate persistent://business/finance/equity -c \"age != nil && age <= 10\"",
+		Args: cobra.MinimumNArgs(1),
 		Run: func(cmd *cobra.Command, args []string) {
 			mdlArgs.topic = args[0]
 			iterateMessages(rtArgs, mdlArgs, cmdArgs)
@@ -42,9 +50,9 @@ func iterateMessages(rtArgs *internal.RootArgs, mdlArgs *messagesArgs, cmdArgs *
 		}
 		switch cmdArgs.printMode {
 		case 1:
-			logrus.Printf("matched msg: %v", formatMessage4Print(msg))
-		case 2:
 			logrus.Printf("matched msg: %v", msg.ID())
+		case 2:
+			logrus.Printf("matched msg: %v", util.FormatMessage4Print(msg))
 		default:
 			// print nothing
 		}
