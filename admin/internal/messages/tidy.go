@@ -33,8 +33,9 @@ type tidyArgs struct {
 func newTidyCommand(rtArgs *internal.RootArgs, mdlArgs *messagesArgs) *cobra.Command {
 	cmdArgs := &tidyArgs{}
 	cmd := &cobra.Command{
-		Use: "tidy ",
-		Short: "Tidy messages of an topic by discarding or transferring.\n" +
+		Use:   "tidy ",
+		Short: "Tidy messages of an topic by discarding or transferring.",
+		Long: "Tidy messages of an topic by discarding or transferring.\n" +
 			"Matched ones with condition can be transferred to another topic or discarded.\n" +
 			"So does unmatched ones.\n" +
 			"\n" +
@@ -42,9 +43,12 @@ func newTidyCommand(rtArgs *internal.RootArgs, mdlArgs *messagesArgs) *cobra.Com
 			"  <schema>://<tenant>/<namespace>/<topic>\n" +
 			"  <tenant>/<namespace>/<topic>\n" +
 			"  <topic>",
-		Example: "(1) soften-admin messages tidy test -c \"age != nil && age <= 10\"\n" +
-			"(2) soften-admin messages tidy public/default/test -c \"age != nil && age <= 10\"\n" +
-			"(3) soften-admin messages tidy persistent://business/finance/equity -c \"age != nil && age <= 10\"",
+
+		Example: "(1) soften-admin messages tidy test -c '" + SampleConditionAgeLessEqualThan10 + "'\n" +
+			"(2) soften-admin messages tidy public/default/test -c '" + SampleConditionUidRangeAndNameStartsWithNo12 + "'\n" +
+			"(3) soften-admin messages tidy persistent://business/finance/equity -c '" + SampleConditionSpouseAgeLessThan40 + "'\n" +
+			"(4) soften-admin messages tidy test -c '" + SampleConditionFriendsHasOneOfAgeLessEqualThan10 + "'\n" +
+			"(5) soften-admin messages tidy test -c '" + SampleConditionAgeLessEqualThan10OrNameStartsWithNo12 + "'",
 		Args: cobra.MinimumNArgs(1),
 		Run: func(cmd *cobra.Command, args []string) {
 			mdlArgs.topic = args[0]

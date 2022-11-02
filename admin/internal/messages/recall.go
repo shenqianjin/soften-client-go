@@ -23,17 +23,21 @@ type recallArgs struct {
 func newRecallCommand(rtArgs *internal.RootArgs, mdlArgs *messagesArgs) *cobra.Command {
 	cmdArgs := &recallArgs{}
 	cmd := &cobra.Command{
-		Use: "recall ",
-		Short: "Iterate messages of a source topic (DQL generally but not only) and then\n" +
+		Use:   "recall ",
+		Short: "Iterate messages of a source topic (DQL generally but not only) and recall to another topic or discard.",
+		Long: "Iterate messages of a source topic (DQL generally but not only) and then\n" +
 			"Recall matched ones with condition to anther one topic.\n" +
 			"\n" +
 			"Exact 1 argument like the below format is necessary: \n" +
 			"  <schema>://<tenant>/<namespace>/<topic>\n" +
 			"  <tenant>/<namespace>/<topic>\n" +
 			"  <topic>",
-		Example: "(1) soften-admin messages recall test -c \"age != nil && age <= 10\"\n" +
-			"(2) soften-admin messages recall public/default/test -c \"age != nil && age <= 10\"\n" +
-			"(3) soften-admin messages recall persistent://business/finance/equity -c \"age != nil && age <= 10\"",
+
+		Example: "(1) soften-admin messages recall test test02 -c '" + SampleConditionAgeLessEqualThan10 + "'\n" +
+			"(2) soften-admin messages recall public/default/test test02 -c '" + SampleConditionUidRangeAndNameStartsWithNo12 + "'\n" +
+			"(3) soften-admin messages recall persistent://business/finance/equity test02 -c '" + SampleConditionSpouseAgeLessThan40 + "'\n" +
+			"(4) soften-admin messages recall test test02 -c '" + SampleConditionFriendsHasOneOfAgeLessEqualThan10 + "'\n" +
+			"(5) soften-admin messages recall test test02 -c '" + SampleConditionAgeLessEqualThan10OrNameStartsWithNo12 + "'",
 		Args: cobra.MinimumNArgs(2),
 		Run: func(cmd *cobra.Command, args []string) {
 			mdlArgs.topic = args[0]

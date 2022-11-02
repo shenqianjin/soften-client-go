@@ -22,8 +22,9 @@ type listArgs struct {
 func newListCommand(rtArgs *internal.RootArgs, mdlArgs *topicsArgs) *cobra.Command {
 	cmdArgs := &listArgs{}
 	cmd := &cobra.Command{
-		Use: "list ",
-		Short: "List soften topic or topics by namespace or ground topic.\n" +
+		Use:   "list ",
+		Short: "List soften topic or topics by namespace or ground topic.",
+		Long: "List soften topic or topics by namespace or ground topic.\n" +
 			"\n" +
 			"Exact 1 argument like the below format is necessary: \n" +
 			"  <schema>://<tenant>/<namespace>/<topic>\n" +

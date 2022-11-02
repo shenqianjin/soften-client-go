@@ -20,8 +20,9 @@ type updateArgs struct {
 func newUpdateCommand(rtArgs *internal.RootArgs, mdlArgs *topicsArgs) *cobra.Command {
 	cmdArgs := &updateArgs{}
 	cmd := &cobra.Command{
-		Use: "update ",
-		Short: "Update partitions for soften topic or topics by ground topic.\n" +
+		Use:   "update ",
+		Short: "Update partitions for soften topic or topics by ground topic.",
+		Long: "Update partitions for soften topic or topics by ground topic.\n" +
 			"It is only active for partitioned topics.\n" +
 			"\n" +
 			"Exact 1 argument like the below format is necessary: \n" +

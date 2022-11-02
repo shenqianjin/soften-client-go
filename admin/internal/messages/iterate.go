@@ -16,16 +16,19 @@ type iterateArgs struct {
 func newIterateCommand(rtArgs *internal.RootArgs, mdlArgs *messagesArgs) *cobra.Command {
 	cmdArgs := &iterateArgs{}
 	cmd := &cobra.Command{
-		Use: "iterate ",
-		Short: "Iterate messages of a source topic and print matched ones with conditions.\n" +
+		Use:   "iterate ",
+		Short: "Iterate messages of a source topic and print matched ones with conditions.",
+		Long: "Iterate messages of a source topic and print matched ones with conditions.\n" +
 			"\n" +
 			"Exact 1 argument like the below format is necessary: \n" +
 			"  <schema>://<tenant>/<namespace>/<topic>\n" +
 			"  <tenant>/<namespace>/<topic>\n" +
 			"  <topic>",
-		Example: "(1) soften-admin messages iterate test -c \"age != nil && age <= 10\"\n" +
-			"(2) soften-admin messages iterate public/default/test -c \"age != nil && age <= 10\"\n" +
-			"(3) soften-admin messages iterate persistent://business/finance/equity -c \"age != nil && age <= 10\"",
+		Example: "(1) soften-admin messages iterate test -c '" + SampleConditionAgeLessEqualThan10 + "'\n" +
+			"(2) soften-admin messages iterate public/default/test -c '" + SampleConditionUidRangeAndNameStartsWithNo12 + "'\n" +
+			"(3) soften-admin messages iterate persistent://business/finance/equity -c '" + SampleConditionSpouseAgeLessThan40 + "'\n" +
+			"(4) soften-admin messages iterate test -c '" + SampleConditionFriendsHasOneOfAgeLessEqualThan10 + "'\n" +
+			"(5) soften-admin messages iterate test -c '" + SampleConditionAgeLessEqualThan10OrNameStartsWithNo12 + "'",
 		Args: cobra.MinimumNArgs(1),
 		Run: func(cmd *cobra.Command, args []string) {
 			mdlArgs.topic = args[0]

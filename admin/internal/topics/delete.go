@@ -20,8 +20,9 @@ type deleteArgs struct {
 func newDeleteCommand(rtArgs *internal.RootArgs, mdlArgs *topicsArgs) *cobra.Command {
 	cmdArgs := &deleteArgs{}
 	cmd := &cobra.Command{
-		Use: "delete ",
-		Short: "Delete soften topic or topics by ground topic.\n" +
+		Use:   "delete ",
+		Short: "Delete soften topic or topics by ground topic.",
+		Long: "Delete soften topic or topics by ground topic.\n" +
 			"\n" +
 			"Exact 1 argument like the below format is necessary: \n" +
 			"  <schema>://<tenant>/<namespace>/<topic>\n" +

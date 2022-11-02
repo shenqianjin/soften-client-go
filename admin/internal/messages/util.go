@@ -30,7 +30,7 @@ func parseTimeString(timeStr string, optionName string) time.Time {
 
 func parseAndCompileConditions(condition string) []*vm.Program {
 	programs := make([]*vm.Program, 0)
-	conditions := strings.Split(condition, ",")
+	conditions := strings.Split(condition, "\\n")
 	for _, c := range conditions {
 		if program, err := expr.Compile(c); err != nil {
 			logrus.Fatalf("invalid condition: %v, err: %v\n", c, err)
@@ -117,3 +117,13 @@ func publishAsync(producer pulsar.Producer, producerMsg *pulsar.ProducerMessage,
 	}
 	producer.SendAsync(context.Background(), producerMsg, callbackNew)
 }
+
+// ------ helpers ------
+
+const (
+	SampleConditionAgeLessEqualThan10                     = "age != nil && age <= 10"
+	SampleConditionUidRangeAndNameStartsWithNo12          = "uid > 100 && uid < 200 && name startsWith \"No12\""
+	SampleConditionSpouseAgeLessThan40                    = "spouse != nil && spouse.age != nil && spouse.age < 40"
+	SampleConditionFriendsHasOneOfAgeLessEqualThan10      = "friends != nil && any(friends, #.age <= 10)"
+	SampleConditionAgeLessEqualThan10OrNameStartsWithNo12 = "age != nil && age <= 10\nname startsWith \"No12\""
+)

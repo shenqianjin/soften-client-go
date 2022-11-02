@@ -17,8 +17,9 @@ type createArgs struct {
 func newCreateCommand(rtArgs *internal.RootArgs, mdlArgs *topicsArgs) *cobra.Command {
 	cmdArgs := &createArgs{}
 	cmd := &cobra.Command{
-		Use: "create ",
-		Short: "Create soften topic or topics based-on ground topic.\n" +
+		Use:   "create ",
+		Short: "Create soften topic or topics based-on ground topic.",
+		Long: "Create soften topic or topics based-on ground topic.\n" +
 			"\n" +
 			"Exact 1 argument like the below format is necessary: \n" +
 			"  <schema>://<tenant>/<namespace>/<topic>\n" +

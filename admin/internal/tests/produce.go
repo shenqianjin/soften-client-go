@@ -25,8 +25,9 @@ func newProduceCommand(rtArgs *internal.RootArgs, mdlArgs *testsArgs) *cobra.Com
 	cmdArgs := &produceArgs{}
 	mockedDataSample := `{"uid":2007008,"name":"shen","age":12,"spouse":{"uid":2006008,"name":"wang","age":10},"friends":[{"uid":2005008,"name":"zhang","age":11}]}`
 	cmd := &cobra.Command{
-		Use: "produce ",
-		Short: "Produce tests messages with mocked random data" +
+		Use:   "produce ",
+		Short: "Produce tests messages with mocked random data.",
+		Long: "Produce tests messages with mocked random data." +
 			"\n" +
 			"Exact 1 argument like the below format is necessary: \n" +
 			"  <schema>://<tenant>/<namespace>/<topic>\n" +

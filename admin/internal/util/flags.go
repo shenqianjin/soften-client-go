@@ -32,7 +32,7 @@ var (
 
 	ConditionsUsage = "conditions to execute\n" +
 		"an expression is a one-liner that returns a bool value\n" +
-		"separate with ',' and equal to 'or' if more than one\n" +
+		"separate with '\\n' and these lines mean 'or' logic for matching\n" +
 		"see https://github.com/antonmedv/expr/blob/master/docs/Language-Definition.md for grammar"
 
 	AllUsage = "process on all topics including all levels, statuses and subscriptions"
