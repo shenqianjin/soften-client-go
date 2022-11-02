@@ -24,7 +24,7 @@ func NewModuleCmd(rootArgs *internal.RootArgs) *cobra.Command {
 	moduleArgs := &messagesArgs{}
 	cmd := &cobra.Command{
 		Use:   "messages ",
-		Short: "sub command to manage messages",
+		Short: "Process messages such as iterate, recall and tidy.",
 	}
 
 	// parser variables

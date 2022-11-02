@@ -50,7 +50,10 @@ func (msg *prettyMessage) String() string {
 
 func parseTimeString(timeStr string, optionName string) time.Time {
 	t := time.Time{}
-	if timeStr != "" {
+	if timeStr == "" {
+	} else if timeStr == "now" || timeStr == "now()" || timeStr == "time.Now()" {
+		t = time.Now()
+	} else if timeStr != "" {
 		var err error
 		t, err = time.Parse(time.RFC3339Nano, timeStr)
 		if err != nil {

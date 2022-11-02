@@ -23,6 +23,8 @@ type tidyArgs struct {
 	subscription                 string //
 	iterateTimeout               uint32 // 终止条件: 能遍历到消息的超时时间
 	matchTimeout                 uint32 // 终止条件: 有能匹配消息的超时时间
+	endPublishTime               string // 终止条件: 发布时间, 支持纳秒精度
+	endEventTime                 string // 终止条件: 事件时间, 支持纳秒精度
 
 	publishBatchEnable bool
 	publishMaxTimes    uint64
@@ -31,9 +33,11 @@ type tidyArgs struct {
 func newTidyCommand(rtArgs *internal.RootArgs, mdlArgs *messagesArgs) *cobra.Command {
 	cmdArgs := &tidyArgs{}
 	cmd := &cobra.Command{
-		Use:   "tidy ",
-		Short: "tidy messages of an topic, matched messages can be published to any topic or discarded, so does unmatched ones",
-		Args:  cobra.MinimumNArgs(1),
+		Use: "tidy ",
+		Short: "Tidy messages of an topic by discarding or transferring.\n" +
+			"Matched ones can be transferred to another topic or discarded.\n" +
+			"So does unmatched ones.",
+		Args: cobra.MinimumNArgs(1),
 		Run: func(cmd *cobra.Command, args []string) {
 			mdlArgs.topic = args[0]
 			tidyMessages(rtArgs, mdlArgs, cmdArgs)
@@ -44,8 +48,12 @@ func newTidyCommand(rtArgs *internal.RootArgs, mdlArgs *messagesArgs) *cobra.Com
 	cmd.Flags().StringVarP(&cmdArgs.subscription, "subscription", "s", "", util.SingleSubscriptionUsage)
 	cmd.Flags().Uint32Var(&cmdArgs.iterateTimeout, "iterate-timeout", 0, "iterate timeout")
 	cmd.Flags().Uint32Var(&cmdArgs.matchTimeout, "match-timeout", 0, "match timeout")
+	cmd.Flags().StringVar(&cmdArgs.endPublishTime, "end-publish-time", "", util.EndPublishTimeUsage)
+	cmd.Flags().StringVar(&cmdArgs.endEventTime, "end-event-time", "", util.EndEventTimeUsage)
+
 	// parse variables for destination
 	cmd.Flags().StringVar(&cmdArgs.matchedTo, "matched-to", "", "topic to publish these matched messages to")
+	cmd.Flags().StringVar(&cmdArgs.unmatchedTo, "unmatched-to", "", "topic to publish these unmatched messages to")
 	cmd.Flags().BoolVar(&cmdArgs.matchedAsDiscard, "matched-as-discard", false, "whether discards these matched messages, it is ignored if '--matched-to' is not empty")
 	cmd.Flags().BoolVar(&cmdArgs.unmatchedAsDiscard, "unmatched-as-discard", false, "whether discards these unmatched messages, it is ignored if '--unmatched-to' is not empty")
 	cmd.Flags().BoolVarP(&cmdArgs.publishBatchEnable, "publish-batch-enable", "b", false, util.BatchEnableUsage)
@@ -63,6 +71,8 @@ func tidyMessages(rtArgs *internal.RootArgs, mdlArgs *messagesArgs, cmdArgs *tid
 	} else if strings.Contains(cmdArgs.subscription, ",") {
 		logrus.Fatalf("multiple subscription names are not supported for this command\n")
 	}
+	endPublishTime := parseTimeString(cmdArgs.endPublishTime, "end-publish-time")
+	endEventTime := parseTimeString(cmdArgs.endEventTime, "end-event-time")
 	// check dest topics
 	if cmdArgs.matchedTo != "" {
 		manager := admin.NewRobustTopicManager(rtArgs.Url)
@@ -168,6 +178,8 @@ func tidyMessages(rtArgs *internal.RootArgs, mdlArgs *messagesArgs, cmdArgs *tid
 		subscription:   cmdArgs.subscription,
 		iterateTimeout: cmdArgs.iterateTimeout,
 		matchTimeout:   cmdArgs.matchTimeout,
+		endPublishTime: endPublishTime,
+		endEventTime:   endEventTime,
 	}, handleFunc)
 
 	if cmdArgs.publishBatchEnable {

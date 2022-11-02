@@ -23,7 +23,9 @@ func NewRootCmd() (*cobra.Command, *RootArgs) {
 				logrus.SetLevel(logrus.DebugLevel)
 			}
 		},
-		Use: "soften-admin",
+		Use: "soften-admin ",
+		Short: "Manage resources such as topics, messages and polices of pulsar messaging system.\n" +
+			"These commands is related to soften client, generally",
 	}
 
 	// parser variables

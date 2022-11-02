@@ -8,63 +8,69 @@ import (
 	"github.com/shenqianjin/soften-client-go/soften/admin"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
+	"golang.org/x/exp/slices"
 )
 
 type updateArgs struct {
-	groundTopic  string
-	status       string
-	level        string
-	subscription string
-	partitions   uint
+	groundTopic string
+	partitions  uint
+	all         bool
 }
 
-func newUpdateCommand(rtArgs *internal.RootArgs) *cobra.Command {
+func newUpdateCommand(rtArgs *internal.RootArgs, mdlArgs *topicsArgs) *cobra.Command {
 	cmdArgs := &updateArgs{}
 	cmd := &cobra.Command{
 		Use:   "update ",
-		Short: "update soften topic or topics",
+		Short: "Update soften topic or topics (only for partitioned).",
 		Args:  cobra.MinimumNArgs(1),
 		Run: func(cmd *cobra.Command, args []string) {
 			cmdArgs.groundTopic = args[0]
-			updateTopics(*rtArgs, cmdArgs)
+			updateTopics(rtArgs, mdlArgs, cmdArgs)
 		},
 	}
-	// parse levels
-	cmd.Flags().StringVarP(&cmdArgs.level, "level", "l", "", util.LevelUsage)
-	// parse statuses
-	cmd.Flags().StringVarP(&cmdArgs.status, "status", "s", "", util.StatusUsage)
-	cmd.Flags().StringVarP(&cmdArgs.subscription, "subscription", "S", "", util.SubscriptionUsage)
-	cmd.Flags().UintVarP(&cmdArgs.partitions, "partitioned", "p", 0, util.PartitionsUsage4Update)
+	// parse variables
+	cmd.Flags().UintVarP(&cmdArgs.partitions, "partitions", "p", 0, util.PartitionsUsage4Update)
+	cmd.Flags().BoolVarP(&cmdArgs.all, "all", "A", false, util.AllUsage)
 
 	return cmd
 }
 
-func updateTopics(rtArgs internal.RootArgs, cmdArgs *updateArgs) {
+func updateTopics(rtArgs *internal.RootArgs, mdlArgs *topicsArgs, cmdArgs *updateArgs) {
 	if cmdArgs.partitions <= 0 {
-		logrus.Fatal("please specify the partitions (with -p or --partitions options) " +
+		logrus.Fatal("please specify the partitions (with -P or --partitions options) " +
 			"and make sure it is more than the original value")
 	}
-	manager := admin.NewPartitionedTopicManager(rtArgs.Url)
-
 	var topics []string
 	var err error
-	if cmdArgs.level != "" || cmdArgs.status != "" || cmdArgs.subscription != "" {
-		topics = util.FormatTopics(cmdArgs.groundTopic, cmdArgs.level, cmdArgs.status, cmdArgs.subscription)
-	} else {
-		topics, err = listAndCheckTopicsByOptions(listOptions{
-			url:          rtArgs.Url,
-			groundTopic:  cmdArgs.groundTopic,
-			subscription: cmdArgs.subscription,
-
+	if cmdArgs.all {
+		// query topics from broker
+		topics, err = queryTopicsFromBrokerByOptions(queryOptions{
+			url:         rtArgs.Url,
+			groundTopic: cmdArgs.groundTopic,
 			partitioned: true,
-			groundOnly:  false,
-			readyOnly:   false,
 		})
+		if err == nil && len(topics) == 0 {
+			err = errors.New("topic not existed")
+		}
+		if err != nil {
+			logrus.Fatalf("updated \"%s\" failed: %v\n", cmdArgs.groundTopic, err)
+		}
+	} else {
+		// filter by options
+		if mdlArgs.level != "" || mdlArgs.status != "" || mdlArgs.subscription != "" {
+			matchedTopics := make([]string, 0)
+			expectedTopics := util.FormatTopics(cmdArgs.groundTopic, mdlArgs.level, mdlArgs.status, mdlArgs.subscription)
+			for _, t := range expectedTopics {
+				if slices.Contains(topics, t) {
+					matchedTopics = append(matchedTopics, t)
+				}
+			}
+			topics = matchedTopics
+		}
 	}
-	if err != nil {
-		logrus.Fatalf("updated \"%s\" failed: %v\n", cmdArgs.groundTopic, err)
-	}
+
 	// update partitions
+	manager := admin.NewPartitionedTopicManager(rtArgs.Url)
 	for _, topic := range topics {
 		err := manager.Update(topic, cmdArgs.partitions)
 		if err != nil {
@@ -73,25 +79,4 @@ func updateTopics(rtArgs internal.RootArgs, cmdArgs *updateArgs) {
 			logrus.Fatalf("updated \"%s\" successfully, partitions is %v now\n", topic, cmdArgs.partitions)
 		}
 	}
-}
-
-// ------ helpers ------
-
-func listAndCheckTopicsByOptions(options listOptions) ([]string, error) {
-	topics, err := listTopicsByOptions(options)
-	if err == nil && len(topics) == 0 {
-		newOptions := options
-		newOptions.partitioned = !options.partitioned
-		newTopics, err1 := listTopicsByOptions(newOptions)
-		if err1 == nil && len(newTopics) > 0 {
-			if options.partitioned {
-				err = errors.New("topic is not partitioned topic")
-			} else {
-				err = errors.New("topic is not non-partitioned topic")
-			}
-		} else {
-			err = errors.New("topic not existed")
-		}
-	}
-	return topics, err
 }

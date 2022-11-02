@@ -10,73 +10,72 @@ import (
 	"github.com/shenqianjin/soften-client-go/soften/admin"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
+	"golang.org/x/exp/slices"
 )
 
 type listArgs struct {
-	groundTopic      string
-	subscription     string
-	partitioned      bool
-	groundOnly       bool
-	readyOnly        bool
-	nonPartitionOnly bool
+	groundTopic string
+	partitioned bool
+	all         bool
 }
 
-func newListCommand(rtArgs *internal.RootArgs) *cobra.Command {
+func newListCommand(rtArgs *internal.RootArgs, mdlArgs *topicsArgs) *cobra.Command {
 	cmdArgs := &listArgs{}
 	cmd := &cobra.Command{
 		Use:   "list ",
-		Short: "list soften topic or topics by ground topic or namespace",
+		Short: "List soften topic or topics (namespace or ground topic).",
 		Args:  cobra.ExactArgs(1),
 		Run: func(cmd *cobra.Command, args []string) {
 			cmdArgs.groundTopic = args[0]
-			listTopics(*rtArgs, cmdArgs)
+			listTopics(rtArgs, mdlArgs, cmdArgs)
 		},
 	}
 
 	flags := cmd.Flags()
 	// parse partition
-	flags.BoolVarP(&cmdArgs.partitioned, "partitioned", "p", false, util.PartitionedUsage)
-	flags.StringVarP(&cmdArgs.subscription, "subscription", "S", "", util.SubscriptionUsage)
-	flags.BoolVarP(&cmdArgs.groundOnly, "ground-only", "g", false, "list L1 topics only")
-	flags.BoolVarP(&cmdArgs.readyOnly, "ready-only", "r", false, "list ready topics only")
+	flags.BoolVarP(&cmdArgs.partitioned, "partitioned", "P", false, util.PartitionedUsage)
+	flags.BoolVarP(&cmdArgs.all, "all", "A", false, util.AllUsage)
 
 	return cmd
 }
 
-func listTopics(rtArgs internal.RootArgs, cmdArgs *listArgs) {
-	topics, err := listTopicsByOptions(listOptions{
-		url:          rtArgs.Url,
-		groundTopic:  cmdArgs.groundTopic,
-		subscription: cmdArgs.subscription,
-
+func listTopics(rtArgs *internal.RootArgs, mdlArgs *topicsArgs, cmdArgs *listArgs) {
+	topics, err := queryTopicsFromBrokerByOptions(queryOptions{
+		url:         rtArgs.Url,
+		groundTopic: cmdArgs.groundTopic,
 		partitioned: cmdArgs.partitioned,
-		groundOnly:  cmdArgs.groundOnly,
-		readyOnly:   cmdArgs.readyOnly,
 	})
-
 	if err != nil {
 		logrus.Fatalf("list \"%s\" failed: %v\n", cmdArgs.groundTopic, err)
-	} else {
-		sort.Strings(topics)
-		for _, topic := range topics {
-			fmt.Println(topic)
+	}
+	// filter by options
+	if !cmdArgs.all {
+		if mdlArgs.level != "" || mdlArgs.status != "" || mdlArgs.subscription != "" {
+			matchedTopics := make([]string, 0)
+			expectedTopics := util.FormatTopics(cmdArgs.groundTopic, mdlArgs.level, mdlArgs.status, mdlArgs.subscription)
+			for _, t := range expectedTopics {
+				if slices.Contains(topics, t) {
+					matchedTopics = append(matchedTopics, t)
+				}
+			}
+			topics = matchedTopics
 		}
+	}
+
+	sort.Strings(topics)
+	for _, topic := range topics {
+		fmt.Println(topic)
 	}
 }
 
-type listOptions struct {
-	url          string
-	groundTopic  string
-	subscription string
+type queryOptions struct {
+	url string
 
+	groundTopic string
 	partitioned bool
-	groundOnly  bool
-	readyOnly   bool
 }
 
-func listTopicsByOptions(options listOptions) ([]string, error) {
-	manager := admin.NewRobustTopicManager(options.url)
-
+func queryTopicsFromBrokerByOptions(options queryOptions) ([]string, error) {
 	namespace := "public/default"
 	// remove schema
 	if ti := strings.Index(options.groundTopic, "://"); ti > 0 {
@@ -89,9 +88,14 @@ func listTopicsByOptions(options listOptions) ([]string, error) {
 			namespace = strings.Join(segments[0:1], "/")
 		}
 	}
+	// query topics from broker
 	var queriedTopics []string
 	var err error
-	queriedTopics, err = manager.List(namespace)
+	if options.partitioned {
+		queriedTopics, err = admin.NewPartitionedTopicManager(options.url).List(namespace)
+	} else {
+		queriedTopics, err = admin.NewNonPartitionedTopicManager(options.url).List(namespace)
+	}
 	if err != nil {
 		logrus.Fatalln(err)
 	}
@@ -104,26 +108,15 @@ func listTopicsByOptions(options listOptions) ([]string, error) {
 		}
 	}
 
-	// exclude non-ground queriedTopics
-	if options.groundOnly {
-		groundTopics := make([]string, 0)
+	// exclude partitioned sub topics for non-partitioned option
+	if !options.partitioned {
+		newTopics := make([]string, 0)
 		for _, topic := range matchedTopics {
-			if !util.IsPartitionedSubTopic(topic) && util.IsL1Topic(topic) && util.IsReadyTopic(topic) {
-				groundTopics = append(groundTopics, topic)
+			if !util.IsPartitionedSubTopic(topic) {
+				newTopics = append(newTopics, topic)
 			}
 		}
-		matchedTopics = groundTopics
-	}
-
-	// exclude non-ready queriedTopics
-	if options.readyOnly {
-		readyTopics := make([]string, 0)
-		for _, topic := range matchedTopics {
-			if !util.IsPartitionedSubTopic(topic) && util.IsReadyTopic(topic) {
-				readyTopics = append(readyTopics, topic)
-			}
-		}
-		matchedTopics = readyTopics
+		matchedTopics = newTopics
 	}
 
 	return matchedTopics, err

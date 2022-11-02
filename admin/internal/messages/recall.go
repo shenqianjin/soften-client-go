@@ -24,7 +24,7 @@ func newRecallCommand(rtArgs *internal.RootArgs, mdlArgs *messagesArgs) *cobra.C
 	cmdArgs := &recallArgs{}
 	cmd := &cobra.Command{
 		Use:   "recall ",
-		Short: "recall messages from a source topic (DQL generally and not only) to anther topic",
+		Short: "Recall messages of a source topic (DQL generally but not only) to anther one.",
 		Args:  cobra.MinimumNArgs(2),
 		Run: func(cmd *cobra.Command, args []string) {
 			mdlArgs.topic = args[0]

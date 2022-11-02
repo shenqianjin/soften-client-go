@@ -1,67 +1,75 @@
 package topics
 
 import (
+	"errors"
+
 	"github.com/shenqianjin/soften-client-go/admin/internal"
 	"github.com/shenqianjin/soften-client-go/admin/internal/util"
 	"github.com/shenqianjin/soften-client-go/soften/admin"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
+	"golang.org/x/exp/slices"
 )
 
 type deleteArgs struct {
-	groundTopic  string
-	status       string
-	level        string
-	subscription string
-	partitioned  bool
+	groundTopic string
+	partitioned bool
+	all         bool
 }
 
-func newDeleteCommand(rtArgs *internal.RootArgs) *cobra.Command {
+func newDeleteCommand(rtArgs *internal.RootArgs, mdlArgs *topicsArgs) *cobra.Command {
 	cmdArgs := &deleteArgs{}
 	cmd := &cobra.Command{
 		Use:   "delete ",
-		Short: "delete soften topic or topics",
+		Short: "Delete soften topic or topics.",
 		Args:  cobra.MinimumNArgs(1),
 		Run: func(cmd *cobra.Command, args []string) {
 			cmdArgs.groundTopic = args[0]
-			deleteTopics(*rtArgs, cmdArgs)
+			deleteTopics(rtArgs, mdlArgs, cmdArgs)
 		},
 	}
-	// parse levels
-	cmd.Flags().StringVarP(&cmdArgs.level, "level", "l", "", util.LevelUsage)
-	// parse statuses
-	cmd.Flags().StringVarP(&cmdArgs.status, "status", "s", "", util.StatusUsage)
-
-	flags := cmd.Flags()
-	// parse partition
-	//flags.BoolVarP(&cmdArgs.partitioned, "partitioned", "p", false, util.PartitionedUsage)
-	flags.StringVarP(&cmdArgs.subscription, "subscription", "S", "", util.SubscriptionUsage)
+	// parse variables
+	cmd.Flags().BoolVarP(&cmdArgs.partitioned, "partitioned", "P", false, util.PartitionedUsage)
+	cmd.Flags().BoolVarP(&cmdArgs.all, "all", "A", false, util.AllUsage)
 
 	return cmd
 }
 
-func deleteTopics(rtArgs internal.RootArgs, cmdArgs *deleteArgs) {
-	manager := admin.NewRobustTopicManager(rtArgs.Url)
-
+func deleteTopics(rtArgs *internal.RootArgs, mdlArgs *topicsArgs, cmdArgs *deleteArgs) {
 	var topics []string
 	var err error
-	if cmdArgs.level != "" || cmdArgs.status != "" {
-		topics = util.FormatTopics(cmdArgs.groundTopic, cmdArgs.level, cmdArgs.status, cmdArgs.subscription)
-	} else {
-		topics, err = listAndCheckTopicsByOptions(listOptions{
-			url:          rtArgs.Url,
-			groundTopic:  cmdArgs.groundTopic,
-			subscription: cmdArgs.subscription,
-
+	if cmdArgs.all {
+		// query topics from broker
+		topics, err = queryTopicsFromBrokerByOptions(queryOptions{
+			url:         rtArgs.Url,
+			groundTopic: cmdArgs.groundTopic,
 			partitioned: cmdArgs.partitioned,
-			groundOnly:  false,
-			readyOnly:   false,
 		})
+		if err == nil && len(topics) == 0 {
+			err = errors.New("topic not existed")
+		}
+		if err != nil {
+			logrus.Fatalf("delete \"%s\" failed: %v\n", cmdArgs.groundTopic, err)
+		}
+	} else {
+		// filter by options
+		if mdlArgs.level != "" || mdlArgs.status != "" || mdlArgs.subscription != "" {
+			matchedTopics := make([]string, 0)
+			expectedTopics := util.FormatTopics(cmdArgs.groundTopic, mdlArgs.level, mdlArgs.status, mdlArgs.subscription)
+			for _, t := range expectedTopics {
+				if slices.Contains(topics, t) {
+					matchedTopics = append(matchedTopics, t)
+				}
+			}
+			topics = matchedTopics
+		}
 	}
 	if err != nil {
 		logrus.Fatalf("delete \"%s\" failed: %v\n", cmdArgs.groundTopic, err)
 	}
+
 	// delete one by one
+	manager := admin.NewRobustTopicManager(rtArgs.Url)
 	for _, topic := range topics {
 		var err error
 		err = manager.Delete(topic)
