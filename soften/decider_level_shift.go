@@ -181,7 +181,7 @@ func (d *shiftDecider) internalSafeGetRouterInAsync(topic string) (*router, erro
 	rtOption := routerOptions{
 		Topic:               topic,
 		connectInSyncEnable: d.options.shift.ConnectInSyncEnable,
-		publishPolicy:       d.options.shift.PublishPolicy,
+		publish:             d.options.shift.Publish,
 	}
 	d.routersLock.Lock()
 	defer d.routersLock.Unlock()

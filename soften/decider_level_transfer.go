@@ -138,7 +138,7 @@ func (d *transferDecider) internalSafeGetRouterInAsync(topic string) (*router, e
 	rtOption := routerOptions{
 		Topic:               topic,
 		connectInSyncEnable: d.options.transfer.ConnectInSyncEnable,
-		publishPolicy:       d.options.transfer.PublishPolicy,
+		publish:             d.options.transfer.Publish,
 	}
 	d.routersLock.Lock()
 	defer d.routersLock.Unlock()

@@ -42,7 +42,7 @@ func newStatusDecider(client *client, policy *config.StatusPolicy, options statu
 	rtOptions := routerOptions{
 		Topic:               options.groundTopic + options.level.TopicSuffix() + subscriptionSuffix + options.status.TopicSuffix(),
 		connectInSyncEnable: true,
-		publishPolicy:       policy.PublishPolicy,
+		publish:             policy.Publish,
 	}
 	rt, err := newRouter(client.logger, client.Client, rtOptions)
 	if err != nil {
@@ -68,7 +68,7 @@ func (d *statusDecider) Decide(msg consumerMessage, cheStatus checker.CheckStatu
 		return d.tryDeadInternal(msg)
 	}
 	// check Nack for equal status
-	delay := d.policy.BackoffPolicy.Next(0, statusMessageCounter.ConsumeTimes)
+	delay := d.policy.BackoffDelayPolicy.Next(0, statusMessageCounter.ConsumeTimes)
 	if delay <= 0 {
 		// default delay as one reentrant delay
 		delay = d.policy.ReentrantDelay

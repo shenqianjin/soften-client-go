@@ -53,79 +53,86 @@ var (
 
 	// defaultStatusPolicyRetrying 默认Retrying状态的校验策略。
 	defaultStatusPolicyRetrying = &StatusPolicy{
-		ConsumeWeight:     defaultConsumeWeightRetrying,
-		ConsumeMaxTimes:   60 * 6,                       // 最多尝试60*6=360次, 6h小时内每分钟重试
-		BackoffDelays:     defaultRetryingBackoffDelays, // 前5次累计1分钟, 第6次开始每隔1分钟开始重试
-		BackoffPolicy:     nil,                          //
-		ReentrantDelay:    60,                           // 每1分钟进行一次重入
-		ReentrantMaxTimes: 0,                            // 最大重入次数不限制
-		PublishPolicy:     newDefaultPublishPolicy(),
+		ConsumeWeight:      defaultConsumeWeightRetrying,
+		ConsumeMaxTimes:    60 * 6,                       // 最多尝试60*6=360次, 6h小时内每分钟重试
+		BackoffDelays:      defaultRetryingBackoffDelays, // 前5次累计1分钟, 第6次开始每隔1分钟开始重试
+		BackoffDelayPolicy: nil,                          //
+		ReentrantDelay:     60,                           // 每1分钟进行一次重入
+		ReentrantMaxTimes:  0,                            // 最大重入次数不限制
+		Publish:            newDefaultPublishPolicy(),
 	}
 
 	// defaultStatusPolicyPending 默认Pending状态的校验策略。
 	defaultStatusPolicyPending = &StatusPolicy{
-		ConsumeWeight:     defaultConsumeWeightPending,
-		ConsumeMaxTimes:   0,                           // pending 默认不限制次数
-		BackoffDelays:     defaultPendingBackoffDelays, // 前5次累计1分钟, 第6次开始每隔1分钟开始重试
-		BackoffPolicy:     nil,                         //
-		ReentrantDelay:    60,                          // 每1分钟进行一次重入
-		ReentrantMaxTimes: 0,                           // 最多重入30次
-		PublishPolicy:     newDefaultPublishPolicy(),
+		ConsumeWeight:      defaultConsumeWeightPending,
+		ConsumeMaxTimes:    0,                           // pending 默认不限制次数
+		BackoffDelays:      defaultPendingBackoffDelays, // 前5次累计1分钟, 第6次开始每隔1分钟开始重试
+		BackoffDelayPolicy: nil,                         //
+		ReentrantDelay:     60,                          // 每1分钟进行一次重入
+		ReentrantMaxTimes:  0,                           // 最多重入30次
+		Publish:            newDefaultPublishPolicy(),
 	}
 
 	// defaultStatusPolicyBlocking 默认pending状态的校验策略。
 	defaultStatusPolicyBlocking = &StatusPolicy{
-		ConsumeWeight:     defaultConsumeWeightBlocking,
-		ConsumeMaxTimes:   6 * 24 * 2,                   // 最多消费6 * 24 * 2=288次, 1h*24*2=2d内重试
-		BackoffDelays:     defaultBlockingBackoffDelays, // 前4次累计2h, 第5次开始每隔2h开始重试
-		BackoffPolicy:     nil,                          //
-		ReentrantDelay:    600,                          // 每10min进行一次重入
-		ReentrantMaxTimes: 144,                          // 最多重入144次 (1天=144*10min)
-		PublishPolicy:     newDefaultPublishPolicy(),
+		ConsumeWeight:      defaultConsumeWeightBlocking,
+		ConsumeMaxTimes:    6 * 24 * 2,                   // 最多消费6 * 24 * 2=288次, 1h*24*2=2d内重试
+		BackoffDelays:      defaultBlockingBackoffDelays, // 前4次累计2h, 第5次开始每隔2h开始重试
+		BackoffDelayPolicy: nil,                          //
+		ReentrantDelay:     600,                          // 每10min进行一次重入
+		ReentrantMaxTimes:  144,                          // 最多重入144次 (1天=144*10min)
+		Publish:            newDefaultPublishPolicy(),
 	}
 
 	// defaultDeadPolicy default dead to D1
 	defaultDeadPolicy = &DeadPolicy{
-		PublishPolicy: newDefaultPublishPolicy(),
+		Publish: newDefaultPublishPolicy(),
 	}
 
 	// defaultUpgradePolicy
 	defaultUpgradePolicy = &ShiftPolicy{
-		PublishPolicy: newDefaultPublishPolicy(),
+		Publish: newDefaultPublishPolicy(),
 	}
 
 	// defaultDegradePolicy
 	defaultDegradePolicy = &ShiftPolicy{
-		PublishPolicy: newDefaultPublishPolicy(),
+		Publish: newDefaultPublishPolicy(),
 	}
 
 	// defaultShiftPolicy
 	defaultShiftPolicy = &ShiftPolicy{
-		PublishPolicy: newDefaultPublishPolicy(),
+		Publish: newDefaultPublishPolicy(),
 	}
 
 	// defaultDeadPolicy default dead to D1
 	defaultShiftDeadPolicy = &ShiftPolicy{
-		Level:         message.D1,
-		PublishPolicy: newDefaultPublishPolicy(),
+		Level:   message.D1,
+		Publish: newDefaultPublishPolicy(),
 	}
 
 	// defaultTransferPolicy
 	defaultTransferPolicy = &TransferPolicy{
-		PublishPolicy: newDefaultPublishPolicy(),
+		Publish: newDefaultPublishPolicy(),
 	}
 )
 
-func newDefaultPublishPolicy() *PublishPolicy {
+func newDefaultBackoffPolicy() *BackoffPolicy {
 	backoffPolicy, err := backoff.NewAbbrBackoffPolicy(defaultPublishBackoffDelays)
 	if err != nil {
 		panic(err)
 	}
-	return &PublishPolicy{
-		BackoffDelays:   defaultPublishBackoffDelays,
-		BackoffMaxTimes: DefaultPublishMaxTimes, // 默认30次,前7次60s,累计24分钟
-		BackoffPolicy:   backoffPolicy,
+	return &BackoffPolicy{
+		Delays:      defaultPublishBackoffDelays,
+		MaxTimes:    DefaultPublishMaxTimes, // 默认30次,前7次60s,累计24分钟
+		DelayPolicy: backoffPolicy,
 	}
+}
+
+func newDefaultPublishPolicy() *PublishPolicy {
+	publishPolicy := &PublishPolicy{
+		Backoff: newDefaultBackoffPolicy(),
+	}
+	return publishPolicy
 }
 
 // ------ default consume leveled policies ------

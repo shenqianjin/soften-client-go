@@ -41,7 +41,7 @@ type producer struct {
 	checkers        map[checker.CheckType]*produceCheckpointChain
 	deciders        produceDeciders
 	metricsProvider *internal.MetricsProvider
-	publishPolicy   *config.PublishPolicy // 发送失败补偿次数。默认30次; 前7次60s,累计24分钟
+	backoff         *config.BackoffPolicy // 发送失败补偿次数。默认30次; 前7次60s,累计24分钟
 }
 
 func newProducer(client *client, conf *config.ProducerConfig, checkpoints map[checker.CheckType][]*checker.ProduceCheckpoint) (*producer, error) {
@@ -74,7 +74,7 @@ func newProducer(client *client, conf *config.ProducerConfig, checkpoints map[ch
 		degradePolicy:   conf.Degrade,
 		routePolicy:     conf.Transfer,
 		metricsProvider: client.metricsProvider,
-		publishPolicy:   conf.Publish,
+		backoff:         conf.Backoff,
 	}
 	// collect enables
 	p.enables = p.collectEnables(conf)
@@ -203,8 +203,8 @@ func (p *producer) Send(ctx context.Context, msg *pulsar.ProducerMessage) (msgId
 	// send
 	msgId, err = p.Producer.Send(ctx, msg)
 	// backoff
-	for sendTimes := uint(1); err != nil && p.publishPolicy.BackoffMaxTimes > 0 && sendTimes <= p.publishPolicy.BackoffMaxTimes; sendTimes++ {
-		delay := p.publishPolicy.BackoffPolicy.Next(int(sendTimes))
+	for sendTimes := uint(1); err != nil && p.backoff.MaxTimes > 0 && sendTimes <= p.backoff.MaxTimes; sendTimes++ {
+		delay := p.backoff.DelayPolicy.Next(int(sendTimes))
 		time.Sleep(time.Duration(delay) * time.Second)
 		msgId, err = p.Producer.Send(ctx, msg)
 	}
@@ -232,8 +232,8 @@ func (p *producer) SendAsync(ctx context.Context, msg *pulsar.ProducerMessage,
 	}
 	callbackNew := func(msgID pulsar.MessageID, msg *pulsar.ProducerMessage, err error) {
 		// backoff with synchronous send
-		for sendTimes := uint(1); err != nil && p.publishPolicy.BackoffMaxTimes > 0 && sendTimes <= p.publishPolicy.BackoffMaxTimes; sendTimes++ {
-			delay := p.publishPolicy.BackoffPolicy.Next(int(sendTimes))
+		for sendTimes := uint(1); err != nil && p.backoff.MaxTimes > 0 && sendTimes <= p.backoff.MaxTimes; sendTimes++ {
+			delay := p.backoff.DelayPolicy.Next(int(sendTimes))
 			time.Sleep(time.Duration(delay) * time.Second)
 			msgID, err = p.Producer.Send(ctx, msg)
 		}

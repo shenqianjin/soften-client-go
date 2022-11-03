@@ -1,9 +1,9 @@
 package config
 
-type BackoffPolicy interface {
+type BackoffDelayPolicy interface {
 	Next(redeliveryTimes int) uint
 }
 
-type StatusBackoffPolicy interface {
+type StatusBackoffDelayPolicy interface {
 	Next(redeliveryTimes int, statusRedeliveryTimes int) uint
 }

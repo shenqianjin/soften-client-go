@@ -72,8 +72,7 @@ type ProducerConfig struct {
 	Shift          *ShiftPolicy    `json:"shift"`          // Optional:
 
 	HandleTimeout uint           `json:"handle_timeout"` // Optional: 发送消息超时时间, Default: 30 seconds
-	Publish       *PublishPolicy `json:"shift"`          // Optional: 发布策略
-
+	Backoff       *BackoffPolicy `json:"backoff"`        // Optional: 补偿策略
 }
 
 // ------ consumer configuration (multi-status) ------
@@ -89,7 +88,7 @@ type ConsumerConfig struct {
 	Level                       internal.TopicLevel                `json:"level"`                         // Optional:
 	Type                        pulsar.SubscriptionType            `json:"type"`                          // Optional: 订阅类型: 0 Exclusive; 1 Shared; 2 Failover; 3 KeyShared
 	SubscriptionInitialPosition pulsar.SubscriptionInitialPosition `json:"subscription_initial_position"` // Optional: 订阅初始消费位置: 0 Latest; 1 Earliest
-	NackBackoffPolicy           pulsar.NackBackoffPolicy           `json:"-"`                             // Optional: Unrecommended, compatible with origin pulsar client
+	NackBackoffDelayPolicy      pulsar.NackBackoffPolicy           `json:"-"`                             // Optional: Unrecommended, compatible with origin pulsar client
 	NackRedeliveryDelay         uint                               `json:"nack_redelivery_delay"`         // Optional: Unrecommended, compatible with origin pulsar client
 	RetryEnable                 bool                               `json:"retry_enable"`                  // Optional: Unrecommended, compatible with origin pulsar client
 	DLQ                         *DLQPolicy                         `json:"dlq"`                           // Optional: Unrecommended, compatible with origin pulsar client
@@ -148,17 +147,17 @@ type ReadyPolicy struct {
 // (2) 借助于 Reentrant 进行补偿, 每次重入代表额外增加一个 ReentrantDelay 延迟;
 // (3) 如果 补偿延迟 - ReentrantDelay 仍然大于 NackBackoffMaxDelay, 那么会发生多次重入。
 type StatusPolicy struct {
-	ConsumeWeight     uint                `json:"consume_weight"`      // Optional: 消费权重
-	ConsumeMaxTimes   int                 `json:"consume_max_times"`   // Optional: 消费次数上限
-	BackoffDelays     []string            `json:"backoff_delays"`      // Optional: 补偿延迟策略 e.g: [5s, 2m, 1h], 如果值大于 ReentrantDelay 时，自动取整为 ReentrantDelay 的整数倍 (默认向下取整)
-	BackoffPolicy     StatusBackoffPolicy `json:"-"`                   // Optional: 补偿策略, 优先级高于 BackoffDelays
-	ReentrantDelay    uint                `json:"reentrant_delay"`     // Optional: 重入延迟
-	ReentrantMaxTimes int                 `json:"reentrant_max_times"` // Optional: 重入次数上限
-	PublishPolicy     *PublishPolicy      `json:"publish"`             // Optional: 发布策略
+	ConsumeWeight      uint                     `json:"consume_weight"`      // Optional: 消费权重
+	ConsumeMaxTimes    int                      `json:"consume_max_times"`   // Optional: 消费次数上限
+	BackoffDelays      []string                 `json:"backoff_delays"`      // Optional: 补偿延迟策略 e.g: [5s, 2m, 1h], 如果值大于 ReentrantDelay 时，自动取整为 ReentrantDelay 的整数倍 (默认向下取整)
+	BackoffDelayPolicy StatusBackoffDelayPolicy `json:"-"`                   // Optional: 补偿策略, 优先级高于 BackoffDelays
+	ReentrantDelay     uint                     `json:"reentrant_delay"`     // Optional: 重入延迟
+	ReentrantMaxTimes  int                      `json:"reentrant_max_times"` // Optional: 重入次数上限
+	Publish            *PublishPolicy           `json:"publish"`             // Optional: 发布策略
 }
 
 type DeadPolicy struct {
-	PublishPolicy *PublishPolicy `json:"publish"` // Optional: 发布策略
+	Publish *PublishPolicy `json:"publish"` // Optional: 发布策略
 }
 
 type TransferPolicy struct {
@@ -166,7 +165,7 @@ type TransferPolicy struct {
 	Topic               string         `json:"topic"`                  // Optional: 默认转移到的队列: 优先级比 GotoExtra参数中指定的低
 	ConsumeDelay        uint64         `json:"consume_delay"`          // Optional: 消费延迟(近似值: 通过1次或者多次重入实现, 不足1次重入延迟时当1次处理), 默认 0
 	CountMode           CountPassMode  `json:"count_pass_mode"`        // Optional: 计数传递模式: 0 传递累计计数; 1 重置计数
-	PublishPolicy       *PublishPolicy `json:"publish"`                // Optional: 发布策略
+	Publish             *PublishPolicy `json:"publish"`                // Optional: 发布策略
 }
 
 type ShiftPolicy struct {
@@ -174,13 +173,20 @@ type ShiftPolicy struct {
 	Level               internal.TopicLevel `json:"level"`                  // Optional: 默认升降级的级别: 优先级比 GotoExtra参数中指定的低
 	ConsumeDelay        uint64              `json:"consume_delay"`          // Optional: 消费延迟(近似值: 通过1次或者多次重入实现, 不足1次重入延迟时当1次处理), 默认 0
 	CountMode           CountPassMode       `json:"count_pass_mode"`        // Optional: 计数传递模式: 0 透传累计计数; 1 重置计数
-	PublishPolicy       *PublishPolicy      `json:"publish"`                // Optional: 发布策略
+	Publish             *PublishPolicy      `json:"publish"`                // Optional: 发布策略
+}
+
+type BackoffPolicy struct {
+	MaxTimes    uint               `json:"max_times"` // Optional: 发送失败默认重试次数
+	Delays      []string           `json:"delays"`    // Optional: 失败重试延迟
+	DelayPolicy BackoffDelayPolicy `json:"-"`         // Optional: 补偿策略, 优先级高于 Delays
 }
 
 type PublishPolicy struct {
-	BackoffMaxTimes uint          `json:"backoff_max_times"` // Optional: 发送失败默认重试次数
-	BackoffDelays   []string      `json:"backoff_delays"`    // Optional: 失败重试延迟
-	BackoffPolicy   BackoffPolicy `json:"-"`                 // Optional: 补偿策略, 优先级高于 BackoffDelays
+	DisableBatching         bool           `json:"disable_batching"`           // Optional:
+	BatchingMaxPublishDelay int64          `json:"batching_max_publish_delay"` // Optional:
+	BatchingMaxMessages     uint           `json:"batching_max_messages"`      // Optional:
+	Backoff                 *BackoffPolicy `json:"backoff"`                    // Optional:
 }
 
 type CountPassMode int

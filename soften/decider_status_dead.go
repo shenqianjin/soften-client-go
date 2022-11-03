@@ -39,7 +39,7 @@ func newDeadDecider(client *client, policy *config.DeadPolicy, options deadDecid
 	rtOptions := routerOptions{
 		Topic:               options.groundTopic + options.level.TopicSuffix() + subscriptionSuffix + message.StatusDead.TopicSuffix(),
 		connectInSyncEnable: true,
-		publishPolicy:       policy.PublishPolicy,
+		publish:             policy.Publish,
 	}
 	rt, err := newRouter(client.logger, client.Client, rtOptions)
 	if err != nil {

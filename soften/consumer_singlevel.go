@@ -171,7 +171,7 @@ func (slc *singleLeveledConsumer) internalSubscribe(cli *client, conf *config.Co
 		Type:                        conf.Type,
 		SubscriptionInitialPosition: conf.SubscriptionInitialPosition,
 		NackRedeliveryDelay:         time.Second * time.Duration(conf.NackRedeliveryDelay),
-		NackBackoffPolicy:           conf.NackBackoffPolicy,
+		NackBackoffPolicy:           conf.NackBackoffDelayPolicy,
 		MessageChannel:              nil,
 	}
 	if conf.DLQ != nil {
