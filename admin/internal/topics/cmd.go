@@ -24,6 +24,7 @@ func NewModuleCmd(rootArgs *internal.RootArgs) *cobra.Command {
 	cmd.AddCommand(newDeleteCommand(rootArgs, mdlArgs))
 	cmd.AddCommand(newUpdateCommand(rootArgs, mdlArgs))
 	cmd.AddCommand(newListCommand(rootArgs, mdlArgs))
+	cmd.AddCommand(newStatCommand(rootArgs, mdlArgs))
 
 	cmd.PersistentFlags().StringVarP(&mdlArgs.level, "level", "l", "L1", util.LevelUsage)
 	cmd.PersistentFlags().StringVarP(&mdlArgs.status, "status", "s", "Ready", util.StatusUsage)

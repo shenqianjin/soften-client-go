@@ -31,4 +31,8 @@ func TestTopicName(t *testing.T) {
 	parsedTopic, err = ParseTopicName("non-persistent://public2/default2/Test")
 	assert.Nil(t, err)
 	assert.Equal(t, "non-persistent://public2/default2/Test", parsedTopic)
+
+	parsedTopic, err = ParseTopicName("persistent://public2/default2")
+	assert.NotNil(t, err)
+	assert.True(t, strings.Contains(err.Error(), "Invalid topic name"))
 }

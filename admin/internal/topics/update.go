@@ -8,7 +8,6 @@ import (
 	"github.com/shenqianjin/soften-client-go/soften/admin"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
-	"golang.org/x/exp/slices"
 )
 
 type updateArgs struct {
@@ -72,14 +71,7 @@ func updateTopics(rtArgs *internal.RootArgs, mdlArgs *topicsArgs, cmdArgs *updat
 	} else {
 		// filter by options
 		if mdlArgs.level != "" || mdlArgs.status != "" || mdlArgs.subscription != "" {
-			matchedTopics := make([]string, 0)
-			expectedTopics := util.FormatTopics(namespaceTopic.FullName, mdlArgs.level, mdlArgs.status, mdlArgs.subscription)
-			for _, t := range expectedTopics {
-				if slices.Contains(topics, t) {
-					matchedTopics = append(matchedTopics, t)
-				}
-			}
-			topics = matchedTopics
+			topics = util.FormatTopics(namespaceTopic.FullName, mdlArgs.level, mdlArgs.status, mdlArgs.subscription)
 		}
 	}
 

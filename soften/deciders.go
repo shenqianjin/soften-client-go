@@ -122,9 +122,10 @@ type generalConsumeDeciderOptions struct {
 	Topic            string                 // Business Topic
 	Level            internal.TopicLevel    //
 	subscriptionName string                 //
-	DiscardEnable    bool                   // Blocking 检查开关
-	DeadEnable       bool                   // Pending 检查开关
-	TransferEnable   bool                   // Retrying 重试检查开关
+	DiscardEnable    bool                   // Discard 检查开关
+	DeadEnable       bool                   // Dead 检查开关
+	Dead             *config.DeadPolicy     //
+	TransferEnable   bool                   // Transfer 重试检查开关
 	Transfer         *config.TransferPolicy // Transfer Policy
 	UpgradeEnable    bool                   //
 	Upgrade          *config.ShiftPolicy    //
@@ -153,7 +154,7 @@ func newGeneralConsumeDeciders(cli *client, l *consumeListener, options generalC
 	if options.DeadEnable {
 		// dead 队列默认统一到L1级别
 		deadOptions := deadDecideOptions{groundTopic: l.groundTopic, level: message.L1, subscription: l.subscription}
-		d, err1 := newDeadDecider(cli, deadOptions, l.metricsProvider)
+		d, err1 := newDeadDecider(cli, options.Dead, deadOptions, l.metricsProvider)
 		if err1 != nil {
 			return nil, err1
 		}

@@ -2,10 +2,13 @@ package soften
 
 import (
 	"errors"
+	"fmt"
+	"time"
 
 	"github.com/apache/pulsar-client-go/pulsar"
 	"github.com/apache/pulsar-client-go/pulsar/log"
 	"github.com/shenqianjin/soften-client-go/soften/checker"
+	"github.com/shenqianjin/soften-client-go/soften/config"
 	"github.com/shenqianjin/soften-client-go/soften/decider"
 	"github.com/shenqianjin/soften-client-go/soften/internal"
 	"github.com/shenqianjin/soften-client-go/soften/message"
@@ -25,7 +28,7 @@ type deadDecider struct {
 	metricsProvider *internal.MetricsProvider
 }
 
-func newDeadDecider(client *client, options deadDecideOptions, metricsProvider *internal.MetricsProvider) (*deadDecider, error) {
+func newDeadDecider(client *client, policy *config.DeadPolicy, options deadDecideOptions, metricsProvider *internal.MetricsProvider) (*deadDecider, error) {
 	if options.groundTopic == "" {
 		return nil, errors.New("topic is blank")
 	}
@@ -36,6 +39,7 @@ func newDeadDecider(client *client, options deadDecideOptions, metricsProvider *
 	rtOptions := routerOptions{
 		Topic:               options.groundTopic + options.level.TopicSuffix() + subscriptionSuffix + message.StatusDead.TopicSuffix(),
 		connectInSyncEnable: true,
+		publishPolicy:       policy.PublishPolicy,
 	}
 	rt, err := newRouter(client.logger, client.Client, rtOptions)
 	if err != nil {
@@ -78,7 +82,16 @@ func (d *deadDecider) Decide(msg consumerMessage, cheStatus checker.CheckStatus)
 			msg.Consumer.Nack(msg)
 			msg.internalExtra.consumerMetrics.ConsumeMessageNacks.Inc()
 		} else {
-			d.logger.WithField("msgID", msg.ID()).Debugf("Succeed to send message to topic: %s", d.router.options.Topic)
+			logContent := fmt.Sprintf("Succeed to send message to dead topic: %s, publish time: %v, properties: %v, payload: %v",
+				d.router.options.Topic, msg.PublishTime(), msg.Properties(), string(msg.Payload()))
+			originalPublishTime := message.Parser.GetOriginalPublishTime(msg)
+			if !originalPublishTime.IsZero() {
+				logContent = fmt.Sprintf("%s, latency from original publish: %v", logContent, time.Now().Sub(originalPublishTime))
+			}
+			if !msg.EventTime().IsZero() {
+				logContent = fmt.Sprintf("%s, latency from event: %v", logContent, time.Now().Sub(msg.EventTime()))
+			}
+			d.logger.WithField("msgID", msg.ID()).Warnf(logContent)
 			msg.Ack()
 			msg.internalExtra.consumerMetrics.ConsumeMessageAcks.Inc()
 		}
@@ -91,5 +104,8 @@ func (d *deadDecider) Decide(msg consumerMessage, cheStatus checker.CheckStatus)
 }
 
 func (d *deadDecider) close() {
+	if d.router != nil {
+		d.router.close()
+	}
 	d.metricsProvider.GetListenerDecidersMetrics(d.options.groundTopic, d.options.subscription, decider.GotoDead).DecidersOpened.Dec()
 }

@@ -41,8 +41,7 @@ type producer struct {
 	checkers        map[checker.CheckType]*produceCheckpointChain
 	deciders        produceDeciders
 	metricsProvider *internal.MetricsProvider
-	BackoffMaxTimes uint // 发送失败补偿次数。补偿次数大于0, 客户端异步发送时, 重试会使用同步请求
-	BackoffPolicy   config.BackoffPolicy
+	publishPolicy   *config.PublishPolicy // 发送失败补偿次数。默认30次; 前7次60s,累计24分钟
 }
 
 func newProducer(client *client, conf *config.ProducerConfig, checkpoints map[checker.CheckType][]*checker.ProduceCheckpoint) (*producer, error) {
@@ -75,8 +74,7 @@ func newProducer(client *client, conf *config.ProducerConfig, checkpoints map[ch
 		degradePolicy:   conf.Degrade,
 		routePolicy:     conf.Transfer,
 		metricsProvider: client.metricsProvider,
-		BackoffMaxTimes: conf.BackoffMaxTimes,
-		BackoffPolicy:   conf.BackoffPolicy,
+		publishPolicy:   conf.Publish,
 	}
 	// collect enables
 	p.enables = p.collectEnables(conf)
@@ -205,7 +203,9 @@ func (p *producer) Send(ctx context.Context, msg *pulsar.ProducerMessage) (msgId
 	// send
 	msgId, err = p.Producer.Send(ctx, msg)
 	// backoff
-	for i := uint(0); err != nil && i < p.BackoffMaxTimes; i++ {
+	for sendTimes := uint(1); err != nil && p.publishPolicy.BackoffMaxTimes > 0 && sendTimes <= p.publishPolicy.BackoffMaxTimes; sendTimes++ {
+		delay := p.publishPolicy.BackoffPolicy.Next(int(sendTimes))
+		time.Sleep(time.Duration(delay) * time.Second)
 		msgId, err = p.Producer.Send(ctx, msg)
 	}
 	if err == nil {
@@ -232,8 +232,10 @@ func (p *producer) SendAsync(ctx context.Context, msg *pulsar.ProducerMessage,
 	}
 	callbackNew := func(msgID pulsar.MessageID, msg *pulsar.ProducerMessage, err error) {
 		// backoff with synchronous send
-		for i := uint(0); err != nil && i < p.BackoffMaxTimes; i++ {
-			_, err = p.Producer.Send(ctx, msg)
+		for sendTimes := uint(1); err != nil && p.publishPolicy.BackoffMaxTimes > 0 && sendTimes <= p.publishPolicy.BackoffMaxTimes; sendTimes++ {
+			delay := p.publishPolicy.BackoffPolicy.Next(int(sendTimes))
+			time.Sleep(time.Duration(delay) * time.Second)
+			msgID, err = p.Producer.Send(ctx, msg)
 		}
 		if err == nil {
 			now := time.Now()

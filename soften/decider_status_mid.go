@@ -42,6 +42,7 @@ func newStatusDecider(client *client, policy *config.StatusPolicy, options statu
 	rtOptions := routerOptions{
 		Topic:               options.groundTopic + options.level.TopicSuffix() + subscriptionSuffix + options.status.TopicSuffix(),
 		connectInSyncEnable: true,
+		publishPolicy:       policy.PublishPolicy,
 	}
 	rt, err := newRouter(client.logger, client.Client, rtOptions)
 	if err != nil {
@@ -155,5 +156,8 @@ func (d *statusDecider) tryDeadInternal(msg consumerMessage) bool {
 }
 
 func (d *statusDecider) close() {
+	if d.router != nil {
+		d.router.close()
+	}
 	d.metricsProvider.GetListenerDecidersMetrics(d.options.groundTopic, d.options.subscription, d.options.msgGoto).DecidersOpened.Dec()
 }

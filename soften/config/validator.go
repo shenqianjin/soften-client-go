@@ -192,10 +192,7 @@ func (v *validator) validateAndDefaultPolicyProps4MainLevel(policy *LevelPolicy,
 		policy.TransferEnable = new(bool)
 	}
 	// default status Policy
-	if policy.Ready == nil {
-		policy.Ready = defaultStatusPolicyReady
-	}
-	if err := v.validateAndDefaultStatusPolicy(policy.Ready, defaultStatusPolicyReady); err != nil {
+	if err := v.validateAndDefaultReadyPolicy(policy.Ready, defaultStatusReadyPolicy); err != nil {
 		return err
 	}
 	// default and valid pending policy
@@ -223,9 +220,10 @@ func (v *validator) validateAndDefaultPolicyProps4MainLevel(policy *LevelPolicy,
 			return err
 		}
 	}
+	// validate and default transfer policy
 	if *policy.TransferEnable {
-		if policy.Transfer == nil {
-			policy.Transfer = defaultTransferPolicy
+		if err := v.validateAndDefaultTransferPolicy(policy.Transfer, defaultTransferPolicy); err != nil {
+			return err
 		}
 	}
 	// validate and default upgrade policy
@@ -292,7 +290,7 @@ func (v *validator) validateAndDefaultPolicyProps4ExtraLevel(policy *LevelPolicy
 	if policy.Ready == nil {
 		policy.Ready = mainPolicy.Ready
 	}
-	if err := v.validateAndDefaultStatusPolicy(policy.Ready, mainPolicy.Ready); err != nil {
+	if err := v.validateAndDefaultReadyPolicy(policy.Ready, mainPolicy.Ready); err != nil {
 		return err
 	}
 	// default and valid pending policy
@@ -320,9 +318,10 @@ func (v *validator) validateAndDefaultPolicyProps4ExtraLevel(policy *LevelPolicy
 			return err
 		}
 	}
+	// validate and default transfer policy
 	if *policy.TransferEnable {
-		if policy.Transfer == nil {
-			policy.Transfer = mainPolicy.Transfer
+		if err := v.validateAndDefaultTransferPolicy(policy.Transfer, mainPolicy.Transfer); err != nil {
+			return err
 		}
 	}
 	// validate and default upgrade policy
@@ -375,6 +374,20 @@ func (v *validator) validateAndDefaultShiftPolicy(mainLevel internal.TopicLevel,
 			return errors.New(fmt.Sprintf("destination level cannot be same with the main level: %v", mainLevel))
 		}
 	}
+	// default publish policy
+	v.defaultPublishPolicy(configuredPolicy.PublishPolicy, newDefaultPublishPolicy())
+
+	return nil
+}
+
+func (v *validator) validateAndDefaultTransferPolicy(configuredPolicy *TransferPolicy, defaultPolicy *TransferPolicy) error {
+	if configuredPolicy == nil {
+		configuredPolicy = defaultPolicy
+		return nil
+	}
+	// count 默认0 无需更改
+	// default publish policy
+	v.defaultPublishPolicy(configuredPolicy.PublishPolicy, newDefaultPublishPolicy())
 	return nil
 }
 
@@ -434,25 +447,14 @@ func (v *validator) ValidateAndDefaultProducerConfig(conf *ProducerConfig) error
 		conf.Level = message.L1
 	}
 	// default backoff policy
-	if conf.BackoffMaxTimes > 0 && conf.BackoffPolicy == nil {
-		// delay resend after 1 second
-		backoffDelays := []string{"1s"}
-		if conf.BackoffDelays != nil {
-			backoffDelays = conf.BackoffDelays
-			conf.BackoffDelays = nil // release unnecessary reference
-		}
-		if backoffPolicy, err := backoff.NewAbbrBackoffPolicy(backoffDelays); err != nil {
-			return err
-		} else {
-			conf.BackoffPolicy = backoffPolicy
-		}
-	}
+	v.defaultPublishPolicy(conf.Publish, newDefaultPublishPolicy())
+
 	// validate dead: default dead to D1
 	if *conf.DeadEnable {
 		if conf.Dead == nil {
-			conf.Dead = defaultDeadPolicy
+			conf.Dead = defaultShiftDeadPolicy
 		}
-		if err := v.validateAndDefaultShiftPolicy(conf.Level, conf.Dead, defaultDeadPolicy); err != nil {
+		if err := v.validateAndDefaultShiftPolicy(conf.Level, conf.Dead, defaultShiftDeadPolicy); err != nil {
 			return err
 		}
 	}
@@ -492,6 +494,17 @@ func (v *validator) ValidateAndDefaultProducerConfig(conf *ProducerConfig) error
 	return nil
 }
 
+func (v *validator) validateAndDefaultReadyPolicy(configuredPolicy *ReadyPolicy, defaultPolicy *ReadyPolicy) error {
+	if configuredPolicy == nil {
+		configuredPolicy = defaultPolicy
+		return nil
+	}
+	if configuredPolicy.ConsumeWeight == 0 {
+		configuredPolicy.ConsumeWeight = defaultPolicy.ConsumeWeight
+	}
+	return nil
+}
+
 func (v *validator) validateAndDefaultStatusPolicy(configuredPolicy *StatusPolicy, defaultPolicy *StatusPolicy) error {
 	if configuredPolicy == nil {
 		configuredPolicy = defaultPolicy
@@ -522,6 +535,9 @@ func (v *validator) validateAndDefaultStatusPolicy(configuredPolicy *StatusPolic
 			configuredPolicy.BackoffPolicy = backoffPolicy
 		}
 	}
+	// default publish policy
+	v.defaultPublishPolicy(configuredPolicy.PublishPolicy, newDefaultPublishPolicy())
+
 	return nil
 }
 
@@ -541,6 +557,30 @@ func (v *validator) validateAndDefaultConcurrencyPolicy(configuredPolicy *Concur
 	}
 	if configuredPolicy.PanicHandler == nil {
 		configuredPolicy.PanicHandler = defaultPolicy.PanicHandler
+	}
+	return nil
+}
+
+func (v *validator) defaultPublishPolicy(configuredPolicy *PublishPolicy, defaultPolicy *PublishPolicy) error {
+	// default publish policy
+	if configuredPolicy == nil {
+		configuredPolicy = defaultPolicy
+		return nil
+	}
+	// enable max time
+	if configuredPolicy.BackoffMaxTimes > 0 {
+		if configuredPolicy.BackoffPolicy == nil {
+			backoffDelays := defaultPolicy.BackoffDelays
+			if len(configuredPolicy.BackoffDelays) > 0 {
+				backoffDelays = configuredPolicy.BackoffDelays
+			}
+			if backoffPolicy, err := backoff.NewAbbrBackoffPolicy(backoffDelays); err != nil {
+				return err
+			} else {
+				configuredPolicy.BackoffDelays = nil // release unnecessary reference
+				configuredPolicy.BackoffPolicy = backoffPolicy
+			}
+		}
 	}
 	return nil
 }

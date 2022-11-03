@@ -118,3 +118,15 @@ func (p *messageParser) GetMessageId(msg pulsar.Message) string {
 	id := msg.ID()
 	return fmt.Sprintf("%d:%d:%d", id.LedgerID(), id.EntryID(), id.PartitionIdx())
 }
+
+func (p *messageParser) GetOriginalPublishTime(msg pulsar.Message) time.Time {
+	properties := msg.Properties()
+	if timeStr, ok := properties[XPropertyOriginPublishTime]; ok {
+		if t, err := time.Parse(internal.RFC3339TimeInSecondPattern, timeStr); err == nil {
+			return t
+		}
+	} else {
+		return msg.PublishTime()
+	}
+	return time.Time{}
+}

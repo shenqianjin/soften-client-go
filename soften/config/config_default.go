@@ -3,6 +3,7 @@ package config
 import (
 	"fmt"
 	"github.com/shenqianjin/soften-client-go/soften/internal"
+	"github.com/shenqianjin/soften-client-go/soften/internal/backoff"
 	"github.com/shenqianjin/soften-client-go/soften/message"
 	"strings"
 )
@@ -21,33 +22,33 @@ const (
 // ------ default others ------
 
 var (
-	DefaultConsumeMaxTimes   = 30  // 一个消息整个生命周期中的消费次数上限
-	DefaultReentrantMaxTimes = 30  // 一个消息整个生命周期中的重入次数上限
-	DefaultNackMaxDelay      = 300 // 最大Nack延迟，默认5分钟
+	DefaultConsumeMaxTimes   = 30       // 一个消息整个生命周期中的消费次数上限
+	DefaultReentrantMaxTimes = 30       // 一个消息整个生命周期中的重入次数上限
+	DefaultPublishMaxTimes   = uint(30) // 一个消息发布次数上限
+	DefaultNackMaxDelay      = 300      // 最大Nack延迟，默认5分钟
 
 	// Main 重试间隔策略策略: 累计 120s, 超过6次 每次按60s记
 	// defaultMainBackoffDelays = []string{"3s", "5s", "8s", "14s", "30s", "60s"}
 	// Retrying 重试间隔策略策略: 累计 20min, 超过9次 每次按600s记
 	// expected: []string{"3s", "5s", "8s", "14s", "30s", "60s", "180s", "300s", "600s"}
+
+	// Retrying 补偿重试间隔策略: 前6次60秒, 超过每次间隔60s
 	defaultRetryingBackoffDelays = []string{"3s", "5s", "8s", "14s", "30s", "60s"}
 	// Pending 重试间隔策略策略: 同 defaultRetryingBackoffDelays
 	defaultPendingBackoffDelays = defaultRetryingBackoffDelays
-	// Retrying 重试间隔策略策略: 累计 4h, 超过5次 每次按2h记
+	// Blocking 重试间隔策略策略: 累计 4h, 超过5次 每次按2h记
 	// expected: []string{"600s", "1200s", "1800s", "3600s", "7200s"}
 	defaultBlockingBackoffDelays = []string{"600s"}
+	// Publish 补偿重试间隔策略: 前7次60秒, 超过每次间隔60s
+	defaultPublishBackoffDelays = []string{"1s", "2s", "3s", "5s", "8s", "11s", "30s", "60s"}
 )
 
 // ------ default consume status policies ------
 
 var (
-	// defaultStatusPolicyReady 默认pending状态的校验策略。
-	defaultStatusPolicyReady = &StatusPolicy{
-		ConsumeWeight:     defaultConsumeWeightMain,
-		ConsumeMaxTimes:   1,   // 消费 Ready 1次即可
-		BackoffDelays:     nil, // 期望不重试
-		BackoffPolicy:     nil, //
-		ReentrantDelay:    0,   // 不需要
-		ReentrantMaxTimes: 0,   // 不需要
+	// defaultStatusReadyPolicy 默认pending状态的校验策略。
+	defaultStatusReadyPolicy = &ReadyPolicy{
+		ConsumeWeight: defaultConsumeWeightMain,
 	}
 
 	// defaultStatusPolicyRetrying 默认Retrying状态的校验策略。
@@ -58,6 +59,7 @@ var (
 		BackoffPolicy:     nil,                          //
 		ReentrantDelay:    60,                           // 每1分钟进行一次重入
 		ReentrantMaxTimes: 0,                            // 最大重入次数不限制
+		PublishPolicy:     newDefaultPublishPolicy(),
 	}
 
 	// defaultStatusPolicyPending 默认Pending状态的校验策略。
@@ -68,6 +70,7 @@ var (
 		BackoffPolicy:     nil,                         //
 		ReentrantDelay:    60,                          // 每1分钟进行一次重入
 		ReentrantMaxTimes: 0,                           // 最多重入30次
+		PublishPolicy:     newDefaultPublishPolicy(),
 	}
 
 	// defaultStatusPolicyBlocking 默认pending状态的校验策略。
@@ -78,20 +81,52 @@ var (
 		BackoffPolicy:     nil,                          //
 		ReentrantDelay:    600,                          // 每10min进行一次重入
 		ReentrantMaxTimes: 144,                          // 最多重入144次 (1天=144*10min)
+		PublishPolicy:     newDefaultPublishPolicy(),
 	}
 
 	// defaultDeadPolicy default dead to D1
-	defaultDeadPolicy = &ShiftPolicy{Level: message.D1}
+	defaultDeadPolicy = &DeadPolicy{
+		PublishPolicy: newDefaultPublishPolicy(),
+	}
 
 	// defaultUpgradePolicy
-	defaultUpgradePolicy = &ShiftPolicy{}
+	defaultUpgradePolicy = &ShiftPolicy{
+		PublishPolicy: newDefaultPublishPolicy(),
+	}
 
 	// defaultDegradePolicy
-	defaultDegradePolicy = &ShiftPolicy{}
+	defaultDegradePolicy = &ShiftPolicy{
+		PublishPolicy: newDefaultPublishPolicy(),
+	}
 
 	// defaultShiftPolicy
-	defaultShiftPolicy = &ShiftPolicy{}
+	defaultShiftPolicy = &ShiftPolicy{
+		PublishPolicy: newDefaultPublishPolicy(),
+	}
+
+	// defaultDeadPolicy default dead to D1
+	defaultShiftDeadPolicy = &ShiftPolicy{
+		Level:         message.D1,
+		PublishPolicy: newDefaultPublishPolicy(),
+	}
+
+	// defaultTransferPolicy
+	defaultTransferPolicy = &TransferPolicy{
+		PublishPolicy: newDefaultPublishPolicy(),
+	}
 )
+
+func newDefaultPublishPolicy() *PublishPolicy {
+	backoffPolicy, err := backoff.NewAbbrBackoffPolicy(defaultPublishBackoffDelays)
+	if err != nil {
+		panic(err)
+	}
+	return &PublishPolicy{
+		BackoffDelays:   defaultPublishBackoffDelays,
+		BackoffMaxTimes: DefaultPublishMaxTimes, // 默认30次,前7次60s,累计24分钟
+		BackoffPolicy:   backoffPolicy,
+	}
+}
 
 // ------ default consume leveled policies ------
 
@@ -123,13 +158,6 @@ var (
 		PanicHandler: func(i interface{}) {
 			panic(i)
 		}, // panic to exit main process. as default ants, exits worker goroutine but not main process
-	}
-)
-
-// ------ default Transfer policy ------
-var (
-	defaultTransferPolicy = &TransferPolicy{
-		ConnectInSyncEnable: false,
 	}
 )
 

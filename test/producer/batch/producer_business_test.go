@@ -37,7 +37,7 @@ func TestGenerateUsers(t *testing.T) {
 
 	// clean up topics
 	internal.CleanUpTopics(t, manager, groundTopic)
-	defer internal.CleanUpTopics(t, manager, groundTopic)
+	//defer internal.CleanUpTopics(t, manager, groundTopic)
 	// create topic if not found in case broker closes auto creation
 	internal.CreateTopicsIfNotFound(t, manager, []string{groundTopic}, 0)
 

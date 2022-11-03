@@ -46,7 +46,8 @@ func newSingleLeveledConsumer(parentLogger log.Logger, client *client, level int
 	} else {
 		metrics := client.metricsProvider.GetListenerConsumerMetrics(groundTopic, level, message.StatusReady,
 			subscription, mainTopic)
-		options := statusConsumerOptions{level: level, status: message.StatusReady, policy: conf.Ready, metrics: metrics}
+		statusReadyPolicy := &config.StatusPolicy{ConsumeWeight: conf.Ready.ConsumeWeight}
+		options := statusConsumerOptions{level: level, status: message.StatusReady, policy: statusReadyPolicy, metrics: metrics}
 		slc.mainConsumer = newStatusConsumer(slc.logger, mainConsumer, options, nil)
 	}
 	if *conf.PendingEnable {

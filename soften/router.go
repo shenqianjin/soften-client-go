@@ -17,10 +17,7 @@ import (
 type routerOptions struct {
 	Topic               string
 	connectInSyncEnable bool
-
-	BackoffMaxTimes uint
-	BackoffDelays   []string
-	BackoffPolicy   config.BackoffPolicy
+	publishPolicy       *config.PublishPolicy
 }
 
 type router struct {
@@ -70,8 +67,10 @@ func (r *router) run() {
 			ctx := context.Background()
 			r.producer.SendAsync(ctx, rm.producerMsg, func(messageID pulsar.MessageID,
 				producerMessage *pulsar.ProducerMessage, err error) {
-				for i := uint(0); err != nil && i < r.options.BackoffMaxTimes; i++ {
-					_, err = r.producer.Send(ctx, rm.producerMsg)
+				for sendTimes := uint(1); err != nil && r.options.publishPolicy.BackoffMaxTimes > 0 && sendTimes < r.options.publishPolicy.BackoffMaxTimes; sendTimes++ {
+					delay := r.options.publishPolicy.BackoffPolicy.Next(int(sendTimes))
+					time.Sleep(time.Duration(delay) * time.Second)
+					messageID, err = r.producer.Send(ctx, rm.producerMsg)
 				}
 				r.logger.WithField("msgID", messageID).Debugf("routed message for topic: %s", r.options.Topic)
 				rm.callback(messageID, producerMessage, err)
@@ -117,6 +116,9 @@ func (r *router) close() {
 	select {
 	case r.closeCh <- nil:
 	default:
+	}
+	if r.producer != nil {
+		r.producer.Close()
 	}
 	close(r.readyCh)
 }

@@ -176,9 +176,7 @@ func (d *producerTransferDecider) internalSafeGetRouter(topic string) (*router, 
 	rtOption := routerOptions{
 		Topic:               topic,
 		connectInSyncEnable: d.options.transfer.ConnectInSyncEnable,
-		BackoffMaxTimes:     d.options.transfer.PublishPolicy.BackoffMaxTimes,
-		BackoffDelays:       d.options.transfer.PublishPolicy.BackoffDelays,
-		BackoffPolicy:       d.options.transfer.PublishPolicy.BackoffPolicy,
+		publishPolicy:       d.options.transfer.PublishPolicy,
 	}
 	d.routersLock.Lock()
 	defer d.routersLock.Unlock()
@@ -199,6 +197,9 @@ func (d *producerTransferDecider) internalSafeGetRouter(topic string) (*router, 
 }
 
 func (d *producerTransferDecider) close() {
+	for _, r := range d.routers {
+		r.close()
+	}
 	for _, metric := range d.routerMetrics {
 		metric.DecidersOpened.Dec()
 	}

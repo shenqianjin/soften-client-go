@@ -138,9 +138,7 @@ func (d *transferDecider) internalSafeGetRouterInAsync(topic string) (*router, e
 	rtOption := routerOptions{
 		Topic:               topic,
 		connectInSyncEnable: d.options.transfer.ConnectInSyncEnable,
-		BackoffMaxTimes:     d.options.transfer.PublishPolicy.BackoffMaxTimes,
-		BackoffDelays:       d.options.transfer.PublishPolicy.BackoffDelays,
-		BackoffPolicy:       d.options.transfer.PublishPolicy.BackoffPolicy,
+		publishPolicy:       d.options.transfer.PublishPolicy,
 	}
 	d.routersLock.Lock()
 	defer d.routersLock.Unlock()
@@ -158,5 +156,8 @@ func (d *transferDecider) internalSafeGetRouterInAsync(topic string) (*router, e
 }
 
 func (d *transferDecider) close() {
+	for _, r := range d.routers {
+		r.close()
+	}
 	d.metricsProvider.GetListenerDecidersMetrics(d.options.groundTopic, d.options.subscription, decider.GotoTransfer).DecidersOpened.Dec()
 }

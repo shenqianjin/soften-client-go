@@ -1,6 +1,7 @@
 package topics
 
 import (
+	"encoding/json"
 	"errors"
 
 	"github.com/shenqianjin/soften-client-go/admin/internal"
@@ -10,29 +11,29 @@ import (
 	"github.com/spf13/cobra"
 )
 
-type deleteArgs struct {
+type statArgs struct {
 	groundTopic string
 	partitioned bool
 	all         bool
 }
 
-func newDeleteCommand(rtArgs *internal.RootArgs, mdlArgs *topicsArgs) *cobra.Command {
-	cmdArgs := &deleteArgs{}
+func newStatCommand(rtArgs *internal.RootArgs, mdlArgs *topicsArgs) *cobra.Command {
+	cmdArgs := &statArgs{}
 	cmd := &cobra.Command{
-		Use:   "delete ",
-		Short: "Delete soften topic or topics by ground topic.",
-		Long: "Delete soften topic or topics by ground topic.\n" +
+		Use:   "stats ",
+		Short: "Stats soften topic or topics by ground topic.",
+		Long: "Stats soften topic or topics by ground topic.\n" +
 			"\n" +
 			"Exact 1 argument like the below format is necessary: \n" +
 			"  <schema>://<tenant>/<namespace>/<topic>\n" +
 			"  <tenant>/<namespace>/<topic>\n" +
 			"  <topic>",
-		Example: "(1) soften-admin topics delete public/default/test\n" +
-			"(2) soften-admin topics delete persistent://business/finance/equity -A",
+		Example: "(1) soften-admin topics stats public/default/test\n" +
+			"(2) soften-admin topics stats persistent://business/finance/equity -A",
 		Args: cobra.MinimumNArgs(1),
 		Run: func(cmd *cobra.Command, args []string) {
 			cmdArgs.groundTopic = args[0]
-			deleteTopics(rtArgs, mdlArgs, cmdArgs)
+			statTopics(rtArgs, mdlArgs, cmdArgs)
 		},
 	}
 	// parse variables
@@ -42,12 +43,12 @@ func newDeleteCommand(rtArgs *internal.RootArgs, mdlArgs *topicsArgs) *cobra.Com
 	return cmd
 }
 
-func deleteTopics(rtArgs *internal.RootArgs, mdlArgs *topicsArgs, cmdArgs *deleteArgs) {
+func statTopics(rtArgs *internal.RootArgs, mdlArgs *topicsArgs, cmdArgs *statArgs) {
 	namespaceTopic, err := util.ParseNamespaceTopic(cmdArgs.groundTopic)
 	if err != nil {
-		logrus.Fatalf("list \"%s\" failed: %v\n", cmdArgs.groundTopic, err)
+		logrus.Fatalf("stats \"%s\" failed: %v\n", cmdArgs.groundTopic, err)
 	} else if namespaceTopic.ShortTopic == "" {
-		logrus.Fatalf("list \"%s\" failed: %v\n", cmdArgs.groundTopic, "not found topic")
+		logrus.Fatalf("stats \"%s\" failed: %v\n", cmdArgs.groundTopic, "not found topic")
 	}
 	var topics []string
 	if cmdArgs.all {
@@ -61,7 +62,7 @@ func deleteTopics(rtArgs *internal.RootArgs, mdlArgs *topicsArgs, cmdArgs *delet
 			err = errors.New("topic not existed")
 		}
 		if err != nil {
-			logrus.Fatalf("delete \"%s\" failed: %v\n", cmdArgs.groundTopic, err)
+			logrus.Fatalf("stats \"%s\" failed: %v\n", cmdArgs.groundTopic, err)
 		}
 	} else {
 		// filter by options
@@ -70,21 +71,31 @@ func deleteTopics(rtArgs *internal.RootArgs, mdlArgs *topicsArgs, cmdArgs *delet
 		}
 	}
 	if err != nil {
-		logrus.Fatalf("delete \"%s\" failed: %v\n", cmdArgs.groundTopic, err)
+		logrus.Fatalf("stats \"%s\" failed: %v\n", cmdArgs.groundTopic, err)
 	}
 
 	if len(topics) == 0 {
 		logrus.Warn("Not Found")
 	}
 	// delete one by one
-	manager := admin.NewRobustTopicManager(rtArgs.Url)
+	manager := admin.NewPartitionedTopicManager(rtArgs.Url)
+	npManager := admin.NewNonPartitionedTopicManager(rtArgs.Url)
 	for _, topic := range topics {
 		var err error
-		err = manager.Delete(topic)
-		if err != nil {
-			logrus.Fatalf("deleted \"%s\" failed: %v\n", topic, err)
+		var st interface{}
+		if cmdArgs.partitioned {
+			st, err = manager.Stats(topic)
 		} else {
-			logrus.Infof("deleted \"%s\" successfully\n", topic)
+			st, err = npManager.Stats(topic)
+		}
+		if err != nil {
+			logrus.Fatalf("stats \"%s\" failed: %v\n", topic, err)
+		} else {
+			stBytes, err := json.MarshalIndent(st, "", "    ")
+			if err != nil {
+				logrus.Fatalf("stats \"%s\" failed: %v\n", topic, err)
+			}
+			logrus.Infof("stats \"%s\" successfully: \n%v\n", topic, string(stBytes))
 		}
 	}
 }

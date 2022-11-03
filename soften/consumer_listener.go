@@ -248,6 +248,7 @@ func (l *consumeListener) formatGeneralDecidersOptions(topic string, enables *in
 		subscriptionName: conf.SubscriptionName,
 		DiscardEnable:    enables.DiscardEnable,
 		DeadEnable:       enables.DeadEnable,
+		Dead:             conf.Dead,
 		TransferEnable:   enables.TransferEnable,
 		Transfer:         conf.Transfer,
 		UpgradeEnable:    enables.UpgradeEnable,

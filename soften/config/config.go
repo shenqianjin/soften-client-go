@@ -71,11 +71,8 @@ type ProducerConfig struct {
 	ShiftEnable    *bool           `json:"shift_enable"`   // Optional:
 	Shift          *ShiftPolicy    `json:"shift"`          // Optional:
 
-	HandleTimeout uint `json:"handle_timeout"` // Optional: 发送消息超时时间, Default: 30 seconds
-
-	BackoffMaxTimes uint          `json:"backoff_max_times"` // Optional: 发送失败默认重试次数
-	BackoffDelays   []string      `json:"backoff_delays"`    // Optional: 失败重试延迟
-	BackoffPolicy   BackoffPolicy `json:"-"`                 // Optional: 补偿策略, 优先级高于 BackoffDelays
+	HandleTimeout uint           `json:"handle_timeout"` // Optional: 发送消息超时时间, Default: 30 seconds
+	Publish       *PublishPolicy `json:"shift"`          // Optional: 发布策略
 
 }
 
@@ -128,7 +125,7 @@ type LevelPolicy struct {
 	TransferEnable *bool           `json:"transfer_enable"` // Optional: PreReTransfer 检查开关, 默认false
 	Transfer       *TransferPolicy `json:"transfer"`        // Optional: Handle失败时的动态重路由
 
-	Ready          *StatusPolicy `json:"ready"`           // Optional: Ready 主题检查策略
+	Ready          *ReadyPolicy  `json:"ready"`           // Optional: Ready 主题检查策略
 	BlockingEnable *bool         `json:"blocking_enable"` // Optional: Blocking 检查开关
 	Blocking       *StatusPolicy `json:"blocking"`        // Optional: Blocking 主题检查策略
 	PendingEnable  *bool         `json:"pending_enable"`  // Optional: Pending 检查开关
@@ -136,9 +133,8 @@ type LevelPolicy struct {
 	RetryingEnable *bool         `json:"retrying_enable"` // Optional: Retrying 重试检查开关
 	Retrying       *StatusPolicy `json:"retrying"`        // Optional: Retrying 主题检查策略
 	DeadEnable     *bool         `json:"dead_enable"`     // Optional: 死信队列开关, 默认false; 如果所有校验器都没能校验通过, 应用代码需要自行Ack或者Nack
-	Dead           *StatusPolicy `json:"dead"`            // Optional: Dead 主题检查策略
+	Dead           *DeadPolicy   `json:"dead"`            // Optional: Dead 主题检查策略
 	DiscardEnable  *bool         `json:"discard_enable"`  // Optional: 丢弃消息开关, 默认false
-	Discard        *StatusPolicy `json:"discard"`         // Optional: Discard 主题检查策略
 }
 
 type ReadyPolicy struct {
@@ -158,15 +154,19 @@ type StatusPolicy struct {
 	BackoffPolicy     StatusBackoffPolicy `json:"-"`                   // Optional: 补偿策略, 优先级高于 BackoffDelays
 	ReentrantDelay    uint                `json:"reentrant_delay"`     // Optional: 重入延迟
 	ReentrantMaxTimes int                 `json:"reentrant_max_times"` // Optional: 重入次数上限
-	PublishPolicy     PublishPolicy       `json:"publish"`             // Optional: 发布策略
+	PublishPolicy     *PublishPolicy      `json:"publish"`             // Optional: 发布策略
+}
+
+type DeadPolicy struct {
+	PublishPolicy *PublishPolicy `json:"publish"` // Optional: 发布策略
 }
 
 type TransferPolicy struct {
-	ConnectInSyncEnable bool          `json:"connect_in_sync_enable"` // Optional: 是否同步建立连接, 首次发送消息需阻塞等待客户端与服务端连接完成
-	Topic               string        `json:"topic"`                  // Optional: 默认转移到的队列: 优先级比 GotoExtra参数中指定的低
-	ConsumeDelay        uint64        `json:"consume_delay"`          // Optional: 消费延迟(近似值: 通过1次或者多次重入实现, 不足1次重入延迟时当1次处理), 默认 0
-	CountMode           CountPassMode `json:"count_pass_mode"`        // Optional: 计数传递模式: 0 传递累计计数; 1 重置计数
-	PublishPolicy       PublishPolicy `json:"publish"`                // Optional: 发布策略
+	ConnectInSyncEnable bool           `json:"connect_in_sync_enable"` // Optional: 是否同步建立连接, 首次发送消息需阻塞等待客户端与服务端连接完成
+	Topic               string         `json:"topic"`                  // Optional: 默认转移到的队列: 优先级比 GotoExtra参数中指定的低
+	ConsumeDelay        uint64         `json:"consume_delay"`          // Optional: 消费延迟(近似值: 通过1次或者多次重入实现, 不足1次重入延迟时当1次处理), 默认 0
+	CountMode           CountPassMode  `json:"count_pass_mode"`        // Optional: 计数传递模式: 0 传递累计计数; 1 重置计数
+	PublishPolicy       *PublishPolicy `json:"publish"`                // Optional: 发布策略
 }
 
 type ShiftPolicy struct {
@@ -174,7 +174,7 @@ type ShiftPolicy struct {
 	Level               internal.TopicLevel `json:"level"`                  // Optional: 默认升降级的级别: 优先级比 GotoExtra参数中指定的低
 	ConsumeDelay        uint64              `json:"consume_delay"`          // Optional: 消费延迟(近似值: 通过1次或者多次重入实现, 不足1次重入延迟时当1次处理), 默认 0
 	CountMode           CountPassMode       `json:"count_pass_mode"`        // Optional: 计数传递模式: 0 透传累计计数; 1 重置计数
-	PublishPolicy       PublishPolicy       `json:"publish"`                // Optional: 发布策略
+	PublishPolicy       *PublishPolicy      `json:"publish"`                // Optional: 发布策略
 }
 
 type PublishPolicy struct {

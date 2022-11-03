@@ -181,9 +181,7 @@ func (d *shiftDecider) internalSafeGetRouterInAsync(topic string) (*router, erro
 	rtOption := routerOptions{
 		Topic:               topic,
 		connectInSyncEnable: d.options.shift.ConnectInSyncEnable,
-		BackoffMaxTimes:     d.options.shift.PublishPolicy.BackoffMaxTimes,
-		BackoffDelays:       d.options.shift.PublishPolicy.BackoffDelays,
-		BackoffPolicy:       d.options.shift.PublishPolicy.BackoffPolicy,
+		publishPolicy:       d.options.shift.PublishPolicy,
 	}
 	d.routersLock.Lock()
 	defer d.routersLock.Unlock()
@@ -201,5 +199,8 @@ func (d *shiftDecider) internalSafeGetRouterInAsync(topic string) (*router, erro
 }
 
 func (d *shiftDecider) close() {
+	for _, r := range d.routers {
+		r.close()
+	}
 	d.metricsProvider.GetListenerDecidersMetrics(d.options.groundTopic, d.options.subscription, d.options.msgGoto).DecidersOpened.Dec()
 }
