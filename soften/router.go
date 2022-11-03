@@ -93,8 +93,10 @@ func (r *router) initializeProducer() {
 		for {
 			producer, err := r.client.CreateProducer(pulsar.ProducerOptions{
 				Topic:                   r.options.Topic,
+				DisableBatching:         r.options.publish.DisableBatching,
+				BatchingMaxPublishDelay: time.Second * time.Duration(r.options.publish.BatchingMaxPublishDelay),
+				BatchingMaxMessages:     r.options.publish.BatchingMaxMessages,
 				CompressionType:         pulsar.LZ4,
-				BatchingMaxPublishDelay: 100 * time.Millisecond,
 			})
 
 			if err != nil {
