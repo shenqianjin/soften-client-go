@@ -528,7 +528,7 @@ func (v *validator) validateAndDefaultStatusPolicy(configuredPolicy *StatusPolic
 	}
 	// default policy
 	if configuredPolicy.BackoffDelayPolicy == nil && configuredPolicy.BackoffDelays != nil {
-		if backoffPolicy, err := backoff.NewAbbrStatusBackoffPolicy(configuredPolicy.BackoffDelays); err != nil {
+		if backoffPolicy, err := backoff.NewAbbrStatusBackoffDelayPolicy(configuredPolicy.BackoffDelays); err != nil {
 			return err
 		} else {
 			configuredPolicy.BackoffDelays = nil // release unnecessary reference
@@ -586,7 +586,7 @@ func (v *validator) validateAndDefaultBackoffPolicy(configuredPolicy *BackoffPol
 			if len(configuredPolicy.Delays) > 0 {
 				backoffDelays = configuredPolicy.Delays
 			}
-			if backoffPolicy, err := backoff.NewAbbrBackoffPolicy(backoffDelays); err != nil {
+			if backoffPolicy, err := backoff.NewAbbrBackoffDelayPolicy(backoffDelays); err != nil {
 				return err
 			} else {
 				configuredPolicy.Delays = nil // release unnecessary reference

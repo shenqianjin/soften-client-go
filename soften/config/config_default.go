@@ -117,7 +117,7 @@ var (
 )
 
 func newDefaultBackoffPolicy() *BackoffPolicy {
-	backoffPolicy, err := backoff.NewAbbrBackoffPolicy(defaultPublishBackoffDelays)
+	backoffPolicy, err := backoff.NewAbbrBackoffDelayPolicy(defaultPublishBackoffDelays)
 	if err != nil {
 		panic(err)
 	}

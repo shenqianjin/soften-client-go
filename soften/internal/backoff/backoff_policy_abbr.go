@@ -8,11 +8,11 @@ import (
 
 // ------ abbr backoff policy ------
 
-type abbrBackoffPolicy struct {
+type abbrBackoffDelayPolicy struct {
 	backoffDelays []uint
 }
 
-func (p abbrBackoffPolicy) Next(redeliveryTimes int) uint {
+func (p abbrBackoffDelayPolicy) Next(redeliveryTimes int) uint {
 	if redeliveryTimes < 0 {
 		redeliveryTimes = 0
 	}
@@ -22,7 +22,7 @@ func (p abbrBackoffPolicy) Next(redeliveryTimes int) uint {
 	return p.backoffDelays[redeliveryTimes]
 }
 
-func NewAbbrBackoffPolicy(delays []string) (*abbrBackoffPolicy, error) {
+func NewAbbrBackoffDelayPolicy(delays []string) (*abbrBackoffDelayPolicy, error) {
 	if len(delays) == 0 {
 		return nil, errors.New("backoffDelays is empty")
 	}
@@ -37,5 +37,5 @@ func NewAbbrBackoffPolicy(delays []string) (*abbrBackoffPolicy, error) {
 			backoffDelays[index] = uint(d) * unit.Delay()
 		}
 	}
-	return &abbrBackoffPolicy{backoffDelays: backoffDelays}, nil
+	return &abbrBackoffDelayPolicy{backoffDelays: backoffDelays}, nil
 }
