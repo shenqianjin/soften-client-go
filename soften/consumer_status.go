@@ -140,7 +140,7 @@ func (sc *statusConsumer) increaseConsumeTimes(msg consumerMessage) {
 	// increase consume times
 	msgCounter.ConsumeTimes += incr
 	// increase reckon times only if consume times limit is enable on current status
-	if sc.status == message.StatusReady || sc.policy.ConsumeMaxTimes > 0 {
+	if sc.status == message.StatusReady || *sc.policy.ConsumeMaxTimes > 0 {
 		msgCounter.ConsumeReckonTimes += incr
 	}
 	message.Helper.InjectMessageCounter(msg.Message.Properties(), msgCounter)
@@ -148,7 +148,7 @@ func (sc *statusConsumer) increaseConsumeTimes(msg consumerMessage) {
 	// increase status consume times
 	statusMsgCounter.ConsumeTimes += incr
 	// increase status reckon times only if consume times limit is enable on current status
-	if sc.status == message.StatusReady || sc.policy.ConsumeMaxTimes > 0 {
+	if sc.status == message.StatusReady || *sc.policy.ConsumeMaxTimes > 0 {
 		statusMsgCounter.ConsumeReckonTimes += incr
 	}
 	message.Helper.InjectStatusMessageCounter(msg.Message.Properties(), sc.status, statusMsgCounter)

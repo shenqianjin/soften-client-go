@@ -22,17 +22,13 @@ const (
 // ------ default others ------
 
 var (
-	DefaultConsumeMaxTimes   = 30       // 一个消息整个生命周期中的消费次数上限
-	DefaultReentrantMaxTimes = 30       // 一个消息整个生命周期中的重入次数上限
-	DefaultPublishMaxTimes   = uint(30) // 一个消息发布次数上限
-	DefaultNackMaxDelay      = 300      // 最大Nack延迟，默认5分钟
-
-	// Main 重试间隔策略策略: 累计 120s, 超过6次 每次按60s记
-	// defaultMainBackoffDelays = []string{"3s", "5s", "8s", "14s", "30s", "60s"}
-	// Retrying 重试间隔策略策略: 累计 20min, 超过9次 每次按600s记
-	// expected: []string{"3s", "5s", "8s", "14s", "30s", "60s", "180s", "300s", "600s"}
+	DefaultConsumeMaxTimes   = uint(30)  // 一个消息整个生命周期中的消费次数上限
+	DefaultReentrantMaxTimes = uint(30)  // 一个消息整个生命周期中的重入次数上限
+	DefaultPublishMaxTimes   = uint(30)  // 一个消息发布次数上限
+	DefaultNackMaxDelay      = uint(300) // 最大Nack延迟，默认5分钟
 
 	// Retrying 补偿重试间隔策略: 前6次60秒, 超过每次间隔60s
+	// expected: []string{"3s", "5s", "8s", "14s", "30s", "60s", "180s", "300s", "600s"}
 	defaultRetryingBackoffDelays = []string{"3s", "5s", "8s", "14s", "30s", "60s"}
 	// Pending 重试间隔策略策略: 同 defaultRetryingBackoffDelays
 	defaultPendingBackoffDelays = defaultRetryingBackoffDelays
@@ -48,39 +44,39 @@ var (
 var (
 	// defaultStatusReadyPolicy 默认pending状态的校验策略。
 	defaultStatusReadyPolicy = &ReadyPolicy{
-		ConsumeWeight: defaultConsumeWeightMain,
+		ConsumeWeight: ToPointer(defaultConsumeWeightMain),
 	}
 
 	// defaultStatusPolicyRetrying 默认Retrying状态的校验策略。
 	defaultStatusPolicyRetrying = &StatusPolicy{
-		ConsumeWeight:      defaultConsumeWeightRetrying,
-		ConsumeMaxTimes:    60 * 6,                       // 最多尝试60*6=360次, 6h小时内每分钟重试
+		ConsumeWeight:      ToPointer(defaultConsumeWeightRetrying),
+		ConsumeMaxTimes:    ToPointer(uint(60 * 6)),      // 最多尝试60*6=360次, 6h小时内每分钟重试
 		BackoffDelays:      defaultRetryingBackoffDelays, // 前5次累计1分钟, 第6次开始每隔1分钟开始重试
 		BackoffDelayPolicy: nil,                          //
-		ReentrantDelay:     60,                           // 每1分钟进行一次重入
-		ReentrantMaxTimes:  0,                            // 最大重入次数不限制
+		ReentrantDelay:     ToPointer(uint(60)),          // 每1分钟进行一次重入
+		ReentrantMaxTimes:  ToPointer(uint(0)),           // 最大重入次数不限制
 		Publish:            newDefaultPublishPolicy(),
 	}
 
 	// defaultStatusPolicyPending 默认Pending状态的校验策略。
 	defaultStatusPolicyPending = &StatusPolicy{
-		ConsumeWeight:      defaultConsumeWeightPending,
-		ConsumeMaxTimes:    0,                           // pending 默认不限制次数
+		ConsumeWeight:      ToPointer(defaultConsumeWeightPending),
+		ConsumeMaxTimes:    ToPointer(uint(0)),          // pending 默认不限制次数
 		BackoffDelays:      defaultPendingBackoffDelays, // 前5次累计1分钟, 第6次开始每隔1分钟开始重试
 		BackoffDelayPolicy: nil,                         //
-		ReentrantDelay:     60,                          // 每1分钟进行一次重入
-		ReentrantMaxTimes:  0,                           // 最多重入30次
+		ReentrantDelay:     ToPointer(uint(60)),         // 每1分钟进行一次重入
+		ReentrantMaxTimes:  ToPointer(uint(0)),          // 最多重入30次
 		Publish:            newDefaultPublishPolicy(),
 	}
 
 	// defaultStatusPolicyBlocking 默认pending状态的校验策略。
 	defaultStatusPolicyBlocking = &StatusPolicy{
-		ConsumeWeight:      defaultConsumeWeightBlocking,
-		ConsumeMaxTimes:    6 * 24 * 2,                   // 最多消费6 * 24 * 2=288次, 1h*24*2=2d内重试
+		ConsumeWeight:      ToPointer(defaultConsumeWeightBlocking),
+		ConsumeMaxTimes:    ToPointer(uint(6 * 24 * 2)),  // 最多消费6 * 24 * 2=288次, 1h*24*2=2d内重试
 		BackoffDelays:      defaultBlockingBackoffDelays, // 前4次累计2h, 第5次开始每隔2h开始重试
 		BackoffDelayPolicy: nil,                          //
-		ReentrantDelay:     600,                          // 每10min进行一次重入
-		ReentrantMaxTimes:  144,                          // 最多重入144次 (1天=144*10min)
+		ReentrantDelay:     ToPointer(uint(600)),         // 每10min进行一次重入
+		ReentrantMaxTimes:  ToPointer(uint(144)),         // 最多重入144次 (1天=144*10min)
 		Publish:            newDefaultPublishPolicy(),
 	}
 
@@ -123,7 +119,7 @@ func newDefaultBackoffPolicy() *BackoffPolicy {
 	}
 	return &BackoffPolicy{
 		Delays:      defaultPublishBackoffDelays,
-		MaxTimes:    DefaultPublishMaxTimes, // 默认30次,前7次60s,累计24分钟
+		MaxTimes:    ToPointer(DefaultPublishMaxTimes), // 默认30次,前7次60s,累计24分钟
 		DelayPolicy: backoffPolicy,
 	}
 }

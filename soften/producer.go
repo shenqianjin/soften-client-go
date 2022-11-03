@@ -203,7 +203,7 @@ func (p *producer) Send(ctx context.Context, msg *pulsar.ProducerMessage) (msgId
 	// send
 	msgId, err = p.Producer.Send(ctx, msg)
 	// backoff
-	for sendTimes := uint(1); err != nil && p.backoff.MaxTimes > 0 && sendTimes <= p.backoff.MaxTimes; sendTimes++ {
+	for sendTimes := uint(1); err != nil && *p.backoff.MaxTimes > 0 && sendTimes <= *p.backoff.MaxTimes; sendTimes++ {
 		delay := p.backoff.DelayPolicy.Next(int(sendTimes))
 		time.Sleep(time.Duration(delay) * time.Second)
 		msgId, err = p.Producer.Send(ctx, msg)
@@ -232,7 +232,7 @@ func (p *producer) SendAsync(ctx context.Context, msg *pulsar.ProducerMessage,
 	}
 	callbackNew := func(msgID pulsar.MessageID, msg *pulsar.ProducerMessage, err error) {
 		// backoff with synchronous send
-		for sendTimes := uint(1); err != nil && p.backoff.MaxTimes > 0 && sendTimes <= p.backoff.MaxTimes; sendTimes++ {
+		for sendTimes := uint(1); err != nil && *p.backoff.MaxTimes > 0 && sendTimes <= *p.backoff.MaxTimes; sendTimes++ {
 			delay := p.backoff.DelayPolicy.Next(int(sendTimes))
 			time.Sleep(time.Duration(delay) * time.Second)
 			msgID, err = p.Producer.Send(ctx, msg)

@@ -162,7 +162,7 @@ func testListenDecide(t *testing.T, testCase testListenDecideCase) {
 
 	testPolicy := &config.StatusPolicy{
 		BackoffDelays:  []string{"1s"},
-		ReentrantDelay: 1,
+		ReentrantDelay: config.ToPointer(uint(1)),
 	}
 	// create listener
 	upgradeLevel, _ := message.LevelOf(testCase.upgradeLevel)

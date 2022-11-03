@@ -42,8 +42,8 @@ func TestConsumeLimitL2_Retrying_Success(t *testing.T) {
 		// reentrant times:        1     +1    +2    +4         = 8
 		// real delay:             2s    2s    4s    8s         = 16s
 		BackoffDelays:   []string{"1s", "2s", "3s", "7s", "3s"}, // 3s   3s    3s
-		ReentrantDelay:  2,
-		ConsumeMaxTimes: 8,
+		ReentrantDelay:  config.ToPointer(uint(2)),
+		ConsumeMaxTimes: config.ToPointer(uint(8)),
 	}
 	successConsumeTimes := 5
 	expectedStatusReentrantTimes := 8
@@ -82,8 +82,8 @@ func TestConsumeLimitL2_Retrying(t *testing.T) {
 		// reentrant times:        1     +1    +2    +4    +2    [+2,  +2     +2] = 16
 		// real delay:             2s    2s    4s    8s    4s     4s    4s     4s = 32s
 		BackoffDelays:   []string{"1s", "2s", "3s", "7s", "3s"}, // 3s   3s    3s -> DLQ
-		ReentrantDelay:  2,
-		ConsumeMaxTimes: 8,
+		ReentrantDelay:  config.ToPointer(uint(2)),
+		ConsumeMaxTimes: config.ToPointer(uint(8)),
 	}
 	expectedStatusReentrantTimes := 16
 	waitTime := (32 + 1) * time.Second
@@ -121,8 +121,8 @@ func TestConsumeLimitL2_Pending(t *testing.T) {
 		// reentrant times:        1     +1    +2    +4    +2     = 16
 		// real delay:             2s    2s    4s    8s    4s     = 32s
 		BackoffDelays:   []string{"1s", "2s", "3s", "7s", "3s"}, // 3s   3s    3s -> DLQ
-		ReentrantDelay:  2,
-		ConsumeMaxTimes: 8,
+		ReentrantDelay:  config.ToPointer(uint(2)),
+		ConsumeMaxTimes: config.ToPointer(uint(8)),
 	}
 	expectedStatusReentrantTimes := 16
 	waitTime := (32 + 1) * time.Second
@@ -156,8 +156,8 @@ func TestConsumeLimitL2_Blocking(t *testing.T) {
 		// reentrant times:        1     +1    +2    +4    +2    [+2,  +2     +2] = 16
 		// real delay:             2s    2s    4s    8s    4s     4s    4s     4s = 32s
 		BackoffDelays:   []string{"1s", "2s", "3s", "7s", "3s"}, // 3s   3s    3s -> DLQ
-		ReentrantDelay:  2,
-		ConsumeMaxTimes: 8,
+		ReentrantDelay:  config.ToPointer(uint(2)),
+		ConsumeMaxTimes: config.ToPointer(uint(8)),
 	}
 	expectedStatusReentrantTimes := 16
 	waitTime := (32 + 1) * time.Second

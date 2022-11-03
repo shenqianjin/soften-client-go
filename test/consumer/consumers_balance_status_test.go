@@ -145,7 +145,7 @@ func testConsumerBalanceStatus(t *testing.T, testCase consumerBalanceCase) {
 
 	testPolicy := &config.StatusPolicy{
 		BackoffDelays:  []string{"1s"},
-		ReentrantDelay: 1,
+		ReentrantDelay: config.ToPointer(uint(1)),
 	}
 	leveledPolicy := &config.LevelPolicy{
 		PendingEnable:  config.ToPointer(enableMap[message.StatusPending.String()]),
@@ -164,16 +164,16 @@ func testConsumerBalanceStatus(t *testing.T, testCase consumerBalanceCase) {
 		},
 	}
 	if w, ok := expectedWeights[message.StatusReady.String()]; ok {
-		consumerConf.Ready = &config.ReadyPolicy{ConsumeWeight: uint(w)}
+		consumerConf.Ready = &config.ReadyPolicy{ConsumeWeight: config.ToPointer(uint(w))}
 	}
 	if w, ok := expectedWeights[message.StatusPending.String()]; ok {
-		consumerConf.Pending = &config.StatusPolicy{ConsumeWeight: uint(w), BackoffDelays: testPolicy.BackoffDelays, ReentrantDelay: testPolicy.ReentrantDelay}
+		consumerConf.Pending = &config.StatusPolicy{ConsumeWeight: config.ToPointer(uint(w)), BackoffDelays: testPolicy.BackoffDelays, ReentrantDelay: testPolicy.ReentrantDelay}
 	}
 	if w, ok := expectedWeights[message.StatusRetrying.String()]; ok {
-		consumerConf.Retrying = &config.StatusPolicy{ConsumeWeight: uint(w), BackoffDelays: testPolicy.BackoffDelays, ReentrantDelay: testPolicy.ReentrantDelay}
+		consumerConf.Retrying = &config.StatusPolicy{ConsumeWeight: config.ToPointer(uint(w)), BackoffDelays: testPolicy.BackoffDelays, ReentrantDelay: testPolicy.ReentrantDelay}
 	}
 	if w, ok := expectedWeights[message.StatusBlocking.String()]; ok {
-		consumerConf.Blocking = &config.StatusPolicy{ConsumeWeight: uint(w), BackoffDelays: testPolicy.BackoffDelays, ReentrantDelay: testPolicy.ReentrantDelay}
+		consumerConf.Blocking = &config.StatusPolicy{ConsumeWeight: config.ToPointer(uint(w)), BackoffDelays: testPolicy.BackoffDelays, ReentrantDelay: testPolicy.ReentrantDelay}
 	}
 	listener, err := client.CreateListener(consumerConf)
 

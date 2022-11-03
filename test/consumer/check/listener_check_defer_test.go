@@ -89,7 +89,7 @@ func TestConsumeCheck_Prev_Pending_Defer(t *testing.T) {
 
 	testPolicy := &config.StatusPolicy{
 		BackoffDelays:  []string{"1s"},
-		ReentrantDelay: 1,
+		ReentrantDelay: config.ToPointer(uint(1)),
 	}
 	leveledPolicy := &config.LevelPolicy{
 		PendingEnable: config.True(),

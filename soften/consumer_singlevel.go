@@ -90,18 +90,18 @@ func (slc *singleLeveledConsumer) retrieveStatusMessages() {
 	chs := make([]<-chan consumerMessage, 1)
 	weights := make([]uint, 1)
 	chs[0] = slc.mainConsumer.StatusChan()
-	weights[0] = slc.mainConsumer.policy.ConsumeWeight
+	weights[0] = *slc.mainConsumer.policy.ConsumeWeight
 	if slc.retryingConsumer != nil {
 		chs = append(chs, slc.retryingConsumer.StatusChan())
-		weights = append(weights, slc.retryingConsumer.policy.ConsumeWeight)
+		weights = append(weights, *slc.retryingConsumer.policy.ConsumeWeight)
 	}
 	if slc.pendingConsumer != nil {
 		chs = append(chs, slc.pendingConsumer.StatusChan())
-		weights = append(weights, slc.pendingConsumer.policy.ConsumeWeight)
+		weights = append(weights, *slc.pendingConsumer.policy.ConsumeWeight)
 	}
 	if slc.blockingConsumer != nil {
 		chs = append(chs, slc.blockingConsumer.StatusChan())
-		weights = append(weights, slc.blockingConsumer.policy.ConsumeWeight)
+		weights = append(weights, *slc.blockingConsumer.policy.ConsumeWeight)
 	}
 	balanceStrategy, err := config.BuildStrategy(slc.statusStrategy, weights)
 	if err != nil {

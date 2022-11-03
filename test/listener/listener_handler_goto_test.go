@@ -198,7 +198,7 @@ func testListenHandleGoto(t *testing.T, testCase testListenHandleCase) {
 
 	testPolicy := &config.StatusPolicy{
 		BackoffDelays:  []string{"1s"},
-		ReentrantDelay: 1,
+		ReentrantDelay: config.ToPointer(uint(1)),
 	}
 	// create listener
 	shiftLevel, _ := message.LevelOf(testCase.shiftLevel)
@@ -337,7 +337,7 @@ func TestListenHandle_All(t *testing.T) {
 
 	testPolicy := &config.StatusPolicy{
 		BackoffDelays:  []string{"1s"},
-		ReentrantDelay: 1,
+		ReentrantDelay: config.ToPointer(uint(1)),
 	}
 	leveledPolicy := &config.LevelPolicy{
 		DiscardEnable:  config.True(),

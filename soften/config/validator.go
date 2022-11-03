@@ -404,6 +404,9 @@ func (v *validator) validateAndDefaultShiftPolicy(mainLevel internal.TopicLevel,
 		}
 	}
 	// default publish policy
+	if configuredPolicy.Publish == nil {
+		configuredPolicy.Publish = newDefaultPublishPolicy()
+	}
 	v.validateAndDefaultPublishPolicy(configuredPolicy.Publish, newDefaultPublishPolicy())
 
 	return nil
@@ -416,6 +419,9 @@ func (v *validator) validateAndDefaultTransferPolicy(configuredPolicy *TransferP
 	}
 	// count 默认0 无需更改
 	// default publish policy
+	if configuredPolicy.Publish == nil {
+		configuredPolicy.Publish = newDefaultPublishPolicy()
+	}
 	v.validateAndDefaultPublishPolicy(configuredPolicy.Publish, newDefaultPublishPolicy())
 	return nil
 }
@@ -537,20 +543,20 @@ func (v *validator) validateAndDefaultStatusPolicy(configuredPolicy *StatusPolic
 		configuredPolicy = defaultPolicy
 		return nil
 	}
-	if configuredPolicy.ConsumeWeight == 0 {
+	if configuredPolicy.ConsumeWeight == nil {
 		configuredPolicy.ConsumeWeight = defaultPolicy.ConsumeWeight
 	}
-	if configuredPolicy.ConsumeMaxTimes == 0 {
+	if configuredPolicy.ConsumeMaxTimes == nil {
 		configuredPolicy.ConsumeMaxTimes = defaultPolicy.ConsumeMaxTimes
 	}
 	if configuredPolicy.BackoffDelays == nil && configuredPolicy.BackoffDelayPolicy == nil {
 		configuredPolicy.BackoffDelays = defaultPolicy.BackoffDelays
 		configuredPolicy.BackoffDelayPolicy = defaultPolicy.BackoffDelayPolicy
 	}
-	if configuredPolicy.ReentrantDelay == 0 {
+	if configuredPolicy.ReentrantDelay == nil {
 		configuredPolicy.ReentrantDelay = defaultPolicy.ReentrantDelay
 	}
-	if configuredPolicy.ReentrantMaxTimes == 0 {
+	if configuredPolicy.ReentrantMaxTimes == nil {
 		configuredPolicy.ReentrantMaxTimes = defaultPolicy.ReentrantMaxTimes
 	}
 	// default policy
@@ -563,6 +569,9 @@ func (v *validator) validateAndDefaultStatusPolicy(configuredPolicy *StatusPolic
 		}
 	}
 	// default publish policy
+	if configuredPolicy.Publish == nil {
+		configuredPolicy.Publish = newDefaultPublishPolicy()
+	}
 	v.validateAndDefaultPublishPolicy(configuredPolicy.Publish, newDefaultPublishPolicy())
 
 	return nil
@@ -589,10 +598,10 @@ func (v *validator) validateAndDefaultConcurrencyPolicy(configuredPolicy *Concur
 }
 
 func (v *validator) validateAndDefaultDeadPolicy(configuredPolicy *DeadPolicy, defaultPolicy *DeadPolicy) error {
+	// validate and default publish policy
 	if configuredPolicy.Publish == nil {
 		configuredPolicy.Publish = newDefaultPublishPolicy()
 	}
-	// validate and default publish policy
 	if err := v.validateAndDefaultPublishPolicy(configuredPolicy.Publish, defaultDeadPolicy.Publish); err != nil {
 		return err
 	}
@@ -606,6 +615,9 @@ func (v *validator) validateAndDefaultPublishPolicy(configuredPolicy *PublishPol
 		return nil
 	}
 	// validate and default backoff policy
+	if configuredPolicy.Backoff == nil {
+		configuredPolicy.Backoff = newDefaultBackoffPolicy()
+	}
 	if err := v.validateAndDefaultBackoffPolicy(configuredPolicy.Backoff, defaultPolicy.Backoff); err != nil {
 		return err
 	}
@@ -618,18 +630,19 @@ func (v *validator) validateAndDefaultBackoffPolicy(configuredPolicy *BackoffPol
 		configuredPolicy = defaultPolicy
 	}
 	// enable max time
-	if configuredPolicy.MaxTimes > 0 {
-		if configuredPolicy.DelayPolicy == nil {
-			backoffDelays := defaultPolicy.Delays
-			if len(configuredPolicy.Delays) > 0 {
-				backoffDelays = configuredPolicy.Delays
-			}
-			if backoffPolicy, err := backoff.NewAbbrBackoffDelayPolicy(backoffDelays); err != nil {
-				return err
-			} else {
-				configuredPolicy.Delays = nil // release unnecessary reference
-				configuredPolicy.DelayPolicy = backoffPolicy
-			}
+	if configuredPolicy.MaxTimes == nil {
+		configuredPolicy.MaxTimes = defaultPolicy.MaxTimes
+	}
+	if configuredPolicy.DelayPolicy == nil {
+		backoffDelays := defaultPolicy.Delays
+		if len(configuredPolicy.Delays) > 0 {
+			backoffDelays = configuredPolicy.Delays
+		}
+		if backoffPolicy, err := backoff.NewAbbrBackoffDelayPolicy(backoffDelays); err != nil {
+			return err
+		} else {
+			configuredPolicy.Delays = nil // release unnecessary reference
+			configuredPolicy.DelayPolicy = backoffPolicy
 		}
 	}
 	return nil

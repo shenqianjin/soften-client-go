@@ -201,7 +201,7 @@ func testListenCheckPostHandle(t *testing.T, testCase testListenCheckCase) {
 
 	testPolicy := &config.StatusPolicy{
 		BackoffDelays:  []string{"1s"},
-		ReentrantDelay: 1,
+		ReentrantDelay: config.ToPointer(uint(1)),
 	}
 	// create listener
 	upgradeLevel, _ := message.LevelOf(testCase.upgradeLevel)
@@ -335,7 +335,7 @@ func TestListenCheck_Post_All(t *testing.T) {
 
 	testPolicy := &config.StatusPolicy{
 		BackoffDelays:  []string{"1s"},
-		ReentrantDelay: 1,
+		ReentrantDelay: config.ToPointer(uint(1)),
 	}
 	leveledPolicy := &config.LevelPolicy{
 		DiscardEnable:  config.True(),

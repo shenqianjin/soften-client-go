@@ -59,7 +59,7 @@ func (d *statusDecider) Decide(msg consumerMessage, cheStatus checker.CheckStatu
 	}
 	statusMessageCounter := message.Parser.GetStatusMessageCounter(d.options.status, msg.Message)
 	// check to dead if exceed max status reconsume times
-	if d.policy.ConsumeMaxTimes > 0 && statusMessageCounter.ConsumeReckonTimes >= d.policy.ConsumeMaxTimes {
+	if *d.policy.ConsumeMaxTimes > 0 && statusMessageCounter.ConsumeReckonTimes >= int(*d.policy.ConsumeMaxTimes) {
 		return d.tryDeadInternal(msg)
 	}
 	msgCounter := message.Parser.GetMessageCounter(msg.Message)
@@ -71,8 +71,8 @@ func (d *statusDecider) Decide(msg consumerMessage, cheStatus checker.CheckStatu
 	delay := d.policy.BackoffDelayPolicy.Next(0, statusMessageCounter.ConsumeTimes)
 	if delay <= 0 {
 		// default delay as one reentrant delay
-		delay = d.policy.ReentrantDelay
-	} else if delay < d.policy.ReentrantDelay {
+		delay = *d.policy.ReentrantDelay
+	} else if delay < *d.policy.ReentrantDelay {
 		// TODO: Use Nack Later to reduce reentrant times in the future.
 		// delay equals or larger than reentrant delay is the essential condition to switch status
 		/*msg.Consumer.NackLater(msg.Message, time.Duration(delay)*time.Second)
@@ -81,7 +81,7 @@ func (d *statusDecider) Decide(msg consumerMessage, cheStatus checker.CheckStatu
 		// Why not Nack later currently?
 		// (1) no redelivery count if subscription type is Exclusive or Fail over. see: https://github.com/apache/pulsar/issues/15836
 		// (2) how to distinct Nack times is retrying, blocking or pending?
-		delay = d.policy.ReentrantDelay
+		delay = *d.policy.ReentrantDelay
 	}
 
 	// prepare to reentrant
@@ -111,10 +111,10 @@ func (d *statusDecider) Decide(msg consumerMessage, cheStatus checker.CheckStatu
 func (d *statusDecider) Reentrant(msg consumerMessage, props map[string]string) bool {
 	statusMsgCounter := message.Parser.GetStatusMessageCounter(d.options.status, msg.Message)
 	// check to dead if exceed max reentrant times
-	if d.policy.ReentrantMaxTimes > 0 && statusMsgCounter.PublishTimes >= d.policy.ReentrantMaxTimes {
+	if *d.policy.ReentrantMaxTimes > 0 && statusMsgCounter.PublishTimes >= int(*d.policy.ReentrantMaxTimes) {
 		return d.tryDeadInternal(msg)
 	}
-	message.Helper.InjectReentrantTime(props, time.Now().Add(time.Duration(d.policy.ReentrantDelay)*time.Second))
+	message.Helper.InjectReentrantTime(props, time.Now().Add(time.Duration(*d.policy.ReentrantDelay)*time.Second))
 	// increase status reentrant times
 	statusMsgCounter.PublishTimes++
 	message.Helper.InjectStatusMessageCounter(props, d.options.status, statusMsgCounter)
