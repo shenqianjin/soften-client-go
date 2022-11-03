@@ -164,7 +164,7 @@ func testConsumerBalanceStatus(t *testing.T, testCase consumerBalanceCase) {
 		},
 	}
 	if w, ok := expectedWeights[message.StatusReady.String()]; ok {
-		consumerConf.Ready = &config.StatusPolicy{ConsumeWeight: uint(w)}
+		consumerConf.Ready = &config.ReadyPolicy{ConsumeWeight: uint(w)}
 	}
 	if w, ok := expectedWeights[message.StatusPending.String()]; ok {
 		consumerConf.Pending = &config.StatusPolicy{ConsumeWeight: uint(w), BackoffDelays: testPolicy.BackoffDelays, ReentrantDelay: testPolicy.ReentrantDelay}

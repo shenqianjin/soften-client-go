@@ -192,8 +192,8 @@ func (v *validator) validateAndDefaultPolicyProps4MainLevel(policy *LevelPolicy,
 		policy.TransferEnable = new(bool)
 	}
 	// default status Policy
-	if err := v.validateAndDefaultReadyPolicy(policy.Ready, defaultStatusReadyPolicy); err != nil {
-		return err
+	if policy.Ready == nil {
+		policy.Ready = defaultStatusReadyPolicy
 	}
 	// default and valid pending policy
 	if *policy.PendingEnable {
@@ -222,24 +222,45 @@ func (v *validator) validateAndDefaultPolicyProps4MainLevel(policy *LevelPolicy,
 	}
 	// validate and default transfer policy
 	if *policy.TransferEnable {
+		if policy.Transfer == nil {
+			policy.Transfer = defaultTransferPolicy
+		}
 		if err := v.validateAndDefaultTransferPolicy(policy.Transfer, defaultTransferPolicy); err != nil {
+			return err
+		}
+	}
+	// validate and default dead policy
+	if *policy.DeadEnable {
+		if policy.Dead == nil {
+			policy.Dead = defaultDeadPolicy
+		}
+		if err := v.validateAndDefaultDeadPolicy(policy.Dead, defaultDeadPolicy); err != nil {
 			return err
 		}
 	}
 	// validate and default upgrade policy
 	if *policy.UpgradeEnable {
+		if policy.Upgrade == nil {
+			policy.Upgrade = defaultUpgradePolicy
+		}
 		if err := v.validateAndDefaultUpgradePolicy(mainLevel, policy.Upgrade, defaultUpgradePolicy); err != nil {
 			return err
 		}
 	}
 	// validate and default degrade policy
 	if *policy.DegradeEnable {
+		if policy.Degrade == nil {
+			policy.Degrade = defaultDegradePolicy
+		}
 		if err := v.validateAndDefaultDegradePolicy(mainLevel, policy.Degrade, defaultDegradePolicy); err != nil {
 			return err
 		}
 	}
 	// validate and default shift policy
 	if *policy.ShiftEnable {
+		if policy.Shift == nil {
+			policy.Shift = defaultShiftPolicy
+		}
 		if err := v.validateAndDefaultShiftPolicy(mainLevel, policy.Shift, defaultShiftPolicy); err != nil {
 			return err
 		}
@@ -290,9 +311,6 @@ func (v *validator) validateAndDefaultPolicyProps4ExtraLevel(policy *LevelPolicy
 	if policy.Ready == nil {
 		policy.Ready = mainPolicy.Ready
 	}
-	if err := v.validateAndDefaultReadyPolicy(policy.Ready, mainPolicy.Ready); err != nil {
-		return err
-	}
 	// default and valid pending policy
 	if *policy.PendingEnable {
 		if policy.Pending == nil {
@@ -320,7 +338,18 @@ func (v *validator) validateAndDefaultPolicyProps4ExtraLevel(policy *LevelPolicy
 	}
 	// validate and default transfer policy
 	if *policy.TransferEnable {
+		if policy.Transfer == nil {
+			policy.Transfer = mainPolicy.Transfer
+		}
 		if err := v.validateAndDefaultTransferPolicy(policy.Transfer, mainPolicy.Transfer); err != nil {
+			return err
+		}
+	}
+	if *policy.DeadEnable {
+		if policy.Dead == nil {
+			policy.Dead = mainPolicy.Dead
+		}
+		if err := v.validateAndDefaultDeadPolicy(policy.Dead, mainPolicy.Dead); err != nil {
 			return err
 		}
 	}
@@ -446,8 +475,14 @@ func (v *validator) ValidateAndDefaultProducerConfig(conf *ProducerConfig) error
 	if conf.Level == "" {
 		conf.Level = message.L1
 	}
+
 	// default backoff policy
-	v.validateAndDefaultBackoffPolicy(conf.Backoff, newDefaultBackoffPolicy())
+	if conf.Backoff == nil {
+		conf.Backoff = newDefaultBackoffPolicy()
+	}
+	if err := v.validateAndDefaultBackoffPolicy(conf.Backoff, newDefaultBackoffPolicy()); err != nil {
+		return err
+	}
 
 	// validate dead: default dead to D1
 	if *conf.DeadEnable {
@@ -490,17 +525,9 @@ func (v *validator) ValidateAndDefaultProducerConfig(conf *ProducerConfig) error
 		if conf.Transfer == nil {
 			conf.Transfer = defaultTransferPolicy
 		}
-	}
-	return nil
-}
-
-func (v *validator) validateAndDefaultReadyPolicy(configuredPolicy *ReadyPolicy, defaultPolicy *ReadyPolicy) error {
-	if configuredPolicy == nil {
-		configuredPolicy = defaultPolicy
-		return nil
-	}
-	if configuredPolicy.ConsumeWeight == 0 {
-		configuredPolicy.ConsumeWeight = defaultPolicy.ConsumeWeight
+		if err := v.validateAndDefaultTransferPolicy(conf.Transfer, defaultTransferPolicy); err != nil {
+			return err
+		}
 	}
 	return nil
 }
@@ -557,6 +584,17 @@ func (v *validator) validateAndDefaultConcurrencyPolicy(configuredPolicy *Concur
 	}
 	if configuredPolicy.PanicHandler == nil {
 		configuredPolicy.PanicHandler = defaultPolicy.PanicHandler
+	}
+	return nil
+}
+
+func (v *validator) validateAndDefaultDeadPolicy(configuredPolicy *DeadPolicy, defaultPolicy *DeadPolicy) error {
+	if configuredPolicy.Publish == nil {
+		configuredPolicy.Publish = newDefaultPublishPolicy()
+	}
+	// validate and default publish policy
+	if err := v.validateAndDefaultPublishPolicy(configuredPolicy.Publish, defaultDeadPolicy.Publish); err != nil {
+		return err
 	}
 	return nil
 }
