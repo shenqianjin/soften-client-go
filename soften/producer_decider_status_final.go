@@ -10,6 +10,7 @@ import (
 	"github.com/shenqianjin/soften-client-go/soften/checker"
 	"github.com/shenqianjin/soften-client-go/soften/decider"
 	"github.com/shenqianjin/soften-client-go/soften/internal"
+	"github.com/shenqianjin/soften-client-go/soften/support/util"
 )
 
 type producerFinalDeciderOptions struct {
@@ -46,8 +47,10 @@ func (d *producerFinalDecider) Decide(ctx context.Context, msg *pulsar.ProducerM
 		decided = false
 		return
 	}
+	// parse log entry
+	logEntry := util.ParseLogEntry(ctx, d.logger)
 	// discard
-	d.logger.Debugf("Decide message as discard. message: %v", string(msg.Payload))
+	logEntry.Debugf("Decide message as discard. message: %v", string(msg.Payload))
 	return nil, nil, true
 }
 
@@ -60,8 +63,10 @@ func (d *producerFinalDecider) DecideAsync(ctx context.Context, msg *pulsar.Prod
 		decided = false
 		return
 	}
+	// parse log entry
+	logEntry := util.ParseLogEntry(ctx, d.logger)
 	// discard
-	d.logger.Debugf("Decide message as discard. message: %v", string(msg.Payload))
+	logEntry.Debugf("Decide message as discard. message: %v", string(msg.Payload))
 	callback(nil, msg, nil)
 	decided = true
 	return

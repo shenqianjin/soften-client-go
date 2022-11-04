@@ -1,6 +1,7 @@
 package soften
 
 import (
+	"context"
 	"errors"
 	"sync"
 
@@ -11,6 +12,7 @@ import (
 	"github.com/shenqianjin/soften-client-go/soften/decider"
 	"github.com/shenqianjin/soften-client-go/soften/internal"
 	"github.com/shenqianjin/soften-client-go/soften/message"
+	"github.com/shenqianjin/soften-client-go/soften/support/util"
 )
 
 type transferDecider struct {
@@ -55,17 +57,19 @@ func newTransferDecider(client *client, options *transferDeciderOptions, metrics
 	return d, nil
 }
 
-func (d *transferDecider) Decide(msg consumerMessage, cheStatus checker.CheckStatus) bool {
+func (d *transferDecider) Decide(ctx context.Context, msg consumerMessage, cheStatus checker.CheckStatus) bool {
 	if !cheStatus.IsPassed() {
 		return false
 	}
+	// parse log entry
+	logEntry := util.ParseLogEntry(ctx, d.logger)
 	// format destTopic
 	destTopic := cheStatus.GetGotoExtra().Topic
 	if destTopic == "" {
 		destTopic = d.options.transfer.Topic
 	}
 	if destTopic == "" {
-		d.logger.Warnf("failed to transfer message because there is no topic is specified. msgId: %v", msg.ID())
+		logEntry.Warnf("failed to transfer message because there is no topic is specified. msgId: %v", msg.ID())
 		return false
 	}
 
@@ -78,7 +82,7 @@ func (d *transferDecider) Decide(msg consumerMessage, cheStatus checker.CheckSta
 		if d.options.transfer.ConnectInSyncEnable {
 			<-rtr.readyCh
 		} else {
-			d.logger.Warnf("skip to decide because router is still not ready for topic: %s", destTopic)
+			logEntry.Warnf("skip to decide because router is still not ready for topic: %s", destTopic)
 			return false
 		}
 	}
@@ -112,11 +116,11 @@ func (d *transferDecider) Decide(msg consumerMessage, cheStatus checker.CheckSta
 	}
 	callback := func(messageID pulsar.MessageID, producerMessage *pulsar.ProducerMessage, err error) {
 		if err != nil {
-			d.logger.WithError(err).WithField("msgID", msg.ID()).Errorf("Failed to send message to destTopic: %s", rtr.options.Topic)
+			logEntry.WithField("msgID", msg.ID()).Errorf("Failed to send message to destTopic: %s, err: %v", rtr.options.Topic, err)
 			msg.Consumer.Nack(msg)
 			msg.internalExtra.consumerMetrics.ConsumeMessageNacks.Inc()
 		} else {
-			d.logger.WithField("msgID", msg.ID()).Debugf("Succeed to send message to destTopic: %s", rtr.options.Topic)
+			logEntry.WithField("msgID", msg.ID()).Debugf("Succeed to send message to destTopic: %s", rtr.options.Topic)
 			msg.Ack()
 			msg.internalExtra.consumerMetrics.ConsumeMessageAcks.Inc()
 		}

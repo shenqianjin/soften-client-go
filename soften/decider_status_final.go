@@ -1,6 +1,7 @@
 package soften
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"time"
@@ -9,6 +10,7 @@ import (
 	"github.com/shenqianjin/soften-client-go/soften/checker"
 	"github.com/shenqianjin/soften-client-go/soften/decider"
 	"github.com/shenqianjin/soften-client-go/soften/internal"
+	"github.com/shenqianjin/soften-client-go/soften/support/util"
 )
 
 type finalStatusDecider struct {
@@ -36,20 +38,22 @@ func newFinalStatusDecider(parentLog log.Logger, options finalStatusDeciderOptio
 
 }
 
-func (d *finalStatusDecider) Decide(msg consumerMessage, cheStatus checker.CheckStatus) (success bool) {
+func (d *finalStatusDecider) Decide(ctx context.Context, msg consumerMessage, cheStatus checker.CheckStatus) (success bool) {
 	if !cheStatus.IsPassed() {
 		return false
 	}
+	// parse log entry
+	logEntry := util.ParseLogEntry(ctx, d.logger)
 	switch d.options.msgGoto {
 	case decider.GotoDone:
 		msg.Ack()
 		msg.internalExtra.consumerMetrics.ConsumeMessageAcks.Inc()
-		d.logger.Debugf("Decide message as done: %v", msg.Message.ID())
+		logEntry.Debugf("Decide message as done: %v", msg.Message.ID())
 		success = true
 	case decider.GotoDiscard:
 		msg.Ack()
 		msg.internalExtra.consumerMetrics.ConsumeMessageAcks.Inc()
-		d.logger.Debugf("Decide message as discard: %v", msg.Message.ID())
+		logEntry.Debugf("Decide message as discard: %v", msg.Message.ID())
 		success = true
 	}
 	if success {

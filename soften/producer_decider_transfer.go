@@ -13,6 +13,7 @@ import (
 	"github.com/shenqianjin/soften-client-go/soften/decider"
 	"github.com/shenqianjin/soften-client-go/soften/internal"
 	"github.com/shenqianjin/soften-client-go/soften/message"
+	"github.com/shenqianjin/soften-client-go/soften/support/util"
 )
 
 type producerTransferDecider struct {
@@ -63,6 +64,8 @@ func (d *producerTransferDecider) Decide(ctx context.Context, msg *pulsar.Produc
 		err = errors.New("transfer decider failed to execute as check status is not passed")
 		return nil, err, false
 	}
+	// parse log entry
+	logEntry := util.ParseLogEntry(ctx, d.logger)
 	// format topic
 	destTopic := checkStatus.GetGotoExtra().Topic
 	if destTopic == "" {
@@ -83,7 +86,7 @@ func (d *producerTransferDecider) Decide(ctx context.Context, msg *pulsar.Produc
 	// get or create router
 	rtr, err := d.internalSafeGetRouter(destTopic)
 	if err != nil {
-		d.logger.Warnf("failed to create router for topic: %s", destTopic)
+		logEntry.Warnf("failed to create router for topic: %s", destTopic)
 		return nil, err, false
 	}
 	if !rtr.ready {
@@ -92,7 +95,7 @@ func (d *producerTransferDecider) Decide(ctx context.Context, msg *pulsar.Produc
 			<-rtr.readyCh
 		} else {
 			// back to other router or main topic before the checked router is ready
-			d.logger.Warnf("skip to decide because router is still not ready for topic: %s", destTopic)
+			logEntry.Warnf("skip to decide because router is still not ready for topic: %s", destTopic)
 			return nil, nil, false
 		}
 	}
@@ -114,7 +117,7 @@ func (d *producerTransferDecider) Decide(ctx context.Context, msg *pulsar.Produc
 	// wait for send request to finish
 	<-doneCh
 	if err != nil {
-		d.logger.Warnf("failed to Transfer message, payload size: %v, properties: %v", len(msg.Payload), msg.Properties)
+		logEntry.Warnf("failed to Transfer message, payload size: %v, properties: %v", len(msg.Payload), msg.Properties)
 		return mid, err, false
 	}
 	return mid, err, true
@@ -128,6 +131,8 @@ func (d *producerTransferDecider) DecideAsync(ctx context.Context, msg *pulsar.P
 		callback(nil, msg, err)
 		return false
 	}
+	// parse log entry
+	logEntry := util.ParseLogEntry(ctx, d.logger)
 	// format topic
 	destTopic := checkStatus.GetGotoExtra().Topic
 	if destTopic == "" {
@@ -144,7 +149,7 @@ func (d *producerTransferDecider) DecideAsync(ctx context.Context, msg *pulsar.P
 	// get or create router
 	rtr, err := d.internalSafeGetRouter(destTopic)
 	if err != nil {
-		d.logger.Warnf("failed to create router for topic: %s", destTopic)
+		logEntry.Warnf("failed to create router for topic: %s", destTopic)
 		return false
 	}
 	if !rtr.ready {
@@ -153,7 +158,7 @@ func (d *producerTransferDecider) DecideAsync(ctx context.Context, msg *pulsar.P
 			<-rtr.readyCh
 		} else {
 			// back to other router or main topic before the checked router is ready
-			d.logger.Warnf("skip to decide because router is still not ready for topic: %s", destTopic)
+			logEntry.Warnf("skip to decide because router is still not ready for topic: %s", destTopic)
 			return false
 		}
 	}

@@ -4,6 +4,8 @@ import (
 	"context"
 )
 
+const KeyReqId = "reqId"
+
 // metasKeyType is private and exclusive meta key type
 // DO NOT expose it out of current package
 type metasKeyType struct{}

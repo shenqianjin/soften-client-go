@@ -1,11 +1,14 @@
 package util
 
 import (
+	"context"
 	"errors"
 	"fmt"
 
+	"github.com/apache/pulsar-client-go/pulsar/log"
 	"github.com/shenqianjin/soften-client-go/soften/internal"
 	"github.com/shenqianjin/soften-client-go/soften/message"
+	"github.com/shenqianjin/soften-client-go/soften/support/meta"
 )
 
 func ParseTopicName(topic string) (string, error) {
@@ -85,4 +88,15 @@ func FormatDeadTopic(groundTopic string, subscription string) (string, error) {
 		return "", errors.New("subscription is missing for dead status topic")
 	}
 	return groundTopic + message.L1.TopicSuffix() + "-" + subscription + message.StatusDead.TopicSuffix(), nil
+}
+
+// ------ logger util ------
+
+func ParseLogEntry(ctx context.Context, logger log.Logger) log.Entry {
+	reqId := meta.GetMeta(ctx, meta.KeyReqId)
+	var logEntry log.Entry = logger
+	if reqId != "" {
+		logEntry = logEntry.WithField(meta.KeyReqId, reqId)
+	}
+	return logEntry
 }

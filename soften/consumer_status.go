@@ -1,6 +1,7 @@
 package soften
 
 import (
+	"context"
 	"time"
 
 	"github.com/apache/pulsar-client-go/pulsar"
@@ -8,6 +9,7 @@ import (
 	"github.com/shenqianjin/soften-client-go/soften/config"
 	"github.com/shenqianjin/soften-client-go/soften/internal"
 	"github.com/shenqianjin/soften-client-go/soften/message"
+	"github.com/shenqianjin/soften-client-go/soften/support/meta"
 )
 
 // statusConsumer received messages from a specified status topic.
@@ -122,7 +124,7 @@ func (sc *statusConsumer) start() {
 			continue
 		}*/
 		// reentrant again util meet the reconsume time
-		if ok := sc.decider.Reentrant(consumerMsg, originalProps); ok {
+		if ok := sc.decider.Reentrant(meta.AsMetas(context.Background()), consumerMsg, originalProps); ok {
 			continue
 		}
 		// delivery the msg to client as well for other cases, such as decide failed

@@ -20,7 +20,7 @@ type internalProduceDecider interface {
 }
 
 type internalConsumeDecider interface {
-	Decide(msg consumerMessage, checkStatus checker.CheckStatus) (success bool)
+	Decide(ctx context.Context, msg consumerMessage, checkStatus checker.CheckStatus) (success bool)
 	close()
 }
 

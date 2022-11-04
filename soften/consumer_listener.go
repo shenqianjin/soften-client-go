@@ -393,7 +393,7 @@ func (l *consumeListener) consume(ctx context.Context, handlerFunc handler.Premi
 			if chkStatus == nil || !chkStatus.IsPassed() {
 				continue
 			}
-			if decided := l.internalDecideByPrevCheckType(msg, checkType, chkStatus); decided {
+			if decided := l.internalDecideByPrevCheckType(ctx, msg, checkType, chkStatus); decided {
 				// return to skip biz decider if check handle succeeded
 				return
 			}
@@ -413,7 +413,7 @@ func (l *consumeListener) consume(ctx context.Context, handlerFunc handler.Premi
 	// post-check to Transfer - for obvious goto action
 	if bizHandleStatus.GetGoto() != "" {
 		gotoCheckStatus := checker.CheckStatusPassed.WithGotoExtra(bizHandleStatus.GetGotoExtra())
-		if decided := l.internalDecide4Goto(bizHandleStatus.GetGoto(), msg, gotoCheckStatus); decided {
+		if decided := l.internalDecide4Goto(ctx, bizHandleStatus.GetGoto(), msg, gotoCheckStatus); decided {
 			// return if handle succeeded
 			return
 		}
@@ -439,7 +439,7 @@ func (l *consumeListener) consume(ctx context.Context, handlerFunc handler.Premi
 			if chkStatus == nil || !chkStatus.IsPassed() {
 				continue
 			}
-			if decided := l.internalDecideByPostCheckType(msg, checkType, chkStatus); decided {
+			if decided := l.internalDecideByPostCheckType(ctx, msg, checkType, chkStatus); decided {
 				// return if check handle succeeded
 				return
 			}
@@ -494,24 +494,24 @@ func (l *consumeListener) internalPostCheck(ctx context.Context, chain *consumeC
 	return checkStatus
 }
 
-func (l *consumeListener) internalDecideByPrevCheckType(msg consumerMessage, checkType checker.CheckType, checkStatus checker.CheckStatus) (ok bool) {
+func (l *consumeListener) internalDecideByPrevCheckType(ctx context.Context, msg consumerMessage, checkType checker.CheckType, checkStatus checker.CheckStatus) (ok bool) {
 	msgGoto, ok := checkTypeGotoMap[checkType]
 	if !ok {
 		return false
 	}
-	return l.internalDecide4Goto(msgGoto, msg, checkStatus)
+	return l.internalDecide4Goto(ctx, msgGoto, msg, checkStatus)
 }
 
-func (l *consumeListener) internalDecideByPostCheckType(msg consumerMessage, checkType checker.CheckType, checkStatus checker.CheckStatus) (ok bool) {
+func (l *consumeListener) internalDecideByPostCheckType(ctx context.Context, msg consumerMessage, checkType checker.CheckType, checkStatus checker.CheckStatus) (ok bool) {
 	msgGoto, ok := checkTypeGotoMap[checkType]
 	if !ok {
 		return false
 	}
 
-	return l.internalDecide4Goto(msgGoto, msg, checkStatus)
+	return l.internalDecide4Goto(ctx, msgGoto, msg, checkStatus)
 }
 
-func (l *consumeListener) internalDecide4Goto(msgGoto internal.DecideGoto, msg consumerMessage, checkStatus checker.CheckStatus) (ok bool) {
+func (l *consumeListener) internalDecide4Goto(ctx context.Context, msgGoto internal.DecideGoto, msg consumerMessage, checkStatus checker.CheckStatus) (ok bool) {
 	d := l.getDeciderByGotoAction(msgGoto, msg)
 	if d == nil {
 		return false
@@ -531,7 +531,7 @@ func (l *consumeListener) internalDecide4Goto(msgGoto internal.DecideGoto, msg c
 	}
 	// do decider
 	start := time.Now()
-	decided := d.Decide(msg, checkStatus)
+	decided := d.Decide(ctx, msg, checkStatus)
 	now := time.Now()
 	msg.internalExtra.deciderMetrics.DecideLatency.Observe(now.Sub(start).Seconds())
 	if !msg.internalExtra.receivedTime.IsZero() {

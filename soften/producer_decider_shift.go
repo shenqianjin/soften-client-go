@@ -15,6 +15,7 @@ import (
 	"github.com/shenqianjin/soften-client-go/soften/decider"
 	"github.com/shenqianjin/soften-client-go/soften/internal"
 	"github.com/shenqianjin/soften-client-go/soften/message"
+	"github.com/shenqianjin/soften-client-go/soften/support/util"
 )
 
 type producerShiftDecider struct {
@@ -83,10 +84,12 @@ func (d *producerShiftDecider) Decide(ctx context.Context, msg *pulsar.ProducerM
 		err = errors.New(fmt.Sprintf("%v decider failed to execute as check status is not passed", d.options.msgGoto))
 		return nil, err, false
 	}
+	// parse log entry
+	logEntry := util.ParseLogEntry(ctx, d.logger)
 	// format topic
 	routeTopic, err := d.internalFormatDestTopic(checkStatus, msg)
 	if err != nil {
-		d.logger.Error(err)
+		logEntry.Error(err)
 	}
 
 	if d.options.shift.CountMode == config.CountPassNull {
@@ -108,7 +111,7 @@ func (d *producerShiftDecider) Decide(ctx context.Context, msg *pulsar.ProducerM
 			<-rtr.readyCh
 		} else {
 			// back to other router or main topic before the checked router is ready
-			d.logger.Warnf("skip to decide because router is still not ready for topic: %s", routeTopic)
+			logEntry.Warnf("skip to decide because router is still not ready for topic: %s", routeTopic)
 			return nil, nil, false
 		}
 	}
@@ -144,6 +147,8 @@ func (d *producerShiftDecider) DecideAsync(ctx context.Context, msg *pulsar.Prod
 		callback(nil, msg, err)
 		return false
 	}
+	// parse log entry
+	logEntry := util.ParseLogEntry(ctx, d.logger)
 	// format topic
 	destTopic, err := d.internalFormatDestTopic(checkStatus, msg)
 	if err != nil {
@@ -164,7 +169,7 @@ func (d *producerShiftDecider) DecideAsync(ctx context.Context, msg *pulsar.Prod
 			<-rtr.readyCh
 		} else {
 			// back to other router or main topic before the checked router is ready
-			d.logger.Warnf("skip to decide because router is still not ready for topic: %s", destTopic)
+			logEntry.Warnf("skip to decide because router is still not ready for topic: %s", destTopic)
 			return false
 		}
 	}

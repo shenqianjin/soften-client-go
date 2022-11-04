@@ -1,6 +1,7 @@
 package soften
 
 import (
+	"context"
 	"errors"
 	"time"
 
@@ -10,6 +11,7 @@ import (
 	"github.com/shenqianjin/soften-client-go/soften/config"
 	"github.com/shenqianjin/soften-client-go/soften/internal"
 	"github.com/shenqianjin/soften-client-go/soften/message"
+	"github.com/shenqianjin/soften-client-go/soften/support/util"
 )
 
 type statusDeciderOptions struct {
@@ -53,19 +55,19 @@ func newStatusDecider(client *client, policy *config.StatusPolicy, options statu
 	return d, nil
 }
 
-func (d *statusDecider) Decide(msg consumerMessage, cheStatus checker.CheckStatus) bool {
+func (d *statusDecider) Decide(ctx context.Context, msg consumerMessage, cheStatus checker.CheckStatus) bool {
 	if !cheStatus.IsPassed() {
 		return false
 	}
 	statusMessageCounter := message.Parser.GetStatusMessageCounter(d.options.status, msg.Message)
 	// check to dead if exceed max status reconsume times
 	if *d.policy.ConsumeMaxTimes > 0 && statusMessageCounter.ConsumeReckonTimes >= int(*d.policy.ConsumeMaxTimes) {
-		return d.tryDeadInternal(msg)
+		return d.tryDeadInternal(ctx, msg)
 	}
 	msgCounter := message.Parser.GetMessageCounter(msg.Message)
 	// check to dead if exceed max total reconsume times
 	if d.options.consumeMaxTimes > 0 && msgCounter.ConsumeReckonTimes >= d.options.consumeMaxTimes {
-		return d.tryDeadInternal(msg)
+		return d.tryDeadInternal(ctx, msg)
 	}
 	// check Nack for equal status
 	delay := d.policy.BackoffDelayPolicy.Next(0, statusMessageCounter.ConsumeTimes)
@@ -105,14 +107,14 @@ func (d *statusDecider) Decide(msg consumerMessage, cheStatus checker.CheckStatu
 	now := time.Now()
 	message.Helper.InjectConsumeTime(props, now.Add(time.Duration(delay)*time.Second))
 	// reentrant
-	return d.Reentrant(msg, props)
+	return d.Reentrant(ctx, msg, props)
 }
 
-func (d *statusDecider) Reentrant(msg consumerMessage, props map[string]string) bool {
+func (d *statusDecider) Reentrant(ctx context.Context, msg consumerMessage, props map[string]string) bool {
 	statusMsgCounter := message.Parser.GetStatusMessageCounter(d.options.status, msg.Message)
 	// check to dead if exceed max reentrant times
 	if *d.policy.ReentrantMaxTimes > 0 && statusMsgCounter.PublishTimes >= int(*d.policy.ReentrantMaxTimes) {
-		return d.tryDeadInternal(msg)
+		return d.tryDeadInternal(ctx, msg)
 	}
 	message.Helper.InjectReentrantTime(props, time.Now().Add(time.Duration(*d.policy.ReentrantDelay)*time.Second))
 	// increase status reentrant times
@@ -130,13 +132,15 @@ func (d *statusDecider) Reentrant(msg consumerMessage, props map[string]string) 
 		Properties:  props,
 		EventTime:   msg.EventTime(),
 	}
+	// parse log entry
+	logEntry := util.ParseLogEntry(ctx, d.logger)
 	callback := func(messageID pulsar.MessageID, producerMessage *pulsar.ProducerMessage, err error) {
 		if err != nil {
-			d.logger.WithError(err).WithField("msgID", msg.ID()).Errorf("Failed to send message to topic: %s", d.router.options.Topic)
+			logEntry.WithField("msgID", msg.ID()).Errorf("Failed to send message to topic: %s, err: %v", d.router.options.Topic, err)
 			msg.Consumer.Nack(msg)
 			msg.internalExtra.consumerMetrics.ConsumeMessageNacks.Inc()
 		} else {
-			d.logger.WithField("msgID", msg.ID()).Debugf("Succeed to send message to topic: %s", d.router.options.Topic)
+			logEntry.WithField("msgID", msg.ID()).Debugf("Succeed to send message to topic: %s", d.router.options.Topic)
 			msg.Ack()
 			msg.internalExtra.consumerMetrics.ConsumeMessageAcks.Inc()
 		}
@@ -148,9 +152,9 @@ func (d *statusDecider) Reentrant(msg consumerMessage, props map[string]string) 
 	return true
 }
 
-func (d *statusDecider) tryDeadInternal(msg consumerMessage) bool {
+func (d *statusDecider) tryDeadInternal(ctx context.Context, msg consumerMessage) bool {
 	if d.options.deaDecider != nil {
-		return d.options.deaDecider.Decide(msg, checker.CheckStatusPassed)
+		return d.options.deaDecider.Decide(ctx, msg, checker.CheckStatusPassed)
 	}
 	return false
 }

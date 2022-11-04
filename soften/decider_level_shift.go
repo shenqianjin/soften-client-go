@@ -1,6 +1,7 @@
 package soften
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"sync"
@@ -12,6 +13,7 @@ import (
 	"github.com/shenqianjin/soften-client-go/soften/decider"
 	"github.com/shenqianjin/soften-client-go/soften/internal"
 	"github.com/shenqianjin/soften-client-go/soften/message"
+	"github.com/shenqianjin/soften-client-go/soften/support/util"
 )
 
 type shiftDecider struct {
@@ -71,27 +73,29 @@ func newShiftDecider(client *client, options *shiftDeciderOptions, metricsProvid
 	return d, nil
 }
 
-func (d *shiftDecider) Decide(msg consumerMessage, cheStatus checker.CheckStatus) bool {
+func (d *shiftDecider) Decide(ctx context.Context, msg consumerMessage, cheStatus checker.CheckStatus) bool {
 	if !cheStatus.IsPassed() {
 		return false
 	}
+	// parse log entry
+	logEntry := util.ParseLogEntry(ctx, d.logger)
 	// format topic
 	topic, err := d.internalFormatDestTopic(cheStatus, msg)
 	if err != nil {
-		d.logger.Error(err)
+		logEntry.Error(err)
 		return false
 	}
 	// create or get router
 	rtr, err := d.internalSafeGetRouterInAsync(topic)
 	if err != nil {
-		d.logger.Error(err)
+		logEntry.Error(err)
 		return false
 	}
 	if !rtr.ready {
 		if d.options.shift.ConnectInSyncEnable {
 			<-rtr.readyCh
 		} else {
-			d.logger.Warnf("skip to decide because router is still not ready for topic: %s", topic)
+			logEntry.Warnf("skip to decide because router is still not ready for topic: %s", topic)
 			return false
 		}
 	}
@@ -125,11 +129,11 @@ func (d *shiftDecider) Decide(msg consumerMessage, cheStatus checker.CheckStatus
 	}
 	callback := func(messageID pulsar.MessageID, producerMessage *pulsar.ProducerMessage, err error) {
 		if err != nil {
-			d.logger.WithError(err).WithField("msgID", msg.ID()).Errorf("Failed to send message to topic: %s", rtr.options.Topic)
+			logEntry.WithField("msgID", msg.ID()).Errorf("Failed to send message to topic: %s, err: %v", rtr.options.Topic, err)
 			msg.Consumer.Nack(msg)
 			msg.internalExtra.consumerMetrics.ConsumeMessageNacks.Inc()
 		} else {
-			d.logger.WithField("msgID", msg.ID()).Debugf("Succeed to send message to topic: %s", rtr.options.Topic)
+			logEntry.WithField("msgID", msg.ID()).Debugf("Succeed to send message to topic: %s", rtr.options.Topic)
 			msg.Ack()
 			msg.internalExtra.consumerMetrics.ConsumeMessageAcks.Inc()
 		}
