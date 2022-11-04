@@ -5,7 +5,8 @@ import (
 	"errors"
 
 	"github.com/shenqianjin/soften-client-go/admin/internal"
-	"github.com/shenqianjin/soften-client-go/admin/internal/util"
+	"github.com/shenqianjin/soften-client-go/admin/internal/support/constant"
+	"github.com/shenqianjin/soften-client-go/admin/internal/support/util"
 	"github.com/shenqianjin/soften-client-go/soften/admin"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
@@ -37,8 +38,8 @@ func newStatCommand(rtArgs *internal.RootArgs, mdlArgs *topicsArgs) *cobra.Comma
 		},
 	}
 	// parse variables
-	cmd.Flags().BoolVarP(&cmdArgs.partitioned, "partitioned", "P", false, util.PartitionedUsage)
-	cmd.Flags().BoolVarP(&cmdArgs.all, "all", "A", false, util.AllUsage)
+	cmd.Flags().BoolVarP(&cmdArgs.partitioned, "partitioned", "P", false, constant.PartitionedUsage)
+	cmd.Flags().BoolVarP(&cmdArgs.all, "all", "A", false, constant.AllUsage)
 
 	return cmd
 }

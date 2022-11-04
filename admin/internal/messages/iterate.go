@@ -3,7 +3,8 @@ package messages
 import (
 	"github.com/apache/pulsar-client-go/pulsar"
 	"github.com/shenqianjin/soften-client-go/admin/internal"
-	"github.com/shenqianjin/soften-client-go/admin/internal/util"
+	"github.com/shenqianjin/soften-client-go/admin/internal/support/constant"
+	util2 "github.com/shenqianjin/soften-client-go/admin/internal/support/util"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 )
@@ -36,8 +37,8 @@ func newIterateCommand(rtArgs *internal.RootArgs, mdlArgs *messagesArgs) *cobra.
 		},
 	}
 	// parse variables
-	cmd.Flags().Uint64Var(&cmdArgs.printProgressIterateInterval, "print-progress-iterate-interval", 10000, util.PrintProgressIterateIntervalUsage)
-	cmd.Flags().UintVar(&cmdArgs.printMode, "print-mode", 0, util.PrintModeUsage)
+	cmd.Flags().Uint64Var(&cmdArgs.printProgressIterateInterval, "print-progress-iterate-interval", 10000, constant.PrintProgressIterateIntervalUsage)
+	cmd.Flags().UintVar(&cmdArgs.printMode, "print-mode", 0, constant.PrintModeUsage)
 	return cmd
 }
 
@@ -55,7 +56,7 @@ func iterateMessages(rtArgs *internal.RootArgs, mdlArgs *messagesArgs, cmdArgs *
 		case 1:
 			logrus.Printf("matched msg: %v", msg.ID())
 		case 2:
-			logrus.Printf("matched msg: %v", util.FormatMessage4Print(msg))
+			logrus.Printf("matched msg: %v", util2.FormatMessage4Print(msg))
 		default:
 			// print nothing
 		}

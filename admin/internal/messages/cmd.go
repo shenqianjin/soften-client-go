@@ -5,7 +5,7 @@ import (
 
 	"github.com/antonmedv/expr/vm"
 	"github.com/shenqianjin/soften-client-go/admin/internal"
-	"github.com/shenqianjin/soften-client-go/admin/internal/util"
+	"github.com/shenqianjin/soften-client-go/admin/internal/support/constant"
 	"github.com/shenqianjin/soften-client-go/soften/admin"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
@@ -30,9 +30,9 @@ func NewModuleCmd(rootArgs *internal.RootArgs) *cobra.Command {
 	// parser variables
 	flags := cmd.PersistentFlags()
 	flags.StringVar(&moduleArgs.BrokerUrl, "broker-url", "pulsar://localhost:6650", "broker url")
-	flags.StringVarP(&moduleArgs.condition, "condition", "c", "", util.ConditionsUsage)
-	flags.StringVar(&moduleArgs.startPublishTime, "start-publish-time", "", util.StartPublishTimeUsage)
-	flags.StringVar(&moduleArgs.startEventTime, "start-event-time", "", util.StartEventTimeUsage)
+	flags.StringVarP(&moduleArgs.condition, "condition", "c", "", constant.ConditionsUsage)
+	flags.StringVar(&moduleArgs.startPublishTime, "start-publish-time", "", constant.StartPublishTimeUsage)
+	flags.StringVar(&moduleArgs.startEventTime, "start-event-time", "", constant.StartEventTimeUsage)
 
 	// add action commands
 	cmd.AddCommand(newRecallCommand(rootArgs, moduleArgs))

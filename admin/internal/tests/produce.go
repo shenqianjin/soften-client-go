@@ -8,8 +8,9 @@ import (
 
 	"github.com/apache/pulsar-client-go/pulsar"
 	"github.com/shenqianjin/soften-client-go/admin/internal"
-	testsutil "github.com/shenqianjin/soften-client-go/admin/internal/tests/util"
-	"github.com/shenqianjin/soften-client-go/admin/internal/util"
+	"github.com/shenqianjin/soften-client-go/admin/internal/support/constant"
+	supportUtil "github.com/shenqianjin/soften-client-go/admin/internal/support/util"
+	"github.com/shenqianjin/soften-client-go/admin/internal/tests/util"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 )
@@ -49,8 +50,8 @@ func newProduceCommand(rtArgs *internal.RootArgs, mdlArgs *testsArgs) *cobra.Com
 		},
 	}
 	// parse variables
-	cmd.Flags().Uint64Var(&cmdArgs.printProgressIterateInterval, "print-progress-iterate-interval", 100, util.PrintProgressIterateIntervalUsage)
-	cmd.Flags().UintVar(&cmdArgs.printMode, "print-mode", 0, util.PrintModeUsage)
+	cmd.Flags().Uint64Var(&cmdArgs.printProgressIterateInterval, "print-progress-iterate-interval", 100, constant.PrintProgressIterateIntervalUsage)
+	cmd.Flags().UintVar(&cmdArgs.printMode, "print-mode", 0, constant.PrintModeUsage)
 	cmd.Flags().Uint64Var(&cmdArgs.sendCount, "send-count", 1200, "the number of mocked messages to send")
 	cmd.Flags().Uint64Var(&cmdArgs.sendAsyncCount, "send-async-count", 1800, "the number of mocked messages to send in async")
 	return cmd
@@ -85,7 +86,7 @@ func produceMessages(rtArgs *internal.RootArgs, mdlArgs *testsArgs, cmdArgs *pro
 	syncCount := cmdArgs.sendCount
 	uid := uint64(1)
 	for ; uid <= syncCount; uid++ {
-		msg := testsutil.GenerateBusinessMsg(uint32(uid))
+		msg := util.GenerateBusinessMsg(uint32(uid))
 		msg.Properties["Index"] = strconv.FormatUint(uid, 10)
 		mid, err := producer.Send(context.Background(), msg)
 		if err != nil {
@@ -101,7 +102,7 @@ func produceMessages(rtArgs *internal.RootArgs, mdlArgs *testsArgs, cmdArgs *pro
 	wg := sync.WaitGroup{}
 	limit := syncCount + asyncCount
 	for ; uid <= limit; uid++ {
-		msg := testsutil.GenerateBusinessMsg(uint32(uid))
+		msg := util.GenerateBusinessMsg(uint32(uid))
 		msg.Properties["Index"] = strconv.FormatUint(uid, 10)
 		wg.Add(1)
 		func(uid uint64) {
@@ -126,7 +127,7 @@ func printWhenMockProduceDone(msg *pulsar.ProducerMessage, mid pulsar.MessageID,
 	case 1:
 		logrus.Printf("Uid: %v, produced msg: %v", msg.Properties["Index"], mid)
 	case 2:
-		logrus.Printf("Uid: %v, produced msg: %v", msg.Properties["Index"], util.FormatProducerMessage4Print(msg, mid))
+		logrus.Printf("Uid: %v, produced msg: %v", msg.Properties["Index"], supportUtil.FormatProducerMessage4Print(msg, mid))
 	default:
 		// print nothing
 	}

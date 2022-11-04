@@ -13,7 +13,6 @@ import (
 	"github.com/shenqianjin/soften-client-go/soften/decider"
 	"github.com/shenqianjin/soften-client-go/soften/internal"
 	"github.com/shenqianjin/soften-client-go/soften/message"
-	"github.com/shenqianjin/soften-client-go/soften/support/meta"
 	"github.com/shenqianjin/soften-client-go/soften/support/util"
 )
 
@@ -95,12 +94,6 @@ func (d *deadDecider) Decide(ctx context.Context, msg consumerMessage, cheStatus
 			}
 			if !msg.EventTime().IsZero() {
 				logContent = fmt.Sprintf("%s, latency from event: %v", logContent, time.Now().Sub(msg.EventTime()))
-			}
-			reqId := meta.GetMeta(ctx, "reqId")
-			if reqId != "" {
-				logEntry.WithField("reqId", reqId).Warnf(logContent)
-			} else {
-				logEntry.WithField("msgID", msg.ID()).Warnf(logContent)
 			}
 			msg.Ack()
 			msg.internalExtra.consumerMetrics.ConsumeMessageAcks.Inc()

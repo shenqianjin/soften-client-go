@@ -16,6 +16,8 @@ const (
 )
 
 type NamespaceTopic struct {
+	Schema         string
+	Tenant         string
 	Namespace      string
 	shortNamespace string
 	ShortTopic     string
@@ -35,24 +37,30 @@ func ParseNamespaceTopic(namespaceOrTopic string) (*NamespaceTopic, error) {
 	// parse topic and namespace
 	shortTopic := ""
 	namespace := ""
+	tenant := ""
 	shortNamespace := ""
 	segments := strings.Split(namespaceOrTopic, "/")
 	switch len(segments) {
 	case 1:
 		namespace = "public/default"
+		tenant = "public"
 		shortNamespace = "default"
 		shortTopic = namespaceOrTopic
 	case 2:
 		namespace = namespaceOrTopic
+		tenant = segments[0]
 		shortNamespace = segments[1]
 	case 3:
 		namespace = strings.Join(segments[0:2], "/")
+		tenant = segments[0]
 		shortNamespace = segments[1]
 		shortTopic = segments[2]
 	default:
 		return nil, errors.New(fmt.Sprintf("invalid namespace or topic name: %v", namespace))
 	}
 	nt := &NamespaceTopic{
+		Schema:         schema,
+		Tenant:         tenant,
 		Namespace:      namespace,
 		shortNamespace: shortNamespace,
 		ShortTopic:     shortTopic,

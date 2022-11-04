@@ -34,3 +34,25 @@ type RobustTopicManager interface {
 	List(namespace string) (topics []string, err error)
 	Stats(topic string) (stats TopicStats, err error)
 }
+
+// ------ namespace api ------
+
+type NamespaceManager interface {
+	Create(namespace string) error
+	Delete(namespace string) error
+	List(tenant string) ([]string, error)
+}
+
+// ------ tenant api ------
+
+type TenantManager interface {
+	Create(tenant string, info TenantInfo) error
+	Delete(tenant string) error
+	List() ([]string, error)
+}
+
+// ------ cluster api ------
+
+type ClusterManager interface {
+	List() ([]string, error)
+}

@@ -6,7 +6,7 @@ import (
 
 	"github.com/apache/pulsar-client-go/pulsar"
 	"github.com/shenqianjin/soften-client-go/admin/internal"
-	"github.com/shenqianjin/soften-client-go/admin/internal/util"
+	"github.com/shenqianjin/soften-client-go/admin/internal/support/constant"
 	"github.com/shenqianjin/soften-client-go/soften/admin"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
@@ -46,9 +46,9 @@ func newRecallCommand(rtArgs *internal.RootArgs, mdlArgs *messagesArgs) *cobra.C
 		},
 	}
 	// parse variables
-	cmd.Flags().Uint64Var(&cmdArgs.printProgressIterateInterval, "print-progress-iterate-interval", 10000, util.PrintProgressIterateIntervalUsage)
-	cmd.Flags().BoolVarP(&cmdArgs.publishBatchEnable, "publish-batch-enable", "b", false, util.BatchEnableUsage)
-	cmd.Flags().Uint64Var(&cmdArgs.publishMaxTimes, "publish-max-times", 0, util.PublishMaxTimesUsage)
+	cmd.Flags().Uint64Var(&cmdArgs.printProgressIterateInterval, "print-progress-iterate-interval", 10000, constant.PrintProgressIterateIntervalUsage)
+	cmd.Flags().BoolVarP(&cmdArgs.publishBatchEnable, "publish-batch-enable", "b", false, constant.BatchEnableUsage)
+	cmd.Flags().Uint64Var(&cmdArgs.publishMaxTimes, "publish-max-times", 0, constant.PublishMaxTimesUsage)
 
 	return cmd
 }

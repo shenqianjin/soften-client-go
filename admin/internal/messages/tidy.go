@@ -7,7 +7,7 @@ import (
 
 	"github.com/apache/pulsar-client-go/pulsar"
 	"github.com/shenqianjin/soften-client-go/admin/internal"
-	"github.com/shenqianjin/soften-client-go/admin/internal/util"
+	"github.com/shenqianjin/soften-client-go/admin/internal/support/constant"
 	"github.com/shenqianjin/soften-client-go/soften/admin"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
@@ -56,20 +56,20 @@ func newTidyCommand(rtArgs *internal.RootArgs, mdlArgs *messagesArgs) *cobra.Com
 		},
 	}
 	// parse variables for source
-	cmd.Flags().Uint64Var(&cmdArgs.printProgressIterateInterval, "print-progress-iterate-interval", 10000, util.PrintProgressIterateIntervalUsage)
-	cmd.Flags().StringVarP(&cmdArgs.subscription, "subscription", "s", "", util.SingleSubscriptionUsage)
+	cmd.Flags().Uint64Var(&cmdArgs.printProgressIterateInterval, "print-progress-iterate-interval", 10000, constant.PrintProgressIterateIntervalUsage)
+	cmd.Flags().StringVarP(&cmdArgs.subscription, "subscription", "s", "", constant.SingleSubscriptionUsage)
 	cmd.Flags().Uint32Var(&cmdArgs.iterateTimeout, "iterate-timeout", 0, "iterate timeout")
 	cmd.Flags().Uint32Var(&cmdArgs.matchTimeout, "match-timeout", 0, "match timeout")
-	cmd.Flags().StringVar(&cmdArgs.endPublishTime, "end-publish-time", "", util.EndPublishTimeUsage)
-	cmd.Flags().StringVar(&cmdArgs.endEventTime, "end-event-time", "", util.EndEventTimeUsage)
+	cmd.Flags().StringVar(&cmdArgs.endPublishTime, "end-publish-time", "", constant.EndPublishTimeUsage)
+	cmd.Flags().StringVar(&cmdArgs.endEventTime, "end-event-time", "", constant.EndEventTimeUsage)
 
 	// parse variables for destination
 	cmd.Flags().StringVar(&cmdArgs.matchedTo, "matched-to", "", "topic to publish these matched messages to")
 	cmd.Flags().StringVar(&cmdArgs.unmatchedTo, "unmatched-to", "", "topic to publish these unmatched messages to")
 	cmd.Flags().BoolVar(&cmdArgs.matchedAsDiscard, "matched-as-discard", false, "whether discards these matched messages, it is ignored if '--matched-to' is not empty")
 	cmd.Flags().BoolVar(&cmdArgs.unmatchedAsDiscard, "unmatched-as-discard", false, "whether discards these unmatched messages, it is ignored if '--unmatched-to' is not empty")
-	cmd.Flags().BoolVarP(&cmdArgs.publishBatchEnable, "publish-batch-enable", "b", false, util.BatchEnableUsage)
-	cmd.Flags().Uint64Var(&cmdArgs.publishMaxTimes, "publish-max-times", 0, util.PublishMaxTimesUsage)
+	cmd.Flags().BoolVarP(&cmdArgs.publishBatchEnable, "publish-batch-enable", "b", false, constant.BatchEnableUsage)
+	cmd.Flags().Uint64Var(&cmdArgs.publishMaxTimes, "publish-max-times", 0, constant.PublishMaxTimesUsage)
 
 	return cmd
 }

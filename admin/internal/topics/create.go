@@ -2,7 +2,10 @@ package topics
 
 import (
 	"github.com/shenqianjin/soften-client-go/admin/internal"
-	"github.com/shenqianjin/soften-client-go/admin/internal/util"
+	"github.com/shenqianjin/soften-client-go/admin/internal/namespaces"
+	"github.com/shenqianjin/soften-client-go/admin/internal/support/constant"
+	"github.com/shenqianjin/soften-client-go/admin/internal/support/util"
+	"github.com/shenqianjin/soften-client-go/admin/internal/tenants"
 	"github.com/shenqianjin/soften-client-go/soften/admin"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
@@ -12,6 +15,9 @@ type createArgs struct {
 	groundTopic string
 	partitioned bool
 	partitions  uint
+
+	autoCreateTenant    bool
+	autoCreateNamespace bool
 }
 
 func newCreateCommand(rtArgs *internal.RootArgs, mdlArgs *topicsArgs) *cobra.Command {
@@ -36,13 +42,25 @@ func newCreateCommand(rtArgs *internal.RootArgs, mdlArgs *topicsArgs) *cobra.Com
 	}
 
 	// parse partition
-	cmd.Flags().BoolVarP(&cmdArgs.partitioned, "partitioned", "P", false, util.PartitionedUsage)
-	cmd.Flags().UintVarP(&cmdArgs.partitions, "partitions", "p", 1, util.PartitionsUsage4Create)
+	cmd.Flags().BoolVarP(&cmdArgs.partitioned, "partitioned", "P", false, constant.PartitionedUsage)
+	cmd.Flags().UintVarP(&cmdArgs.partitions, "partitions", "p", 1, constant.PartitionsUsage4Create)
+	cmd.Flags().BoolVar(&cmdArgs.autoCreateTenant, "auto-create-tenant", false, "auto create tenant if missing")
+	cmd.Flags().BoolVar(&cmdArgs.autoCreateNamespace, "auto-create-namespace", false, "auto create tenant if missing")
 
 	return cmd
 }
 
 func createTopics(rtArgs *internal.RootArgs, mdlArgs *topicsArgs, cmdArgs *createArgs) {
+	namespaceTopic, err := util.ParseNamespaceTopic(cmdArgs.groundTopic)
+	if err != nil {
+		logrus.Fatal(err)
+	}
+	if cmdArgs.autoCreateTenant {
+		tenants.CreateIfNotExist(rtArgs.Url, namespaceTopic.Tenant)
+	}
+	if cmdArgs.autoCreateNamespace {
+		namespaces.CreateIfNotExist(rtArgs.Url, namespaceTopic.Namespace)
+	}
 	// format and validate topics
 	topics := util.FormatTopics(cmdArgs.groundTopic, mdlArgs.level, mdlArgs.status, mdlArgs.subscription)
 	// validate partitions

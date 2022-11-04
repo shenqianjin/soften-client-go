@@ -6,7 +6,8 @@ import (
 	"strings"
 
 	"github.com/shenqianjin/soften-client-go/admin/internal"
-	"github.com/shenqianjin/soften-client-go/admin/internal/util"
+	"github.com/shenqianjin/soften-client-go/admin/internal/support/constant"
+	"github.com/shenqianjin/soften-client-go/admin/internal/support/util"
 	"github.com/shenqianjin/soften-client-go/soften/admin"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
@@ -42,8 +43,8 @@ func newListCommand(rtArgs *internal.RootArgs, mdlArgs *topicsArgs) *cobra.Comma
 
 	flags := cmd.Flags()
 	// parse partition
-	flags.BoolVarP(&cmdArgs.partitioned, "partitioned", "P", false, util.PartitionedUsage)
-	flags.BoolVarP(&cmdArgs.all, "all", "A", false, util.AllUsage)
+	flags.BoolVarP(&cmdArgs.partitioned, "partitioned", "P", false, constant.PartitionedUsage)
+	flags.BoolVarP(&cmdArgs.all, "all", "A", false, constant.AllUsage)
 
 	return cmd
 }

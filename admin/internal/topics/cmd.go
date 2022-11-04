@@ -2,7 +2,7 @@ package topics
 
 import (
 	"github.com/shenqianjin/soften-client-go/admin/internal"
-	"github.com/shenqianjin/soften-client-go/admin/internal/util"
+	"github.com/shenqianjin/soften-client-go/admin/internal/support/constant"
 	"github.com/spf13/cobra"
 )
 
@@ -26,9 +26,9 @@ func NewModuleCmd(rootArgs *internal.RootArgs) *cobra.Command {
 	cmd.AddCommand(newListCommand(rootArgs, mdlArgs))
 	cmd.AddCommand(newStatCommand(rootArgs, mdlArgs))
 
-	cmd.PersistentFlags().StringVarP(&mdlArgs.level, "level", "l", "L1", util.LevelUsage)
-	cmd.PersistentFlags().StringVarP(&mdlArgs.status, "status", "s", "Ready", util.StatusUsage)
-	cmd.PersistentFlags().StringVarP(&mdlArgs.subscription, "subscription", "S", "", util.SubscriptionUsage)
+	cmd.PersistentFlags().StringVarP(&mdlArgs.level, "level", "l", "L1", constant.LevelUsage)
+	cmd.PersistentFlags().StringVarP(&mdlArgs.status, "status", "s", "Ready", constant.StatusUsage)
+	cmd.PersistentFlags().StringVarP(&mdlArgs.subscription, "subscription", "S", "", constant.SubscriptionUsage)
 
 	return cmd
 }
