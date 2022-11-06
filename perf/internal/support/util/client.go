@@ -1,32 +1,29 @@
-package main
+package util
 
 import (
-	"io/ioutil"
 	"os"
 
 	"github.com/apache/pulsar-client-go/pulsar"
 	"github.com/shenqianjin/soften-client-go/soften"
 	"github.com/shenqianjin/soften-client-go/soften/config"
-	log "github.com/sirupsen/logrus"
+	"github.com/sirupsen/logrus"
 )
 
-type clientArgs struct {
-	ServiceURL       string
+type ClientArgs struct {
+	BrokerUrl        string
 	TokenFile        string
 	TLSTrustCertFile string
 }
 
-func newClient(clientArgs *clientArgs) (soften.Client, error) {
+func NewClient(clientArgs *ClientArgs) (soften.Client, error) {
 	clientOpts := config.ClientConfig{
-		URL: clientArgs.ServiceURL,
+		URL: clientArgs.BrokerUrl,
 	}
-	//log.SetLevel(log.DebugLevel)
-
 	if clientArgs.TokenFile != "" {
 		// read JWT from the file
-		tokenBytes, err := ioutil.ReadFile(clientArgs.TokenFile)
+		tokenBytes, err := os.ReadFile(clientArgs.TokenFile)
 		if err != nil {
-			log.WithError(err).Errorf("failed to read Pulsar JWT from a file %s", clientArgs.TokenFile)
+			logrus.WithError(err).Errorf("failed to read Pulsar JWT from a file %s", clientArgs.TokenFile)
 			os.Exit(1)
 		}
 		clientOpts.Authentication = pulsar.NewAuthenticationToken(string(tokenBytes))

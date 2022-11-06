@@ -83,7 +83,7 @@ func deleteTopics(rtArgs *internal.RootArgs, mdlArgs *topicsArgs, cmdArgs *delet
 		var err error
 		err = manager.Delete(topic)
 		if err != nil {
-			logrus.Fatalf("deleted \"%s\" failed: %v\n", topic, err)
+			logrus.Warnf("deleted \"%s\" failed: %v\n", topic, err)
 		} else {
 			logrus.Infof("deleted \"%s\" successfully\n", topic)
 		}

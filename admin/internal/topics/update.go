@@ -84,7 +84,7 @@ func updateTopics(rtArgs *internal.RootArgs, mdlArgs *topicsArgs, cmdArgs *updat
 	for _, topic := range topics {
 		err := manager.Update(topic, cmdArgs.partitions)
 		if err != nil {
-			logrus.Fatalf("updated \"%s\" failed: %v\n", topic, err)
+			logrus.Warnf("updated \"%s\" failed: %v\n", topic, err)
 		} else {
 			logrus.Fatalf("updated \"%s\" successfully, partitions is %v now\n", topic, cmdArgs.partitions)
 		}

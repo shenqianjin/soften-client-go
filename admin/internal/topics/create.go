@@ -79,7 +79,7 @@ func createTopics(rtArgs *internal.RootArgs, mdlArgs *topicsArgs, cmdArgs *creat
 		var err error
 		err = manager.Create(topic, cmdArgs.partitions)
 		if err != nil {
-			logrus.Fatalf("created \"%s\" failed: %v\n", topic, err)
+			logrus.Warnf("created \"%s\" failed: %v\n", topic, err)
 		} else {
 			logrus.Infof("created \"%s\" successfully\n", topic)
 		}
