@@ -347,6 +347,7 @@ func (l *consumeListener) internalStartInPool(ctx context.Context, handler handl
 				panic(fmt.Sprintf("submit msg failed. err: %v", err))
 			}
 		case <-ctx.Done():
+			pool.Release()
 			l.logger.Warnf("closed soften listener")
 			return
 		}

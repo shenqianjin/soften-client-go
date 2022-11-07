@@ -10,6 +10,7 @@ import (
 	"syscall"
 
 	"github.com/shenqianjin/soften-client-go/perf/internal/support/util"
+	"github.com/shenqianjin/soften-client-go/soften/config"
 	"github.com/shenqianjin/soften-client-go/soften/support/log"
 	"github.com/shenqianjin/soften-client-go/soften/support/promhttp"
 	"github.com/sirupsen/logrus"
@@ -30,6 +31,7 @@ func NewRootCommand() (*cobra.Command, *RootArgs) {
 	rtArgs := &RootArgs{}
 	cmd := &cobra.Command{
 		PersistentPreRun: func(cmd *cobra.Command, args []string) {
+			config.DebugMode = false
 			// context
 			var cancelFunc context.CancelFunc
 			rtArgs.Ctx, cancelFunc = context.WithCancel(context.Background())

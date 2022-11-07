@@ -53,7 +53,7 @@ func ProduceStats(ctx context.Context, statCh <-chan *ProduceStatEntry, messageS
 			}
 			for _, typeName := range typeNames {
 				_, _ = fmt.Fprintf(statB, `
-                    %s rate: %6.1f msg/s`, typeName, float64(radicalMsgPublished[typeName])/float64(10))
+                %s rate: %6.1f msg/s`, typeName, float64(radicalMsgPublished[typeName])/float64(10))
 				radicalMsgPublished[typeName] = 0
 			}
 			logrus.Info(statB.String())
@@ -149,7 +149,7 @@ func ConsumeStats(ctx context.Context, consumeStatCh <-chan *ConsumeStatEntry, t
 					continue
 				}
 				_, _ = fmt.Fprintf(statB, `
-				  %s Finished Latency ms: 50%% %5.1f - 95%% %5.1f - 99%% %5.1f - 99.9%% %5.1f - max %6.1f`, typeName,
+                %s Finished Latency ms: 50%% %5.1f - 95%% %5.1f - 99%% %5.1f - 99.9%% %5.1f - max %6.1f`, typeName,
 					q.Query(0.5)*1000, q.Query(0.95)*1000, q.Query(0.99)*1000, q.Query(0.999)*1000, q.Query(1.0)*1000)
 			}
 			for _, typeName := range typeNames {
@@ -158,7 +158,7 @@ func ConsumeStats(ctx context.Context, consumeStatCh <-chan *ConsumeStatEntry, t
 					continue
 				}
 				_, _ = fmt.Fprintf(statB, `
-                    %s Handled  Latency ms: 50%% %5.1f - 95%% %5.1f - 99%% %5.1f - 99.9%% %5.1f - max %6.1f`, typeName,
+                %s Handled  Latency ms: 50%% %5.1f - 95%% %5.1f - 99%% %5.1f - 99.9%% %5.1f - max %6.1f`, typeName,
 					q.Query(0.5)*1000, q.Query(0.95)*1000, q.Query(0.99)*1000, q.Query(0.999)*1000, q.Query(1.0)*1000)
 			}
 			logrus.Info(statB.String())

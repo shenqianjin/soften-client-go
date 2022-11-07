@@ -18,7 +18,7 @@ func NewRootCmd() (*cobra.Command, *RootArgs) {
 	cmdArgs := &RootArgs{}
 	cmd := &cobra.Command{
 		PersistentPreRun: func(cmd *cobra.Command, args []string) {
-			config.DebugMode = cmdArgs.Debug
+			config.DebugMode = false
 			if cmdArgs.Debug {
 				logrus.SetLevel(logrus.DebugLevel)
 			}
