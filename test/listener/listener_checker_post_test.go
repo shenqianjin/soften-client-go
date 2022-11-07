@@ -158,7 +158,7 @@ func testListenCheckPostHandle(t *testing.T, testCase testListenCheckCase) {
 	pTopics := make([]string, 0)
 	pTopics = append(pTopics, testCase.groundTopic)
 	cTopics := make([]string, 0)
-	if testCase.checkpoint.CheckType == checker.CheckTypePrevTransfer {
+	if testCase.checkpoint.CheckType == checker.CheckTypePostTransfer {
 		cTopics = append(cTopics, testCase.transferToTopic)
 	} else if testCase.checkpoint.CheckType == checker.CheckTypePrevDiscard {
 		// do nothing
