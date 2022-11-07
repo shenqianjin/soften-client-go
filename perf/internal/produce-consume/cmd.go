@@ -16,7 +16,7 @@ func NewProduceConsumeCommand(rtArgs *internal.RootArgs) *cobra.Command {
 		Use:   "produce-consume ",
 		Short: "Both produce and consume messages based-on a topic and measure their performances",
 		Example: "(1) soften-perf produce-consume test -R 0\n" +
-			"(2) soften-perf produce-consume test -r 20,50,80 -R 20,50,80\n" +
+			"(2) soften-perf produce-consume test -r 20,50,80 -R 50,50,50\n" +
 			"(3) soften-perf produce-consume test persistent/public/default/test --consume-goto-retrying-weight 2",
 		Args: cobra.ExactArgs(1),
 		Run: func(cmd *cobra.Command, args []string) {

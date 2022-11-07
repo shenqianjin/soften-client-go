@@ -62,16 +62,25 @@ func PerfConsume(ctx context.Context, rtArgs *internal.RootArgs, cmdArgs *Consum
 	if ens.TransferEnable {
 		lvlPolicy.Transfer = &config.TransferPolicy{Topic: cmdArgs.Topic + message.L4.TopicSuffix(), ConnectInSyncEnable: true}
 	}
-	// collect status
+	// collect status and policy
 	statuses := message.Statuses{message.StatusReady}
 	if ens.PendingEnable {
 		statuses = append(statuses, message.StatusPending)
+		if cmdArgs.StatusParam.PendingReentrantDelay > 0 {
+			lvlPolicy.Pending = &config.StatusPolicy{ReentrantDelay: &cmdArgs.StatusParam.PendingReentrantDelay}
+		}
 	}
 	if ens.BlockingEnable {
 		statuses = append(statuses, message.StatusBlocking)
+		if cmdArgs.StatusParam.BlockingReentrantDelay > 0 {
+			lvlPolicy.Blocking = &config.StatusPolicy{ReentrantDelay: &cmdArgs.StatusParam.BlockingReentrantDelay}
+		}
 	}
 	if ens.RetryingEnable {
 		statuses = append(statuses, message.StatusRetrying)
+		if cmdArgs.StatusParam.RetryingReentrantDelay > 0 {
+			lvlPolicy.Retrying = &config.StatusPolicy{ReentrantDelay: &cmdArgs.StatusParam.RetryingReentrantDelay}
+		}
 	}
 	if ens.DeadEnable {
 		statuses = append(statuses, message.StatusDead)
@@ -87,7 +96,7 @@ func PerfConsume(ctx context.Context, rtArgs *internal.RootArgs, cmdArgs *Consum
 		content := &bytes.Buffer{}
 		for _, topic := range topics {
 			if _, err2 := manager.Stats(topic); err2 != nil {
-				fmt.Fprintf(content, "\nstats %v err: %v", topic, err2)
+				_, _ = fmt.Fprintf(content, "\nstats %v err: %v", topic, err2)
 			}
 		}
 		if content.Len() > 0 {
@@ -127,7 +136,7 @@ func PerfConsume(ctx context.Context, rtArgs *internal.RootArgs, cmdArgs *Consum
 	defer listener.Close()
 
 	// start monitoring: async
-	go stats.ConsumeStats(ctx, svc.consumeStatCh, len(svc.concurrencyLimits))
+	go stats.ConsumeStats(ctx, svc.consumeStatCh)
 
 	// start message listener
 	err = listener.StartPremium(context.Background(), svc.internalHandle)

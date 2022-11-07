@@ -26,6 +26,7 @@ type ConsumeArgs struct {
 
 	// goto weights
 	ConsumeGoto param.GotoParam
+	StatusParam param.StatusParam
 }
 
 func NewConsumerCommand(rtArgs *internal.RootArgs) *cobra.Command {
@@ -55,8 +56,8 @@ func LoadConsumeFlags(flags *pflag.FlagSet, cArgs *ConsumeArgs) {
 
 	// limits
 	flags.StringVar(&cArgs.ConsumeQuotaLimit, "consume-quota-limit", "0,0", "consume quota for types [t1, t2, t3, ..., tn]. 0 means un-throttled")
-	flags.StringVarP(&cArgs.ConsumeRateLimit, "consume-rate-limit", "R", "50,50", "consume qps for types [t1, t2, t3, ..., tn]. 0 means un-throttled")
-	flags.StringVar(&cArgs.ConsumeConcurrencyLimit, "consume-concurrency-limit", "50,50", "handle concurrences for different types")
+	flags.StringVarP(&cArgs.ConsumeRateLimit, "consume-rate-limit", "R", "0,0", "consume qps for types [t1, t2, t3, ..., tn]. 0 means un-throttled")
+	flags.StringVar(&cArgs.ConsumeConcurrencyLimit, "consume-concurrency-limit", "0,0", "handle concurrences for different types")
 
 	// cost
 	flags.Int64Var(&cArgs.handleCostAvgInMs, "handle-cost-avg-in-ms", 100, "mocked average consume cost in milliseconds, use -1 to disable")
@@ -74,9 +75,14 @@ func LoadConsumeFlags(flags *pflag.FlagSet, cArgs *ConsumeArgs) {
 	flags.Uint64Var(&cArgs.ConsumeGoto.DegradeWeight, "consume-goto-degrade-weight", 0, "the weight to handle messages to")
 	flags.Uint64Var(&cArgs.ConsumeGoto.ShiftWeight, "consume-goto-shift-weight", 0, "the weight to handle messages to")
 	flags.Uint64Var(&cArgs.ConsumeGoto.TransferWeight, "consume-goto-transfer-weight", 0, "the weight to handle messages to")
-	flags.StringVar(&cArgs.ConsumeGoto.Weight, "goto-weight", "100,5,5,30,10,60,0,0,0,0",
+	flags.StringVar(&cArgs.ConsumeGoto.Weight, "goto-weight", "1,0,0,0,0,0,0,0,0,0",
 		//flags.StringVar(&cArgs.Weight, "goto-weight", "100,0,0,0,0,0,0,0,0",
-		"the weight to handle messages to: [done, discard, dead, pending, blocking, retrying, upgrade, degrade, shift, transfer]")
+		"the weight to handle messages to: [done, discard, dead, pending, blocking, retrying, upgrade, degrade, shift, transfer]. example like: '100,5,5,30,10,60,0,0,0,0'")
+
+	// status params
+	flags.UintVar(&cArgs.StatusParam.PendingReentrantDelay, "pending-reentrant-delay", 20, "reentrant delay for pending")
+	flags.UintVar(&cArgs.StatusParam.BlockingReentrantDelay, "blocking-reentrant-delay", 20, "reentrant delay for blocking")
+	flags.UintVar(&cArgs.StatusParam.RetryingReentrantDelay, "retrying-reentrant-delay", 20, "reentrant delay for retrying")
 
 	if cArgs.handleCostAvgInMs < 0 {
 		cArgs.handleCostAvgInMs = 0

@@ -8,6 +8,7 @@ import (
 	"os/signal"
 	"strconv"
 	"syscall"
+	"time"
 
 	"github.com/shenqianjin/soften-client-go/perf/internal/support/util"
 	"github.com/shenqianjin/soften-client-go/soften/config"
@@ -48,6 +49,7 @@ func NewRootCommand() (*cobra.Command, *RootArgs) {
 				<-ch
 				cancelFunc()
 				logrus.Println("soften performing exiting")
+				time.Sleep(time.Second)
 			}()
 		},
 

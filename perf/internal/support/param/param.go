@@ -14,3 +14,9 @@ type GotoParam struct {
 	ShiftWeight    uint64
 	TransferWeight uint64
 }
+
+type StatusParam struct {
+	PendingReentrantDelay  uint
+	BlockingReentrantDelay uint
+	RetryingReentrantDelay uint
+}

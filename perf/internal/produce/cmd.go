@@ -80,7 +80,7 @@ func PerfProduce(ctx context.Context, rtArgs *internal.RootArgs, cmdArgs *Produc
 	statCh := make(chan *stats.ProduceStatEntry)
 	rates := util.ParseUint64Array(cmdArgs.ProduceRate)
 	// start monitoring: async
-	go stats.ProduceStats(rtArgs.Ctx, statCh, cmdArgs.MessageSize, len(rates))
+	go stats.ProduceStats(rtArgs.Ctx, statCh, cmdArgs.MessageSize)
 
 	// start PerfProduce for different types: sync to hang
 	for index, produceRate := range rates {
