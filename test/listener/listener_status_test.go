@@ -40,7 +40,7 @@ func testListenBySingleStatus(t *testing.T, status string) {
 	pTopics := make([]string, 0)
 	pTopics = append(pTopics, groundTopic)
 	if status != message.StatusReady.String() {
-		fTopics, err := util.FormatTopics(groundTopic, []string{message.L1.String()}, []string{status}, internal.TestSubscriptionName())
+		fTopics, err := util.FormatTopics(groundTopic, message.Levels{message.L1}, internal.FormatStatuses(status), internal.TestSubscriptionName())
 		assert.Nil(t, err)
 		pTopics = append(pTopics, fTopics...)
 	}
@@ -122,8 +122,8 @@ func testListenBySingleStatus(t *testing.T, status string) {
 func TestListen_4Msg_Ready_Retrying_Pending_Blocking(t *testing.T) {
 	groundTopic := internal.GenerateTestTopic(internal.PrefixTestListen)
 	// format topics
-	statuses := []string{string(message.StatusReady), string(message.StatusRetrying), string(message.StatusPending), string(message.StatusBlocking)}
-	pTopics, err := util.FormatTopics(groundTopic, []string{message.L1.String()}, statuses, internal.TestSubscriptionName())
+	statuses := message.Statuses{message.StatusReady, message.StatusRetrying, message.StatusPending, message.StatusBlocking}
+	pTopics, err := util.FormatTopics(groundTopic, message.Levels{message.L1}, statuses, internal.TestSubscriptionName())
 	assert.Nil(t, err)
 	manager := admin.NewRobustTopicManager(internal.DefaultPulsarHttpUrl)
 

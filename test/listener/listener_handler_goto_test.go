@@ -160,11 +160,11 @@ func testListenHandleGoto(t *testing.T, testCase testListenHandleCase) {
 	} else if testCase.handleGoto == decider.GotoDiscard.String() {
 		// do nothing
 	} else if testCase.consumeToLevel != "" {
-		fTopics, err := util.FormatTopics(testCase.groundTopic, []string{testCase.consumeToLevel}, []string{message.StatusReady.String()}, "")
+		fTopics, err := util.FormatTopics(testCase.groundTopic, internal.FormatLevels(testCase.consumeToLevel), message.Statuses{message.StatusReady}, "")
 		assert.Nil(t, err)
 		cTopics = append(cTopics, fTopics...)
 	} else if testCase.consumeToStatus != "" {
-		fTopics, err := util.FormatTopics(testCase.groundTopic, []string{message.L1.String()}, []string{testCase.consumeToStatus}, internal.TestSubscriptionName())
+		fTopics, err := util.FormatTopics(testCase.groundTopic, message.Levels{message.L1}, internal.FormatStatuses(testCase.consumeToStatus), internal.TestSubscriptionName())
 		assert.Nil(t, err)
 		cTopics = append(cTopics, fTopics...)
 	}

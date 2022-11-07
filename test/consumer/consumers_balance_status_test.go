@@ -80,16 +80,18 @@ func testConsumerBalanceStatus(t *testing.T, testCase consumerBalanceCase) {
 	for index, status := range testCase.consumeTypes {
 		expectedWeights[status] = testCase.weights[index]
 	}
+	statuses := message.Statuses{}
 	enableMap := make(map[string]bool)
 	for index, status := range testCase.consumeTypes {
 		enableMap[status] = true
-		_, err := message.StatusOf(status)
+		s, err := message.StatusOf(status)
 		assert.Nil(t, err)
+		statuses = append(statuses, s)
 		expectedTotal += totals[index]
 	}
 
 	manager := admin.NewRobustTopicManager(internal.DefaultPulsarHttpUrl)
-	pTopics, err := util.FormatTopics(groundTopic, []string{message.L1.String()}, testCase.consumeTypes, internal.TestSubscriptionName())
+	pTopics, err := util.FormatTopics(groundTopic, message.Levels{message.L1}, statuses, internal.TestSubscriptionName())
 	assert.Nil(t, err)
 
 	// clean up topic

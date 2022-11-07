@@ -78,54 +78,10 @@ func FormatTopics(groundTopic string, levelStr, statusStr string, subscription s
 	statuses := formatStatuses(statusStr)
 	subs := formatSubs(subscription)
 	// validate subs and statuses
-	if len(subs) <= 0 {
-		for _, s := range statuses {
-			status, err := message.StatusOf(s)
-			if err != nil {
-				logrus.Fatal(err)
-			}
-			if status == message.StatusPending ||
-				status == message.StatusBlocking ||
-				status == message.StatusRetrying ||
-				status == message.StatusDead {
-				logrus.Fatalf("Error: subscription is necessary to create %s status topic\n", s)
-			}
-		}
-	}
-	for _, l := range levels {
-		level, err := message.LevelOf(l)
-		if err != nil {
-			logrus.Fatal(err)
-		}
-		for _, s := range statuses {
-			status, err := message.StatusOf(s)
-			if err != nil {
-				logrus.Fatal(err)
-			}
-			subRequired := false
-			if status == message.StatusDead {
-				if level == message.L1 {
-					subRequired = true
-				} else {
-					// skip non-L1 for dead status
-					continue
-				}
-			} else if status == message.StatusPending ||
-				status == message.StatusBlocking ||
-				status == message.StatusRetrying {
-				subRequired = true
-			}
-			if subRequired {
-				for _, sub := range subs {
-					topic := groundTopic + level.TopicSuffix() + "-" + sub + status.TopicSuffix()
-					topics = append(topics, formatTopic(topic))
 
-				}
-			} else {
-				topic := groundTopic + level.TopicSuffix() + status.TopicSuffix()
-				topics = append(topics, formatTopic(topic))
-			}
-		}
+	topics, err := util.FormatTopics(groundTopic, levels, statuses, subs...)
+	if err != nil {
+		logrus.Fatal(err)
 	}
 	return topics
 }
@@ -170,33 +126,35 @@ func IsPartitionedSubTopic(topic string) bool {
 	return false
 }
 
-func formatLevels(levelStr string) (levels []string) {
+func formatLevels(levelStr string) (levels message.Levels) {
 	if levelStr == "" {
-		levels = []string{message.L1.String()}
+		levels = message.Levels{message.L1}
 	} else {
 		segments := strings.Split(levelStr, ",")
 		for _, seg := range segments {
 			l := strings.TrimSpace(seg)
-			if _, err := message.LevelOf(l); err != nil {
+			if lv, err := message.LevelOf(l); err != nil {
 				logrus.Fatal(err)
+			} else {
+				levels = append(levels, lv)
 			}
-			levels = append(levels, l)
 		}
 	}
 	return levels
 }
 
-func formatStatuses(statusStr string) (statuses []string) {
+func formatStatuses(statusStr string) (statuses message.Statuses) {
 	if statusStr == "" {
-		statuses = []string{message.StatusReady.String()}
+		statuses = message.Statuses{message.StatusReady}
 	} else {
 		segments := strings.Split(statusStr, ",")
 		for _, seg := range segments {
 			s := strings.TrimSpace(seg)
-			if _, err := message.StatusOf(s); err != nil {
+			if st, err := message.StatusOf(s); err != nil {
 				logrus.Fatal(err)
+			} else {
+				statuses = append(statuses, st)
 			}
-			statuses = append(statuses, s)
 		}
 	}
 	return

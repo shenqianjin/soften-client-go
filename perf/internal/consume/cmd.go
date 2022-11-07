@@ -1,28 +1,24 @@
 package consume
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
 	"log"
-	"time"
 
-	"github.com/apache/pulsar-client-go/pulsar"
 	"github.com/shenqianjin/soften-client-go/perf/internal"
-	"github.com/shenqianjin/soften-client-go/perf/internal/support/choice"
-	"github.com/shenqianjin/soften-client-go/perf/internal/support/cost"
-	"github.com/shenqianjin/soften-client-go/perf/internal/support/limiter"
+	"github.com/shenqianjin/soften-client-go/perf/internal/support/param"
 	"github.com/shenqianjin/soften-client-go/perf/internal/support/stats"
 	"github.com/shenqianjin/soften-client-go/perf/internal/support/util"
+	"github.com/shenqianjin/soften-client-go/soften/admin"
 	"github.com/shenqianjin/soften-client-go/soften/checker"
 	"github.com/shenqianjin/soften-client-go/soften/config"
-	"github.com/shenqianjin/soften-client-go/soften/decider"
-	"github.com/shenqianjin/soften-client-go/soften/handler"
 	"github.com/shenqianjin/soften-client-go/soften/message"
+	sutil "github.com/shenqianjin/soften-client-go/soften/support/util"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
-	"golang.org/x/time/rate"
 )
 
 // ConsumeArgs define the parameters required by PerfConsume
@@ -30,38 +26,57 @@ type ConsumeArgs struct {
 	Topic             string
 	SubscriptionName  string
 	ReceiverQueueSize int
+	Concurrency       uint
 
-	costAverageInMs    int64   // 处理消息业务时长
-	costPositiveJitter float64 // 处理消息快波动率
-	costNegativeJitter float64 // 处理消息慢波动率
+	// limits
+	ConsumeQuotaLimit       string
+	ConsumeRateLimit        string
+	ConsumeConcurrencyLimit string
 
-	Concurrency        uint
-	ConsumeQuota       string
-	ConsumeRate        string
-	ConsumeConcurrency string
-	GotoWeight         string // 处理决策权重, 固定顺序: [done, discard, dead, pending, blocking, retrying, upgrade, degrade]
+	// cost
+	handleCostAvgInMs        int64   // 处理消息业务时长
+	handleCostPositiveJitter float64 // 处理消息快波动率
+	handleCostNegativeJitter float64 // 处理消息慢波动率
+
+	// goto weights
+	ConsumeGoto param.GotoParam
 }
 
 func LoadConsumeFlags(flags *pflag.FlagSet, cArgs *ConsumeArgs) {
 	flags.StringVarP(&cArgs.SubscriptionName, "subscription", "S", "sub", "Subscription name")
 	flags.IntVar(&cArgs.ReceiverQueueSize, "receive-queue-size", 1000, "Receiver queue size")
-
-	flags.Int64Var(&cArgs.costAverageInMs, "cost-average-in-ms", 100, "mocked average consume cost in milliseconds, use -1 to disable")
-	flags.Float64Var(&cArgs.costPositiveJitter, "cost-positive-jitter", 0, "cost positive jitter")
-	flags.Float64Var(&cArgs.costNegativeJitter, "cost-negative-jitter", 0, "cost negative jitter")
-
 	flags.UintVarP(&cArgs.Concurrency, "concurrency", "C", 50, "consume concurrency")
-	flags.StringVar(&cArgs.ConsumeQuota, "consume-quota", "0,0", "consume quota for types [t1, t2, t3, ..., tn]. 0 means un-throttled")
-	flags.StringVarP(&cArgs.ConsumeRate, "consume-rate", "R", "50,50", "consume qps for types [t1, t2, t3, ..., tn]. 0 means un-throttled")
-	flags.StringVar(&cArgs.ConsumeConcurrency, "consume-concurrency", "50,50", "handle concurrences for different types")
-	//flags.StringVar(&cArgs.GotoWeight, "goto-weight", "100,5,5,30,10,60,0,0,0",
-	flags.StringVar(&cArgs.GotoWeight, "goto-weight", "100,0,0,0,0,0,0,0",
-		"mocked goto weights for consume handling. fixed order and number as: [done, discard, dead, pending, blocking, retrying, upgrade, degrade, shift]")
-	if cArgs.costAverageInMs < 0 {
-		cArgs.costAverageInMs = 0
+
+	// limits
+	flags.StringVar(&cArgs.ConsumeQuotaLimit, "consume-quota-limit", "0,0", "consume quota for types [t1, t2, t3, ..., tn]. 0 means un-throttled")
+	flags.StringVarP(&cArgs.ConsumeRateLimit, "consume-rate-limit", "R", "50,50", "consume qps for types [t1, t2, t3, ..., tn]. 0 means un-throttled")
+	flags.StringVar(&cArgs.ConsumeConcurrencyLimit, "consume-concurrency-limit", "50,50", "handle concurrences for different types")
+
+	// cost
+	flags.Int64Var(&cArgs.handleCostAvgInMs, "handle-cost-avg-in-ms", 100, "mocked average consume cost in milliseconds, use -1 to disable")
+	flags.Float64Var(&cArgs.handleCostPositiveJitter, "handle-cost-positive-jitter", 0, "cost positive jitter")
+	flags.Float64Var(&cArgs.handleCostNegativeJitter, "handle-cost-negative-jitter", 0, "cost negative jitter")
+
+	// handle goto weights
+	flags.Uint64Var(&cArgs.ConsumeGoto.DoneWeight, "consume-goto-done-weight", 10, "the weight to handle messages to")
+	flags.Uint64Var(&cArgs.ConsumeGoto.DiscardWeight, "consume-goto-discard-weight", 0, "the weight to handle messages to")
+	flags.Uint64Var(&cArgs.ConsumeGoto.DeadWeight, "consume-goto-dead-weight", 0, "the weight to handle messages to")
+	flags.Uint64Var(&cArgs.ConsumeGoto.PendingWeight, "consume-goto-pending-weight", 0, "the weight to handle messages to")
+	flags.Uint64Var(&cArgs.ConsumeGoto.BlockingWeight, "consume-goto-blocking-weight", 0, "the weight to handle messages to")
+	flags.Uint64Var(&cArgs.ConsumeGoto.RetryingWeight, "consume-goto-retrying-weight", 0, "the weight to handle messages to")
+	flags.Uint64Var(&cArgs.ConsumeGoto.UpgradeWeight, "consume-goto-upgrade-weight", 0, "the weight to handle messages to")
+	flags.Uint64Var(&cArgs.ConsumeGoto.DegradeWeight, "consume-goto-degrade-weight", 0, "the weight to handle messages to")
+	flags.Uint64Var(&cArgs.ConsumeGoto.ShiftWeight, "consume-goto-shift-weight", 0, "the weight to handle messages to")
+	flags.Uint64Var(&cArgs.ConsumeGoto.TransferWeight, "consume-goto-transfer-weight", 0, "the weight to handle messages to")
+	flags.StringVar(&cArgs.ConsumeGoto.Weight, "goto-weight", "100,5,5,30,10,60,0,0,0,0",
+		//flags.StringVar(&cArgs.Weight, "goto-weight", "100,0,0,0,0,0,0,0,0",
+		"the weight to handle messages to: [done, discard, dead, pending, blocking, retrying, upgrade, degrade, shift, transfer]")
+
+	if cArgs.handleCostAvgInMs < 0 {
+		cArgs.handleCostAvgInMs = 0
 	}
-	if cArgs.costNegativeJitter > 1 {
-		cArgs.costNegativeJitter = 1
+	if cArgs.handleCostNegativeJitter > 1 {
+		cArgs.handleCostNegativeJitter = 1
 	}
 }
 
@@ -69,8 +84,11 @@ func NewConsumerCommand(rtArgs *internal.RootArgs) *cobra.Command {
 	cArgs := &ConsumeArgs{}
 	cmd := &cobra.Command{
 		Use:   "consume <topic>",
-		Short: "Consume from topic",
-		Args:  cobra.ExactArgs(1),
+		Short: "Consume messages from a topic and measure its performance",
+		Example: "(1) soften-perf consume test -R 0\n" +
+			"(2) soften-perf consume test -R 20,50,80\n" +
+			"(3) soften-perf consume test persistent/public/default/test --consume-goto-retrying-weight 2",
+		Args: cobra.ExactArgs(1),
 		Run: func(cmd *cobra.Command, args []string) {
 			cArgs.Topic = args[0]
 			PerfConsume(rtArgs.Ctx, rtArgs, cArgs)
@@ -80,18 +98,6 @@ func NewConsumerCommand(rtArgs *internal.RootArgs) *cobra.Command {
 	LoadConsumeFlags(cmd.Flags(), cArgs)
 
 	return cmd
-}
-
-var handleGotoIndexes = map[string]int{
-	decider.GotoDone.String():     0,
-	decider.GotoDiscard.String():  1,
-	decider.GotoDead.String():     2,
-	decider.GotoPending.String():  3,
-	decider.GotoBlocking.String(): 4,
-	decider.GotoRetrying.String(): 5,
-	decider.GotoUpgrade.String():  6,
-	decider.GotoDegrade.String():  7,
-	decider.GotoShift.String():    8,
 }
 
 func PerfConsume(ctx context.Context, rtArgs *internal.RootArgs, cmdArgs *ConsumeArgs) {
@@ -110,27 +116,101 @@ func PerfConsume(ctx context.Context, rtArgs *internal.RootArgs, cmdArgs *Consum
 	defer client.Close()
 
 	// create consumeService
+	ens := svc.collectEnables()
 	lvlPolicy := &config.LevelPolicy{
-		PendingEnable:  config.True(),
-		BlockingEnable: config.True(),
-		RetryingEnable: config.True(),
+		DiscardEnable:  config.ToPointer(ens.DiscardEnable),
+		DeadEnable:     config.ToPointer(ens.DeadEnable),
+		PendingEnable:  config.ToPointer(ens.PendingEnable),
+		BlockingEnable: config.ToPointer(ens.BlockingEnable),
+		RetryingEnable: config.ToPointer(ens.RetryingEnable),
+		UpgradeEnable:  config.ToPointer(ens.UpgradeEnable),
+		DegradeEnable:  config.ToPointer(ens.DegradeEnable),
+		ShiftEnable:    config.ToPointer(ens.ShiftEnable),
+		TransferEnable: config.ToPointer(ens.TransferEnable),
 	}
+	lvls := message.Levels{message.L1}
+	checkpoints := make([]checker.ConsumeCheckpoint, 0)
+	if ens.UpgradeEnable {
+		lvls = append(lvls, message.L2)
+		lvlPolicy.Upgrade = &config.ShiftPolicy{Level: message.L2, ConnectInSyncEnable: true}
+	}
+	if ens.DegradeEnable {
+		lvls = append(lvls, message.B1)
+		lvlPolicy.Degrade = &config.ShiftPolicy{Level: message.B1, ConnectInSyncEnable: true}
+	}
+	if ens.ShiftEnable {
+		lvls = append(lvls, message.L3)
+		lvlPolicy.Shift = &config.ShiftPolicy{Level: message.L3, ConnectInSyncEnable: true}
+	}
+	if ens.TransferEnable {
+		lvlPolicy.Transfer = &config.TransferPolicy{Topic: cmdArgs.Topic + message.L4.TopicSuffix(), ConnectInSyncEnable: true}
+	}
+	// collect status
+	statuses := message.Statuses{message.StatusReady}
+	if ens.PendingEnable {
+		statuses = append(statuses, message.StatusPending)
+	}
+	if ens.BlockingEnable {
+		statuses = append(statuses, message.StatusBlocking)
+	}
+	if ens.RetryingEnable {
+		statuses = append(statuses, message.StatusRetrying)
+	}
+	if ens.DeadEnable {
+		statuses = append(statuses, message.StatusDead)
+	}
+
+	// validate topic existence
+	if !rtArgs.AutoCreateTopic {
+		topics, err1 := sutil.FormatTopics(cmdArgs.Topic, lvls, statuses, cmdArgs.SubscriptionName)
+		if err1 != nil {
+			logrus.Fatal(err1)
+		}
+		manager := admin.NewRobustTopicManager(rtArgs.BrokerUrl)
+		content := &bytes.Buffer{}
+		for _, topic := range topics {
+			if _, err2 := manager.Stats(topic); err2 != nil {
+				fmt.Fprintf(content, "stats %v err: %v", topic, err2)
+			}
+		}
+		if content.Len() > 0 {
+			logrus.Fatalf(`failed to validate topic existence:\n%s`, content.String())
+		}
+	}
+
+	for _, v := range svc.concurrencyLimiters {
+		if v != nil {
+			checkpoints = append(checkpoints, checker.PrevHandlePending(svc.exceedConcurrency))
+			break
+		}
+	}
+	for _, v := range svc.rateLimiters {
+		if v != nil {
+			checkpoints = append(checkpoints, checker.PrevHandlePending(svc.exceedRate))
+			break
+		}
+	}
+	for _, v := range svc.quotaLimiters {
+		if v != nil {
+			checkpoints = append(checkpoints, checker.PrevHandlePending(svc.exceedQuota))
+			break
+		}
+	}
+
 	listener, err := client.CreateListener(config.ConsumerConfig{
 		Topic:            cmdArgs.Topic,
 		SubscriptionName: cmdArgs.SubscriptionName,
 		Concurrency:      &config.ConcurrencyPolicy{CorePoolSize: cmdArgs.Concurrency},
 		LevelPolicy:      lvlPolicy,
-	},
-		//checker.PrevHandlePending(concurrencyCheck),
-		//checker.PrevHandleBlocking(quotaCheck),
-		checker.PrevHandleRetrying(svc.rateCheck))
+		Levels:           lvls,
+	}, checkpoints...)
 	if err != nil {
 		log.Fatal(err)
 	}
 	defer listener.Close()
 
 	// start monitoring: async
-	go stats.ConsumeStats(ctx, svc.consumeStatCh, len(svc.ConsumeConcurrences))
+	go stats.ConsumeStats(ctx, svc.consumeStatCh, len(svc.concurrencyLimits))
 
 	// start message listener
 	err = listener.StartPremium(context.Background(), svc.internalHandle)
@@ -140,192 +220,4 @@ func PerfConsume(ctx context.Context, rtArgs *internal.RootArgs, cmdArgs *Consum
 
 	//
 	<-ctx.Done()
-}
-
-// ------ consume service ------
-
-type consumeService struct {
-	consumerArgs *ConsumeArgs
-
-	handleGotoChoice choice.GotoPolicy
-	costPolicy       cost.CostPolicy
-
-	ConsumeQuotas       []uint64
-	ConsumeRates        []uint64
-	ConsumeConcurrences []uint64
-	GotoWeights         []uint64
-
-	consumeStatCh       chan *stats.ConsumeStatEntry
-	concurrencyLimiters map[string]limiter.CountLimiter // 超并发限制时,去pending队列
-	rateLimiters        map[string]*rate.Limiter        // 超额度限制时,去blocking对列
-	quotaLimiters       map[string]limiter.CountLimiter // 超额度限制时,去blocking对列
-}
-
-func newConsumer(rtArgs *internal.RootArgs, cmdArgs *ConsumeArgs) *consumeService {
-	gotoWeights := util.ParseUint64Array(cmdArgs.GotoWeight)
-	gotoWeightMap := map[string]uint64{
-		decider.GotoDone.String(): gotoWeights[handleGotoIndexes[decider.GotoDone.String()]],
-	}
-	if weight := gotoWeights[handleGotoIndexes[decider.GotoRetrying.String()]]; weight > 0 {
-		gotoWeightMap[decider.GotoRetrying.String()] = weight
-	}
-	if weight := gotoWeights[handleGotoIndexes[decider.GotoPending.String()]]; weight > 0 {
-		gotoWeightMap[decider.GotoPending.String()] = weight
-	}
-	if weight := gotoWeights[handleGotoIndexes[decider.GotoBlocking.String()]]; weight > 0 {
-		gotoWeightMap[decider.GotoBlocking.String()] = weight
-	}
-	if weight := gotoWeights[handleGotoIndexes[decider.GotoDead.String()]]; weight > 0 {
-		gotoWeightMap[decider.GotoDead.String()] = weight
-	}
-	if weight := gotoWeights[handleGotoIndexes[decider.GotoDiscard.String()]]; weight > 0 {
-		gotoWeightMap[decider.GotoDiscard.String()] = weight
-	}
-	handleGotoChoice := choice.NewRoundRandWeightGotoPolicy(gotoWeightMap)
-
-	// Retry to create producer indefinitely
-	c := &consumeService{
-		consumerArgs:     cmdArgs,
-		handleGotoChoice: handleGotoChoice,
-		consumeStatCh:    make(chan *stats.ConsumeStatEntry),
-
-		ConsumeQuotas:       util.ParseUint64Array(cmdArgs.ConsumeQuota),
-		ConsumeRates:        util.ParseUint64Array(cmdArgs.ConsumeRate),
-		ConsumeConcurrences: util.ParseUint64Array(cmdArgs.ConsumeConcurrency),
-
-		concurrencyLimiters: make(map[string]limiter.CountLimiter), // 超并发限制时,去pending队列
-		rateLimiters:        make(map[string]*rate.Limiter),        // 超额度限制时,去blocking对列
-		quotaLimiters:       make(map[string]limiter.CountLimiter), // 超额度限制时,去blocking对列
-	}
-	// initialize cost policy
-	if cmdArgs.costAverageInMs > 0 {
-		c.costPolicy = cost.NewAvgCostPolicy(cmdArgs.costAverageInMs, cmdArgs.costPositiveJitter, cmdArgs.costNegativeJitter)
-	}
-	// handle message type-level concurrency limiters
-	if len(c.ConsumeConcurrences) > 0 {
-		for index, con := range c.ConsumeConcurrences {
-			if con > 0 {
-				c.concurrencyLimiters[fmt.Sprintf("Type-%d", index+1)] = limiter.NewCountLimiter(int(con)) // rate.New(int(li), time.Second)
-			} else {
-				c.concurrencyLimiters[fmt.Sprintf("Type-%d", index+1)] = nil
-			}
-		}
-	}
-	// handle message type-level qps limiters
-	if len(c.ConsumeRates) > 0 {
-		for index, r := range c.ConsumeRates {
-			if r > 0 {
-				c.rateLimiters[fmt.Sprintf("Type-%d", index+1)] = rate.NewLimiter(rate.Limit(r), int(r)) // rate.New(int(li), time.Second)
-			} else {
-				c.rateLimiters[fmt.Sprintf("Type-%d", index+1)] = nil
-			}
-		}
-
-	}
-	// handle message type-level quota limiters
-	if len(c.ConsumeRates) > 0 {
-		for index, quota := range c.ConsumeQuotas {
-			if quota > 0 {
-				c.quotaLimiters[fmt.Sprintf("Type-%d", index+1)] = limiter.NewCountLimiter(int(quota)) // rate.New(int(li), time.Second)
-			} else {
-				c.quotaLimiters[fmt.Sprintf("Type-%d", index+1)] = nil
-			}
-		}
-
-	}
-
-	return c
-}
-
-// 各类型超Quota限制时,去blocking队列
-func (svc *consumeService) quotaCheck(msg pulsar.Message) checker.CheckStatus {
-	if typeName, ok := msg.Properties()["Type"]; ok {
-		if limiter, ok2 := svc.quotaLimiters[typeName]; ok2 && limiter != nil {
-			if !limiter.TryAcquire() { // non-blocking operation
-				return checker.CheckStatusPassed
-			} else {
-				return checker.CheckStatusRejected.WithHandledDefer(func() {
-					limiter.Release()
-				})
-			}
-		}
-	}
-	return checker.CheckStatusRejected
-}
-
-// 各类型超Concurrency限制时,去blocking队列
-func (svc *consumeService) concurrencyCheck(msg pulsar.Message) checker.CheckStatus {
-	if typeName, ok := msg.Properties()["Type"]; ok {
-		if limiter, ok2 := svc.concurrencyLimiters[typeName]; ok2 && limiter != nil {
-			if !limiter.TryAcquire() { // non-blocking operation
-				return checker.CheckStatusPassed
-			} else {
-				return checker.CheckStatusRejected.WithHandledDefer(func() {
-					limiter.Release()
-				})
-			}
-		}
-	}
-	return checker.CheckStatusRejected
-}
-
-// 各类型超QPS限制时,去retrying队列
-func (svc *consumeService) rateCheck(ctx context.Context, msg message.Message) checker.CheckStatus {
-	if typeName, ok := msg.Properties()["Type"]; ok {
-		if limiter, ok2 := svc.rateLimiters[typeName]; ok2 && limiter != nil {
-			if !limiter.Allow() { // non-blocking operation
-				return checker.CheckStatusPassed
-			}
-		}
-	}
-	return checker.CheckStatusRejected
-}
-
-var RFC3339TimeInSecondPattern = "20060102150405.999"
-
-func (svc *consumeService) internalHandle(ctx context.Context, msg message.Message) handler.HandleStatus {
-	originPublishTime := msg.PublishTime()
-	if originalPublishTime, ok := msg.Properties()[message.XPropertyOriginPublishTime]; ok {
-		if parsedTime, err := time.Parse(RFC3339TimeInSecondPattern, originalPublishTime); err == nil {
-			originPublishTime = parsedTime
-		}
-	}
-	start := time.Now()
-	stat := &stats.ConsumeStatEntry{
-		Bytes:           int64(len(msg.Payload())),
-		ReceivedLatency: time.Since(msg.PublishTime()).Seconds(),
-	}
-
-	if svc.consumerArgs.costAverageInMs > 0 {
-		time.Sleep(svc.costPolicy.Next()) // 模拟业务处理
-	}
-	var result handler.HandleStatus
-	n := svc.handleGotoChoice.Next()
-	switch n {
-	case string(decider.GotoRetrying):
-		result = handler.StatusRetrying
-	case string(decider.GotoPending):
-		result = handler.StatusPending
-	case string(decider.GotoBlocking):
-		result = handler.StatusBlocking
-	case string(decider.GotoDead):
-		result = handler.StatusDead
-	case string(decider.GotoDiscard):
-		result = handler.StatusDiscard
-	default:
-		result = handler.StatusDone
-		stat.FinishedLatency = time.Since(originPublishTime).Seconds() // 从消息产生到处理完成的时间(中间状态不是完成状态)
-		if radicalKey, ok := msg.Properties()["Type"]; ok {
-			stat.TypeName = radicalKey
-			//stat.radicalFinishedLatencies[typeName] = stat.finishedLatency
-		}
-	}
-
-	stat.HandledLatency = time.Since(start).Seconds()
-	if radicalKey, ok := msg.Properties()["Type"]; ok {
-		stat.TypeName = radicalKey
-		//stat.radicalHandledLatencies[typeName] = stat.handledLatency
-	}
-	svc.consumeStatCh <- stat
-	return result
 }

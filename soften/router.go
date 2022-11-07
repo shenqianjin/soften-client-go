@@ -3,6 +3,8 @@ package soften
 import (
 	"context"
 	"errors"
+	"fmt"
+	"strings"
 	"sync"
 	"time"
 
@@ -100,6 +102,9 @@ func (r *router) initializeProducer() {
 			})
 
 			if err != nil {
+				if strings.Contains(err.Error(), "Topic Not Found") {
+					panic(fmt.Sprintf("Failed to create producer for topic: %s", r.options.Topic))
+				}
 				r.logger.WithError(err).Errorf("Failed to create producer for topic: %s", r.options.Topic)
 				time.Sleep(backoffPolicy.Next())
 				continue

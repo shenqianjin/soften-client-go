@@ -113,7 +113,7 @@ func testProduceCheckBySendAsync(t *testing.T, testCase testProduceCheckCase) {
 	} else if testCase.checkpoint.CheckType == checker.ProduceCheckTypeDiscard {
 		// do nothing
 	} else {
-		fTopics, err := util.FormatTopics(testCase.groundTopic, []string{testCase.produceToLevel}, []string{message.StatusReady.String()}, "")
+		fTopics, err := util.FormatTopics(testCase.groundTopic, internal.FormatLevels(testCase.produceToLevel), message.Statuses{message.StatusReady}, "")
 		assert.Nil(t, err)
 		pTopics = append(pTopics, fTopics...)
 	}

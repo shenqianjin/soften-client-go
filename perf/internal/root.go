@@ -55,10 +55,13 @@ func NewRootCommand() (*cobra.Command, *RootArgs) {
 	cmd.PersistentFlags().IntVar(&rtArgs.ProfilePort, "profile-port", 6060, "Port to expose profiling info, use -1 to disable")
 	cmd.PersistentFlags().IntVar(&rtArgs.PrometheusPort, "metrics-port", 8000, "Port to use to export metrics for Prometheus. Use -1 to disable.")
 	cmd.PersistentFlags().BoolVar(&rtArgs.Debug, "debug", false, "enable debug output")
-	//
+	// consume client
 	cmd.PersistentFlags().StringVarP(&rtArgs.ClientArgs.BrokerUrl, "broker-url", "u", "pulsar://localhost:6650", "The Pulsar service URL")
 	cmd.PersistentFlags().StringVar(&rtArgs.ClientArgs.TokenFile, "token-file", "", "file path to the Pulsar JWT file")
 	cmd.PersistentFlags().StringVar(&rtArgs.ClientArgs.TLSTrustCertFile, "trust-cert-file", "", "file path to the trusted certificate file")
+	// auto create topic flag
+	cmd.PersistentFlags().BoolVar(&rtArgs.ClientArgs.AutoCreateTopic, "auto-create-topic", false, "switch to create topic automatically. fatal will happen if your broker disables allowAutoTopicCreation")
+	cmd.PersistentFlags().StringVar(&rtArgs.ClientArgs.WebUrl, "web-url", "http://localhost:8080", "The Pulsar HTTP service URL. It is optional if enable --auto-create-topic")
 
 	return cmd, rtArgs
 }

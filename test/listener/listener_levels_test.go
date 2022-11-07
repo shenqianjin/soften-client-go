@@ -57,11 +57,7 @@ func TestListen_7Msg_AllLevels(t *testing.T) {
 func testListenByMultiLevels(t *testing.T, levels message.Levels) {
 	groundTopic := internal.GenerateTestTopic(internal.PrefixTestListen)
 	// format topics
-	lvls := make([]string, 0)
-	for _, level := range levels {
-		lvls = append(lvls, level.String())
-	}
-	fTopics, err := util.FormatTopics(groundTopic, lvls, []string{message.StatusReady.String()}, "")
+	fTopics, err := util.FormatTopics(groundTopic, levels, message.Statuses{message.StatusReady}, "")
 	assert.Nil(t, err)
 	pTopics := []string{groundTopic} // L1 first
 	pTopics = append(pTopics, fTopics...)

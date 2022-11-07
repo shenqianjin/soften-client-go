@@ -194,9 +194,9 @@ func testConsumeLimitGoto(t *testing.T, handleCase testConsumeLimitCase) {
 			level = lvl
 		}
 	}
-	pTopics, err := util.FormatTopics(handleCase.groundTopic, []string{handleCase.level}, []string{message.StatusReady.String()}, "")
+	pTopics, err := util.FormatTopics(handleCase.groundTopic, message.Levels{level}, message.Statuses{message.StatusReady}, "")
 	assert.Nil(t, err)
-	cTopics, err := util.FormatTopics(handleCase.groundTopic, []string{handleCase.level}, []string{handleCase.consumeToStatus}, internal.TestSubscriptionName())
+	cTopics, err := util.FormatTopics(handleCase.groundTopic, message.Levels{level}, internal.FormatStatuses(handleCase.consumeToStatus), internal.TestSubscriptionName())
 	assert.Nil(t, err)
 	if handleCase.consumeToDeadFinal {
 		dTopic, err1 := util.FormatDeadTopic(handleCase.groundTopic, internal.TestSubscriptionName())

@@ -181,7 +181,7 @@ func testListenHandleLnGoto(t *testing.T, testCase testListenHandleLnCase) {
 	}
 	manager := admin.NewRobustTopicManager(internal.DefaultPulsarHttpUrl)
 	// format topics
-	pTopics, err := util.FormatTopics(testCase.groundTopic, []string{testCase.level}, []string{message.StatusReady.String()}, "")
+	pTopics, err := util.FormatTopics(testCase.groundTopic, internal.FormatLevels(testCase.level), message.Statuses{message.StatusReady}, "")
 	assert.Nil(t, err)
 	cTopics := make([]string, 0)
 	if testCase.handleGoto == decider.GotoTransfer.String() {
@@ -189,7 +189,7 @@ func testListenHandleLnGoto(t *testing.T, testCase testListenHandleLnCase) {
 	} else if testCase.handleGoto == decider.GotoDiscard.String() {
 		// do nothing
 	} else if testCase.consumeToLevel != "" {
-		fTopics, err := util.FormatTopics(testCase.groundTopic, []string{testCase.consumeToLevel}, []string{message.StatusReady.String()}, "")
+		fTopics, err := util.FormatTopics(testCase.groundTopic, internal.FormatLevels(testCase.consumeToLevel), message.Statuses{message.StatusReady}, "")
 		assert.Nil(t, err)
 		cTopics = append(cTopics, fTopics...)
 	} else if testCase.consumeToStatus != "" {
@@ -197,7 +197,7 @@ func testListenHandleLnGoto(t *testing.T, testCase testListenHandleLnCase) {
 		if testCase.consumeToStatus == message.StatusDead.String() {
 			lvl = message.L1.String()
 		}
-		fTopics, err := util.FormatTopics(testCase.groundTopic, []string{lvl}, []string{testCase.consumeToStatus}, internal.TestSubscriptionName())
+		fTopics, err := util.FormatTopics(testCase.groundTopic, internal.FormatLevels(lvl), internal.FormatStatuses(testCase.consumeToStatus), internal.TestSubscriptionName())
 		assert.Nil(t, err)
 		cTopics = append(cTopics, fTopics...)
 	}

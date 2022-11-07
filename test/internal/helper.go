@@ -13,6 +13,7 @@ import (
 	"github.com/shenqianjin/soften-client-go/soften"
 	"github.com/shenqianjin/soften-client-go/soften/admin"
 	"github.com/shenqianjin/soften-client-go/soften/config"
+	"github.com/shenqianjin/soften-client-go/soften/message"
 	"github.com/shenqianjin/soften-client-go/soften/support/util"
 	"github.com/stretchr/testify/assert"
 )
@@ -141,8 +142,8 @@ func CleanUpTopic(t *testing.T, manager admin.RobustTopicManager, storedTopic st
 type CreateTopicOptions struct {
 	Partitions   uint
 	Subscription string
-	Levels       []string
-	Statuses     []string
+	Levels       message.Levels
+	Statuses     message.Statuses
 }
 
 func CreateTopicIfNotFound(t *testing.T, manager admin.RobustTopicManager, groundTopic string, options CreateTopicOptions) {
@@ -165,4 +166,28 @@ func CreateTopicsIfNotFound(t *testing.T, manager admin.RobustTopicManager, topi
 		}
 		assert.Nil(t, err)
 	}
+}
+
+func FormatLevels(levels ...string) message.Levels {
+	lvls := message.Levels{}
+	for _, level := range levels {
+		l, err := message.LevelOf(level)
+		if err != nil {
+			panic(err)
+		}
+		lvls = append(lvls, l)
+	}
+	return lvls
+}
+
+func FormatStatuses(statuses ...string) message.Statuses {
+	stats := message.Statuses{}
+	for _, status := range statuses {
+		s, err := message.StatusOf(status)
+		if err != nil {
+			panic(err)
+		}
+		stats = append(stats, s)
+	}
+	return stats
 }

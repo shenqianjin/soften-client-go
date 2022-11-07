@@ -20,7 +20,7 @@ func ParseTopicName(topic string) (string, error) {
 	}
 }
 
-func FormatTopics(groundTopic string, levels []string, statuses []string, subscription string) ([]string, error) {
+func FormatTopics(groundTopic string, levels message.Levels, statuses message.Statuses, subs ...string) ([]string, error) {
 	topics := make([]string, 0)
 	if groundTopic == "" {
 		return topics, errors.New("ground topic is empty")
@@ -28,32 +28,23 @@ func FormatTopics(groundTopic string, levels []string, statuses []string, subscr
 	if len(levels) < 1 {
 		return topics, errors.New("levels is empty")
 	}
+	if len(statuses) < 1 {
+		return topics, errors.New("statuses is empty")
+	}
 	// validate subscription and statuses
-	if subscription == "" {
-		for _, s := range statuses {
-			status, err := message.StatusOf(s)
-			if err != nil {
-				return topics, err
-			}
+	if len(subs) <= 0 {
+		for _, status := range statuses {
 			if status == message.StatusPending ||
 				status == message.StatusBlocking ||
 				status == message.StatusRetrying ||
 				status == message.StatusDead {
-				return topics, errors.New(fmt.Sprintf("subscription is missing for %s status topic", s))
+				return topics, errors.New(fmt.Sprintf("subscription is missing for %v status topic", status))
 			}
 		}
 	}
 	// start to format topics
-	for _, l := range levels {
-		level, err := message.LevelOf(l)
-		if err != nil {
-			return topics, err
-		}
-		for _, s := range statuses {
-			status, err1 := message.StatusOf(s)
-			if err1 != nil {
-				return topics, err1
-			}
+	for _, level := range levels {
+		for _, status := range statuses {
 			subRequired := false
 			if status == message.StatusDead {
 				if level == message.L1 {
@@ -68,8 +59,10 @@ func FormatTopics(groundTopic string, levels []string, statuses []string, subscr
 				subRequired = true
 			}
 			if subRequired {
-				topic := groundTopic + level.TopicSuffix() + "-" + subscription + status.TopicSuffix()
-				topics = append(topics, topic)
+				for _, sub := range subs {
+					topic := groundTopic + level.TopicSuffix() + "-" + sub + status.TopicSuffix()
+					topics = append(topics, topic)
+				}
 			} else {
 				topic := groundTopic + level.TopicSuffix() + status.TopicSuffix()
 				topics = append(topics, topic)

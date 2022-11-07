@@ -13,6 +13,9 @@ type ClientArgs struct {
 	BrokerUrl        string
 	TokenFile        string
 	TLSTrustCertFile string
+
+	AutoCreateTopic bool
+	WebUrl          string
 }
 
 func NewClient(clientArgs *ClientArgs) (soften.Client, error) {

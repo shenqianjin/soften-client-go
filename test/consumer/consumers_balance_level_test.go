@@ -93,7 +93,7 @@ func testConsumerBalanceLevel(t *testing.T, testCase consumerBalanceCase) {
 	}
 
 	manager := admin.NewRobustTopicManager(internal.DefaultPulsarHttpUrl)
-	pTopics, err := util.FormatTopics(groundTopic, testCase.consumeTypes, []string{message.StatusReady.String()}, internal.TestSubscriptionName())
+	pTopics, err := util.FormatTopics(groundTopic, levels, message.Statuses{message.StatusReady}, internal.TestSubscriptionName())
 	assert.Nil(t, err)
 	// clean up tpc
 	internal.CleanUpTopics(t, manager, pTopics...)

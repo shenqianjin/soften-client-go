@@ -12,9 +12,11 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
+// ------ produce stats ------
+
 type ProduceStatEntry struct {
-	Latency  float64
-	TypeName string
+	Latency   float64
+	GroupName string
 }
 
 func ProduceStats(ctx context.Context, statCh <-chan *ProduceStatEntry, messageSize int, typeSize int) {
@@ -35,8 +37,8 @@ func ProduceStats(ctx context.Context, statCh <-chan *ProduceStatEntry, messageS
 
 			statB := &bytes.Buffer{}
 			_, _ = fmt.Fprintf(statB, `>>>>>>>>>>
-		ProduceStats - Publish rate: %6.1f msg/s - %6.1f Mbps - 
-				Finished Latency ms: 50%% %5.1f - 95%% %5.1f - 99%% %5.1f - 99.9%% %5.1f - max %6.1f`,
+            ProduceStats - Publish rate: %6.1f msg/s - %6.1f Mbps -
+                    Finished Latency ms: 50%% %5.1f - 95%% %5.1f - 99%% %5.1f - 99.9%% %5.1f - max %6.1f`,
 				messageRate,
 				messageRate*float64(messageSize)/1024/1024*8,
 				q.Query(0.5)*1000,
@@ -47,10 +49,11 @@ func ProduceStats(ctx context.Context, statCh <-chan *ProduceStatEntry, messageS
 			)
 			if len(radicalMsgPublished) > 0 {
 				_, _ = fmt.Fprintf(statB, `
-			Detail >> `)
+            Detail >> `)
 			}
 			for _, typeName := range typeNames {
-				_, _ = fmt.Fprintf(statB, "%s rate: %6.1f msg/s - ", typeName, float64(radicalMsgPublished[typeName])/float64(10))
+				_, _ = fmt.Fprintf(statB, `
+                    %s rate: %6.1f msg/s`, typeName, float64(radicalMsgPublished[typeName])/float64(10))
 				radicalMsgPublished[typeName] = 0
 			}
 			logrus.Info(statB.String())
@@ -58,13 +61,13 @@ func ProduceStats(ctx context.Context, statCh <-chan *ProduceStatEntry, messageS
 			messagesPublished = 0
 		case stat := <-statCh:
 			messagesPublished++
-			if _, ok := radicalMsgPublished[stat.TypeName]; !ok {
-				typeNames = append(typeNames, stat.TypeName)
+			if _, ok := radicalMsgPublished[stat.GroupName]; !ok {
+				typeNames = append(typeNames, stat.GroupName)
 				if len(typeNames) == typeSize {
 					sort.Strings(typeNames)
 				}
 			}
-			radicalMsgPublished[stat.TypeName]++
+			radicalMsgPublished[stat.GroupName]++
 			q.Insert(stat.Latency)
 		}
 	}
@@ -77,7 +80,7 @@ type ConsumeStatEntry struct {
 	ReceivedLatency float64
 	FinishedLatency float64
 	HandledLatency  float64
-	TypeName        string
+	GroupName       string
 }
 
 func ConsumeStats(ctx context.Context, consumeStatCh <-chan *ConsumeStatEntry, typeSize int) {
@@ -107,10 +110,10 @@ func ConsumeStats(ctx context.Context, consumeStatCh <-chan *ConsumeStatEntry, t
 
 			statB := &bytes.Buffer{}
 			_, _ = fmt.Fprintf(statB, `<<<<<<<<<<
-			Summary - Consume rate: %6.1f msg/s - %6.1f Mbps - 
-				Received Latency ms: 50%% %5.1f - 95%% %5.1f - 99%% %5.1f - 99.9%% %5.1f - max %6.1f  
-				Finished Latency ms: 50%% %5.1f - 95%% %5.1f - 99%% %5.1f - 99.9%% %5.1f - max %6.1f
-				Handled  Latency ms: 50%% %5.1f - 95%% %5.1f - 99%% %5.1f - 99.9%% %5.1f - max %6.1f`,
+            Summary - Consume rate: %6.1f msg/s - %6.1f Mbps - 
+               Received Latency ms: 50%% %5.1f - 95%% %5.1f - 99%% %5.1f - 99.9%% %5.1f - max %6.1f  
+               Finished Latency ms: 50%% %5.1f - 95%% %5.1f - 99%% %5.1f - 99.9%% %5.1f - max %6.1f
+               Handled  Latency ms: 50%% %5.1f - 95%% %5.1f - 99%% %5.1f - 99.9%% %5.1f - max %6.1f`,
 				msgRate, bytesRate*8/1024/1024,
 
 				receivedQ.Query(0.5)*1000,
@@ -133,10 +136,11 @@ func ConsumeStats(ctx context.Context, consumeStatCh <-chan *ConsumeStatEntry, t
 			)
 			if len(radicalHandleMsg) > 0 {
 				_, _ = fmt.Fprintf(statB, `
-			Detail >> `)
+            Detail >> `)
 			}
 			for _, typeName := range typeNames {
-				_, _ = fmt.Fprintf(statB, "%s rate: %6.1f msg/s - ", typeName, float64(radicalHandleMsg[typeName])/float64(10))
+				_, _ = fmt.Fprintf(statB, `
+                %s rate: %6.1f msg/s - `, typeName, float64(radicalHandleMsg[typeName])/float64(10))
 				radicalHandleMsg[typeName] = 0
 			}
 			for _, typeName := range typeNames {
@@ -154,7 +158,7 @@ func ConsumeStats(ctx context.Context, consumeStatCh <-chan *ConsumeStatEntry, t
 					continue
 				}
 				_, _ = fmt.Fprintf(statB, `
-				  %s Handled  Latency ms: 50%% %5.1f - 95%% %5.1f - 99%% %5.1f - 99.9%% %5.1f - max %6.1f`, typeName,
+                    %s Handled  Latency ms: 50%% %5.1f - 95%% %5.1f - 99%% %5.1f - 99.9%% %5.1f - max %6.1f`, typeName,
 					q.Query(0.5)*1000, q.Query(0.95)*1000, q.Query(0.99)*1000, q.Query(0.999)*1000, q.Query(1.0)*1000)
 			}
 			logrus.Info(statB.String())
@@ -175,23 +179,23 @@ func ConsumeStats(ctx context.Context, consumeStatCh <-chan *ConsumeStatEntry, t
 			receivedQ.Insert(stat.ReceivedLatency)
 			finishedQ.Insert(stat.FinishedLatency)
 			handledQ.Insert(stat.HandledLatency)
-			if _, ok := radicalHandleMsg[stat.TypeName]; !ok {
-				typeNames = append(typeNames, stat.TypeName)
+			if _, ok := radicalHandleMsg[stat.GroupName]; !ok {
+				typeNames = append(typeNames, stat.GroupName)
 				if len(typeNames) == typeSize {
 					sort.Strings(typeNames)
 				}
 			}
-			radicalHandleMsg[stat.TypeName]++
+			radicalHandleMsg[stat.GroupName]++
 			// handle
-			if _, ok := radicalHandleQ[stat.TypeName]; !ok {
-				radicalHandleQ[stat.TypeName] = quantile.NewTargeted(0.50, 0.95, 0.99, 0.999, 1.0)
+			if _, ok := radicalHandleQ[stat.GroupName]; !ok {
+				radicalHandleQ[stat.GroupName] = quantile.NewTargeted(0.50, 0.95, 0.99, 0.999, 1.0)
 			}
-			radicalHandleQ[stat.TypeName].Insert(stat.HandledLatency)
+			radicalHandleQ[stat.GroupName].Insert(stat.HandledLatency)
 			// finish
-			if _, ok := radicalFinishedQ[stat.TypeName]; !ok {
-				radicalFinishedQ[stat.TypeName] = quantile.NewTargeted(0.50, 0.95, 0.99, 0.999, 1.0)
+			if _, ok := radicalFinishedQ[stat.GroupName]; !ok {
+				radicalFinishedQ[stat.GroupName] = quantile.NewTargeted(0.50, 0.95, 0.99, 0.999, 1.0)
 			}
-			radicalFinishedQ[stat.TypeName].Insert(stat.FinishedLatency)
+			radicalFinishedQ[stat.GroupName].Insert(stat.FinishedLatency)
 		}
 	}
 }
