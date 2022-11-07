@@ -87,7 +87,7 @@ func tidyMessages(rtArgs *internal.RootArgs, mdlArgs *messagesArgs, cmdArgs *tid
 	endEventTime := parseTimeString(cmdArgs.endEventTime, "end-event-time")
 	// check dest topics
 	if cmdArgs.matchedTo != "" {
-		manager := admin.NewRobustTopicManager(rtArgs.Url)
+		manager := admin.NewRobustTopicManager(rtArgs.WebUrl)
 		if _, err := manager.Stats(cmdArgs.matchedTo); err != nil {
 			logrus.Fatalf("invalid 'matched-to' destination topic: %v, err: %v\n", cmdArgs.matchedTo, err)
 		}
@@ -95,7 +95,7 @@ func tidyMessages(rtArgs *internal.RootArgs, mdlArgs *messagesArgs, cmdArgs *tid
 		logrus.Fatalf("missing 'matched-to' destination. please specify one by '--matched-to' or enable '--matched-as-discard'")
 	}
 	if cmdArgs.unmatchedTo != "" {
-		manager := admin.NewRobustTopicManager(rtArgs.Url)
+		manager := admin.NewRobustTopicManager(rtArgs.WebUrl)
 		if _, err := manager.Stats(cmdArgs.unmatchedTo); err != nil {
 			logrus.Fatalf("invalid 'unmatched-to' destination topic: %v, err: %v\n", cmdArgs.unmatchedTo, err)
 		}
@@ -195,8 +195,8 @@ func tidyMessages(rtArgs *internal.RootArgs, mdlArgs *messagesArgs, cmdArgs *tid
 	}, handleFunc)
 
 	if cmdArgs.publishBatchEnable {
-		logrus.Infof("recall done => %v, async done: %v\n", res.PrettyString(), asyncHandleDone.Load())
+		logrus.Infof("recall done => \n%v, async done: %v\n", res.PrettyString(), asyncHandleDone.Load())
 	} else {
-		logrus.Infof("recall done => %v\n", res.PrettyString())
+		logrus.Infof("recall done => \n%v\n", res.PrettyString())
 	}
 }

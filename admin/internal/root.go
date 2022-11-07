@@ -7,8 +7,8 @@ import (
 )
 
 type RootArgs struct {
-	Debug bool
-	Url   string
+	Debug  bool
+	WebUrl string
 }
 
 func NewRootCmd() (*cobra.Command, *RootArgs) {
@@ -31,7 +31,7 @@ func NewRootCmd() (*cobra.Command, *RootArgs) {
 	// parser variables
 	flags := cmd.PersistentFlags()
 	flags.BoolVarP(&cmdArgs.Debug, "debug", "d", false, "enable debug mode")
-	flags.StringVarP(&cmdArgs.Url, "url", "u", "http://localhost:8080", "pulsar broker http url")
+	flags.StringVarP(&cmdArgs.WebUrl, "web-url", "u", "http://localhost:8080", "pulsar broker http url")
 	return cmd, cmdArgs
 }
 

@@ -58,7 +58,7 @@ func newProduceCommand(rtArgs *internal.RootArgs, mdlArgs *testsArgs) *cobra.Com
 }
 
 func produceMessages(rtArgs *internal.RootArgs, mdlArgs *testsArgs, cmdArgs *produceArgs) {
-	/*manager := admin.NewRobustTopicManager(rtArgs.Url)
+	/*manager := admin.NewRobustTopicManager(rtArgs.WebUrl)
 	// validate
 	if _, err := manager.Stats(mdlArgs.topic); err != nil {
 		logrus.Fatal(err)

@@ -54,7 +54,7 @@ func deleteTopics(rtArgs *internal.RootArgs, mdlArgs *topicsArgs, cmdArgs *delet
 	if cmdArgs.all {
 		// query topics from broker
 		topics, err = queryTopicsFromBrokerByOptions(queryOptions{
-			url:            rtArgs.Url,
+			url:            rtArgs.WebUrl,
 			namespaceTopic: *namespaceTopic,
 			partitioned:    cmdArgs.partitioned,
 		})
@@ -78,7 +78,7 @@ func deleteTopics(rtArgs *internal.RootArgs, mdlArgs *topicsArgs, cmdArgs *delet
 		logrus.Warn("Not Found")
 	}
 	// delete one by one
-	manager := admin.NewRobustTopicManager(rtArgs.Url)
+	manager := admin.NewRobustTopicManager(rtArgs.WebUrl)
 	for _, topic := range topics {
 		var err error
 		err = manager.Delete(topic)

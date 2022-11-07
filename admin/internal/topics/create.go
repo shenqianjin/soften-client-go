@@ -56,10 +56,10 @@ func createTopics(rtArgs *internal.RootArgs, mdlArgs *topicsArgs, cmdArgs *creat
 		logrus.Fatal(err)
 	}
 	if cmdArgs.autoCreateTenant {
-		tenants.CreateIfNotExist(rtArgs.Url, namespaceTopic.Tenant)
+		tenants.CreateIfNotExist(rtArgs.WebUrl, namespaceTopic.Tenant)
 	}
 	if cmdArgs.autoCreateNamespace {
-		namespaces.CreateIfNotExist(rtArgs.Url, namespaceTopic.Namespace)
+		namespaces.CreateIfNotExist(rtArgs.WebUrl, namespaceTopic.Namespace)
 	}
 	// format and validate topics
 	topics := util.FormatTopics(cmdArgs.groundTopic, mdlArgs.level, mdlArgs.status, mdlArgs.subscription)
@@ -74,10 +74,14 @@ func createTopics(rtArgs *internal.RootArgs, mdlArgs *topicsArgs, cmdArgs *creat
 		}
 	}
 	// create
-	manager := admin.NewRobustTopicManager(rtArgs.Url)
+	manager := admin.NewRobustTopicManager(rtArgs.WebUrl)
+	partitions := cmdArgs.partitions
+	if !cmdArgs.partitioned {
+		partitions = 0 // non-partition
+	}
 	for _, topic := range topics {
 		var err error
-		err = manager.Create(topic, cmdArgs.partitions)
+		err = manager.Create(topic, partitions)
 		if err != nil {
 			logrus.Warnf("created \"%s\" failed: %v\n", topic, err)
 		} else {

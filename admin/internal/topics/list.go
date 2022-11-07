@@ -55,7 +55,7 @@ func listTopics(rtArgs *internal.RootArgs, mdlArgs *topicsArgs, cmdArgs *listArg
 		logrus.Fatalf("list \"%s\" failed: %v\n", cmdArgs.namespaceOrTopic, err)
 	}
 	topics, err := queryTopicsFromBrokerByOptions(queryOptions{
-		url:            rtArgs.Url,
+		url:            rtArgs.WebUrl,
 		namespaceTopic: *namespaceTopic,
 		partitioned:    cmdArgs.partitioned,
 	})

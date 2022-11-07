@@ -36,7 +36,8 @@ func NewConsumerCommand(rtArgs *internal.RootArgs) *cobra.Command {
 		Short: "Consume messages from a topic and measure its performance",
 		Example: "(1) soften-perf consume test -R 0\n" +
 			"(2) soften-perf consume test -R 20,50,80\n" +
-			"(3) soften-perf consume test persistent/public/default/test --consume-goto-retrying-weight 2",
+			"(3) soften-perf consume test persistent/public/default/test --consume-goto-retrying-weight 2\n" +
+			"(4) soften-perf consume test --consume-quota-limit 20,50,80 --consume-concurrency-limit 20,20,20",
 		Args: cobra.ExactArgs(1),
 		Run: func(cmd *cobra.Command, args []string) {
 			cArgs.Topic = args[0]

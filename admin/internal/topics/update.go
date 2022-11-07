@@ -59,7 +59,7 @@ func updateTopics(rtArgs *internal.RootArgs, mdlArgs *topicsArgs, cmdArgs *updat
 	if cmdArgs.all {
 		// query topics from broker
 		topics, err = queryTopicsFromBrokerByOptions(queryOptions{
-			url:            rtArgs.Url,
+			url:            rtArgs.WebUrl,
 			namespaceTopic: *namespaceTopic,
 			partitioned:    true,
 		})
@@ -80,7 +80,7 @@ func updateTopics(rtArgs *internal.RootArgs, mdlArgs *topicsArgs, cmdArgs *updat
 		logrus.Warn("Not Found")
 	}
 	// update partitions
-	manager := admin.NewPartitionedTopicManager(rtArgs.Url)
+	manager := admin.NewPartitionedTopicManager(rtArgs.WebUrl)
 	for _, topic := range topics {
 		err := manager.Update(topic, cmdArgs.partitions)
 		if err != nil {

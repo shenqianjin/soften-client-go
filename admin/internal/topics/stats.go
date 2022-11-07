@@ -55,7 +55,7 @@ func statTopics(rtArgs *internal.RootArgs, mdlArgs *topicsArgs, cmdArgs *statArg
 	if cmdArgs.all {
 		// query topics from broker
 		topics, err = queryTopicsFromBrokerByOptions(queryOptions{
-			url:            rtArgs.Url,
+			url:            rtArgs.WebUrl,
 			namespaceTopic: *namespaceTopic,
 			partitioned:    cmdArgs.partitioned,
 		})
@@ -79,8 +79,8 @@ func statTopics(rtArgs *internal.RootArgs, mdlArgs *topicsArgs, cmdArgs *statArg
 		logrus.Warn("Not Found")
 	}
 	// delete one by one
-	manager := admin.NewPartitionedTopicManager(rtArgs.Url)
-	npManager := admin.NewNonPartitionedTopicManager(rtArgs.Url)
+	manager := admin.NewPartitionedTopicManager(rtArgs.WebUrl)
+	npManager := admin.NewNonPartitionedTopicManager(rtArgs.WebUrl)
 	for _, topic := range topics {
 		var err error
 		var st interface{}

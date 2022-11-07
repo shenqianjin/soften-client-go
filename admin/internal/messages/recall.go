@@ -57,7 +57,7 @@ func recallMessages(rtArgs *internal.RootArgs, mdlArgs *messagesArgs, cmdArgs *r
 	// parse vars
 	parsedMdlVars := parseAndValidateMessagesVars(rtArgs, mdlArgs)
 	// check src/dest topics
-	manager := admin.NewRobustTopicManager(rtArgs.Url)
+	manager := admin.NewRobustTopicManager(rtArgs.WebUrl)
 	if _, err := manager.Stats(cmdArgs.destTopic); err != nil {
 		logrus.Fatalf("invalid destination topic: %v, err: %v\n", cmdArgs.destTopic, err)
 	}
@@ -110,6 +110,7 @@ func recallMessages(rtArgs *internal.RootArgs, mdlArgs *messagesArgs, cmdArgs *r
 	logrus.Printf("conditions: %v\n", mdlArgs.condition)
 	res := iterateInternalByReader(iterateOptions{
 		brokerUrl:                    mdlArgs.BrokerUrl,
+		webUrl:                       mdlArgs.WebUrl,
 		topic:                        mdlArgs.topic,
 		conditions:                   parsedMdlVars.conditions,
 		startPublishTime:             parsedMdlVars.startPublishTime,
@@ -118,8 +119,8 @@ func recallMessages(rtArgs *internal.RootArgs, mdlArgs *messagesArgs, cmdArgs *r
 	}, handleFunc)
 	wg.Wait()
 	if cmdArgs.publishBatchEnable {
-		logrus.Infof("recall done => %v, async done: %v\n", res.PrettyString(), asyncHandleDone.Load())
+		logrus.Infof("recall done => \n%v, async done: %v\n", res.PrettyString(), asyncHandleDone.Load())
 	} else {
-		logrus.Infof("recall done => %v\n", res.PrettyString())
+		logrus.Infof("recall done => \n%v\n", res.PrettyString())
 	}
 }

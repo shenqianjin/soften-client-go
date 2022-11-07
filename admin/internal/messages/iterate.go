@@ -67,12 +67,13 @@ func iterateMessages(rtArgs *internal.RootArgs, mdlArgs *messagesArgs, cmdArgs *
 	logrus.Infof("conditions: %v\n", mdlArgs.condition)
 	res := iterateInternalByReader(iterateOptions{
 		brokerUrl:                    mdlArgs.BrokerUrl,
+		webUrl:                       mdlArgs.WebUrl,
 		topic:                        mdlArgs.topic,
 		conditions:                   parsedMdlVars.conditions,
 		startPublishTime:             parsedMdlVars.startPublishTime,
 		startEventTime:               parsedMdlVars.startEventTime,
 		printProgressIterateInterval: cmdArgs.printProgressIterateInterval,
 	}, handleFunc)
-	logrus.Infof("iterate done => %v\n", res.PrettyString())
+	logrus.Infof("iterate done => \n%v\n", res.PrettyString())
 
 }

@@ -3,17 +3,21 @@ package messages
 import (
 	"context"
 	"fmt"
+	"strconv"
+	"strings"
 	"sync/atomic"
 	"time"
 
 	"github.com/antonmedv/expr/vm"
 	"github.com/apache/pulsar-client-go/pulsar"
+	"github.com/shenqianjin/soften-client-go/soften/admin"
 	"github.com/sirupsen/logrus"
 )
 
 type iterateOptions struct {
 	// resource information
 	brokerUrl string
+	webUrl    string
 	topic     string
 
 	// conditions
@@ -62,8 +66,48 @@ func (ir *iterateResult) PrettyString() string {
 	return fmt.Sprintf("%s, %s, %s", iterateString, matchString, handleString)
 }
 
+type iterateResults []iterateResult
+
+func (irs *iterateResults) PrettyString() string {
+	if len(*irs) == 0 {
+		return "empty iterate result"
+	}
+	if len(*irs) > 1 {
+		total := iterateResult{}
+		var iterateString string
+		for index, it := range *irs {
+			total.iterated += it.iterated
+			total.matched += it.matched
+			total.handled += it.handled
+			iterateString += fmt.Sprintf("partitioned-%d >>> %v\n", index, it.PrettyString())
+		}
+		return iterateString + fmt.Sprintf("total >>> %s", total.PrettyString())
+	}
+	return (*irs)[0].PrettyString()
+}
+
 func iterateInternalByReader(options iterateOptions,
-	handleFunc func(msg pulsar.Message) bool) iterateResult {
+	handleFunc func(msg pulsar.Message) bool) iterateResults {
+	topics := make([]string, 0)
+	// calculate non-partitioned topics
+	// pulsar-go-client doesn't support reader on partitioned topics currently.
+	// @see: https://github.com/apache/pulsar-client-go/issues/553
+	nonPartitionedManager := admin.NewNonPartitionedTopicManager(options.webUrl)
+	_, err := nonPartitionedManager.Stats(options.topic)
+	if err == nil {
+		topics = append(topics, options.topic)
+	} else if strings.Contains(err.Error(), admin.Err404NotFound) {
+		partitionedManager := admin.NewPartitionedTopicManager(options.webUrl)
+		stat2, err2 := partitionedManager.Stats(options.topic)
+		if err2 != nil || stat2.Metadata.Partitions <= 0 {
+			logrus.Fatal(err)
+		}
+		for i := 0; i < stat2.Metadata.Partitions; i++ {
+			topics = append(topics, options.topic+"-partition-"+strconv.Itoa(i))
+		}
+	} else {
+		logrus.Fatal(err)
+	}
 	// src client
 	client, err := pulsar.NewClient(pulsar.ClientOptions{URL: options.brokerUrl})
 	if err != nil {
@@ -71,63 +115,68 @@ func iterateInternalByReader(options iterateOptions,
 	}
 	defer client.Close()
 
-	// src reader
-	reader, err := client.CreateReader(pulsar.ReaderOptions{
-		Topic:          options.topic,
-		StartMessageID: pulsar.EarliestMessageID(),
-	})
-	if err != nil {
-		logrus.Fatal(err)
-	}
-	defer reader.Close()
-
 	// iterate
-	iterated := atomic.Uint64{}
-	hit := atomic.Uint64{}
-	handled := atomic.Uint64{}
-	var firstMatchedMsg pulsar.Message
-	var lastMatchedMsg pulsar.Message
-	var firstHandledMsg pulsar.Message
-	var lastHandledMsg pulsar.Message
-	for reader.HasNext() {
-		msg, err := reader.Next(context.Background())
+	results := make(iterateResults, 0)
+	for _, topic := range topics {
+		iterated := atomic.Uint64{}
+		hit := atomic.Uint64{}
+		handled := atomic.Uint64{}
+		var firstMatchedMsg pulsar.Message
+		var lastMatchedMsg pulsar.Message
+		var firstHandledMsg pulsar.Message
+		var lastHandledMsg pulsar.Message
+		// src reader
+		reader, err := client.CreateReader(pulsar.ReaderOptions{
+			Topic:          topic,
+			StartMessageID: pulsar.EarliestMessageID(),
+		})
 		if err != nil {
 			logrus.Fatal(err)
 		}
-		logrus.Debugf("started to iterate src mid: %v", msg.ID())
-		iterated.Add(1)
-		iteratedVal := iterated.Load()
-		// info progress
-		if options.printProgressIterateInterval > 0 && iteratedVal%options.printProgressIterateInterval == 0 {
-			logrus.Infof("iterate progress => iterated: %v, matched: %v, handled: %v. next => mid: %v, publish time: %v, event time: %v\n",
-				iteratedVal, hit.Load(), handled.Load(), msg.ID(), msg.PublishTime(), msg.EventTime())
-		}
-		// skip unmatched messages
-		if !matched(msg, matchOptions{
-			conditions:       options.conditions,
-			startEventTime:   options.startEventTime,
-			startPublishTime: options.startPublishTime}) {
-			continue
-		}
-		hit.Add(1)
-		if firstMatchedMsg == nil {
-			firstMatchedMsg = msg
-		}
-		lastMatchedMsg = msg
+		defer reader.Close()
 
-		// handle
-		if handleFunc(msg) {
-			handled.Add(1)
-			if firstHandledMsg == nil {
-				firstHandledMsg = msg
+		for reader.HasNext() {
+			msg, err := reader.Next(context.Background())
+			if err != nil {
+				logrus.Fatal(err)
 			}
-			lastHandledMsg = msg
+			logrus.Debugf("started to iterate src mid: %v", msg.ID())
+			iterated.Add(1)
+			iteratedVal := iterated.Load()
+			// info progress
+			if options.printProgressIterateInterval > 0 && iteratedVal%options.printProgressIterateInterval == 0 {
+				logrus.Infof("iterate progress => iterated: %v, matched: %v, handled: %v. next => mid: %v, publish time: %v, event time: %v\n",
+					iteratedVal, hit.Load(), handled.Load(), msg.ID(), msg.PublishTime(), msg.EventTime())
+			}
+			// skip unmatched messages
+			if !matched(msg, matchOptions{
+				conditions:       options.conditions,
+				startEventTime:   options.startEventTime,
+				startPublishTime: options.startPublishTime}) {
+				continue
+			}
+			hit.Add(1)
+			if firstMatchedMsg == nil {
+				firstMatchedMsg = msg
+			}
+			lastMatchedMsg = msg
+
+			// handle
+			if handleFunc(msg) {
+				handled.Add(1)
+				if firstHandledMsg == nil {
+					firstHandledMsg = msg
+				}
+				lastHandledMsg = msg
+			}
+			logrus.Debugf("ended to iterate src mid: %v", msg.ID())
 		}
-		logrus.Debugf("ended to iterate src mid: %v", msg.ID())
+		r := iterateResult{iterated: iterated.Load(), matched: hit.Load(), handled: handled.Load(),
+			firstMatchedMsg: firstMatchedMsg, lastMatchedMsg: lastMatchedMsg,
+			firstHandledMsg: firstMatchedMsg, lastHandledMsg: lastHandledMsg}
+		results = append(results, r)
 	}
-	return iterateResult{iterated: iterated.Load(), matched: hit.Load(), handled: handled.Load(),
-		firstMatchedMsg: firstMatchedMsg, lastMatchedMsg: lastMatchedMsg,
-		firstHandledMsg: firstMatchedMsg, lastHandledMsg: lastHandledMsg}
+	return results
 }
 
 type consumerIterateResult struct {

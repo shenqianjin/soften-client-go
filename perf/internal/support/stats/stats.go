@@ -37,8 +37,8 @@ func ProduceStats(ctx context.Context, statCh <-chan *ProduceStatEntry, messageS
 
 			statB := &bytes.Buffer{}
 			_, _ = fmt.Fprintf(statB, `>>>>>>>>>>
-            ProduceStats - Publish rate: %6.1f msg/s - %6.1f Mbps -
-                    Finished Latency ms: 50%% %5.1f - 95%% %5.1f - 99%% %5.1f - 99.9%% %5.1f - max %6.1f`,
+            Summary >> Publish rate: %6.1f msg/s - %6.1f Mbps -
+            >>> Finished Latency ms: 50%% %5.1f - 95%% %5.1f - 99%% %5.1f - 99.9%% %5.1f - max %6.1f`,
 				messageRate,
 				messageRate*float64(messageSize)/1024/1024*8,
 				q.Query(0.5)*1000,
@@ -53,7 +53,7 @@ func ProduceStats(ctx context.Context, statCh <-chan *ProduceStatEntry, messageS
 			}
 			for _, groupName := range groupNames {
 				_, _ = fmt.Fprintf(statB, `
-                %s rate: %6.1f msg/s`, groupName, float64(radicalMsgPublished[groupName])/float64(10))
+            >>> %s rate: %6.1f msg/s`, groupName, float64(radicalMsgPublished[groupName])/float64(10))
 				radicalMsgPublished[groupName] = 0
 			}
 			logrus.Info(statB.String())
@@ -108,10 +108,10 @@ func ConsumeStats(ctx context.Context, consumeStatCh <-chan *ConsumeStatEntry) {
 
 			statB := &bytes.Buffer{}
 			_, _ = fmt.Fprintf(statB, `<<<<<<<<<<
-            Summary - Consume rate: %6.1f msg/s - %6.1f Mbps - 
-               Received Latency ms: 50%% %5.1f - 95%% %5.1f - 99%% %5.1f - 99.9%% %5.1f - max %6.1f  
-               Finished Latency ms: 50%% %5.1f - 95%% %5.1f - 99%% %5.1f - 99.9%% %5.1f - max %6.1f
-               Handled  Latency ms: 50%% %5.1f - 95%% %5.1f - 99%% %5.1f - 99.9%% %5.1f - max %6.1f`,
+            Summary << Consume rate: %6.1f msg/s - %6.1f Mbps - 
+            <<< Received Latency ms: 50%% %5.1f - 95%% %5.1f - 99%% %5.1f - 99.9%% %5.1f - max %6.1f  
+            <<< Finished Latency ms: 50%% %5.1f - 95%% %5.1f - 99%% %5.1f - 99.9%% %5.1f - max %6.1f
+            <<< Handled  Latency ms: 50%% %5.1f - 95%% %5.1f - 99%% %5.1f - 99.9%% %5.1f - max %6.1f`,
 				msgRate, bytesRate*8/1024/1024,
 
 				receivedQ.Query(0.5)*1000,
@@ -134,11 +134,11 @@ func ConsumeStats(ctx context.Context, consumeStatCh <-chan *ConsumeStatEntry) {
 			)
 			if len(radicalHandleMsg) > 0 {
 				_, _ = fmt.Fprintf(statB, `
-            Detail >> `)
+            Detail << `)
 			}
 			for _, groupName := range groupNames {
 				_, _ = fmt.Fprintf(statB, `
-                %s rate: %6.1f msg/s - `, groupName, float64(radicalHandleMsg[groupName])/float64(10))
+            <<< %s rate: %6.1f msg/s - `, groupName, float64(radicalHandleMsg[groupName])/float64(10))
 				radicalHandleMsg[groupName] = 0
 			}
 			for _, groupName := range groupNames {
@@ -147,7 +147,7 @@ func ConsumeStats(ctx context.Context, consumeStatCh <-chan *ConsumeStatEntry) {
 					continue
 				}
 				_, _ = fmt.Fprintf(statB, `
-                %s Finished Latency ms: 50%% %5.1f - 95%% %5.1f - 99%% %5.1f - 99.9%% %5.1f - max %6.1f`, groupName,
+            <<< %s Finished Latency ms: 50%% %5.1f - 95%% %5.1f - 99%% %5.1f - 99.9%% %5.1f - max %6.1f`, groupName,
 					q.Query(0.5)*1000, q.Query(0.95)*1000, q.Query(0.99)*1000, q.Query(0.999)*1000, q.Query(1.0)*1000)
 			}
 			for _, groupName := range groupNames {
@@ -156,7 +156,7 @@ func ConsumeStats(ctx context.Context, consumeStatCh <-chan *ConsumeStatEntry) {
 					continue
 				}
 				_, _ = fmt.Fprintf(statB, `
-                %s Handled  Latency ms: 50%% %5.1f - 95%% %5.1f - 99%% %5.1f - 99.9%% %5.1f - max %6.1f`, groupName,
+            <<< %s Handled  Latency ms: 50%% %5.1f - 95%% %5.1f - 99%% %5.1f - 99.9%% %5.1f - max %6.1f`, groupName,
 					q.Query(0.5)*1000, q.Query(0.95)*1000, q.Query(0.99)*1000, q.Query(0.999)*1000, q.Query(1.0)*1000)
 			}
 			logrus.Info(statB.String())
