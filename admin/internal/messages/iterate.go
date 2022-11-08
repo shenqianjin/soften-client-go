@@ -25,11 +25,11 @@ func newIterateCommand(rtArgs *internal.RootArgs, mdlArgs *messagesArgs) *cobra.
 			"  <schema>://<tenant>/<namespace>/<topic>\n" +
 			"  <tenant>/<namespace>/<topic>\n" +
 			"  <topic>",
-		Example: "(1) soften-admin messages iterate test -c '" + SampleConditionAgeLessEqualThan10 + "'\n" +
-			"(2) soften-admin messages iterate public/default/test -c '" + SampleConditionUidRangeAndNameStartsWithNo12 + "'\n" +
+		Example: "(1) soften-admin messages iterate test01 -c '" + SampleConditionAgeLessEqualThan10 + "'\n" +
+			"(2) soften-admin messages iterate public/default/test01 -c '" + SampleConditionUidRangeAndNameStartsWithNo12 + "'\n" +
 			"(3) soften-admin messages iterate persistent://business/finance/equity -c '" + SampleConditionSpouseAgeLessThan40 + "'\n" +
-			"(4) soften-admin messages iterate test -c '" + SampleConditionFriendsHasOneOfAgeLessEqualThan10 + "'\n" +
-			"(5) soften-admin messages iterate test -c '" + SampleConditionAgeLessEqualThan10OrNameStartsWithNo12 + "'",
+			"(4) soften-admin messages iterate test03 -c '" + SampleConditionFriendsHasOneOfAgeLessEqualThan10 + "'\n" +
+			"(5) soften-admin messages iterate test03 -c '" + SampleConditionAgeLessEqualThan10OrNameStartsWithNo12 + "'",
 		Args: cobra.MinimumNArgs(1),
 		Run: func(cmd *cobra.Command, args []string) {
 			mdlArgs.topic = args[0]
@@ -74,6 +74,6 @@ func iterateMessages(rtArgs *internal.RootArgs, mdlArgs *messagesArgs, cmdArgs *
 		startEventTime:               parsedMdlVars.startEventTime,
 		printProgressIterateInterval: cmdArgs.printProgressIterateInterval,
 	}, handleFunc)
-	logrus.Infof("iterate done => \n%v\n", res.PrettyString())
+	logrus.Infof("iterate done =>>>>>> \n%v\n", res.PrettyString())
 
 }

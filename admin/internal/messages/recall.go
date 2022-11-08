@@ -33,11 +33,11 @@ func newRecallCommand(rtArgs *internal.RootArgs, mdlArgs *messagesArgs) *cobra.C
 			"  <tenant>/<namespace>/<topic>\n" +
 			"  <topic>",
 
-		Example: "(1) soften-admin messages recall test test02 -c '" + SampleConditionAgeLessEqualThan10 + "'\n" +
-			"(2) soften-admin messages recall public/default/test test02 -c '" + SampleConditionUidRangeAndNameStartsWithNo12 + "'\n" +
+		Example: "(1) soften-admin messages recall test01 test02 -c '" + SampleConditionAgeLessEqualThan10 + "'\n" +
+			"(2) soften-admin messages recall public/default/test01 test02 -c '" + SampleConditionUidRangeAndNameStartsWithNo12 + "'\n" +
 			"(3) soften-admin messages recall persistent://business/finance/equity test02 -c '" + SampleConditionSpouseAgeLessThan40 + "'\n" +
-			"(4) soften-admin messages recall test test02 -c '" + SampleConditionFriendsHasOneOfAgeLessEqualThan10 + "'\n" +
-			"(5) soften-admin messages recall test test02 -c '" + SampleConditionAgeLessEqualThan10OrNameStartsWithNo12 + "'",
+			"(4) soften-admin messages recall test03 test02 -c '" + SampleConditionFriendsHasOneOfAgeLessEqualThan10 + "'\n" +
+			"(5) soften-admin messages recall test03 test02 -c '" + SampleConditionAgeLessEqualThan10OrNameStartsWithNo12 + "'",
 		Args: cobra.MinimumNArgs(2),
 		Run: func(cmd *cobra.Command, args []string) {
 			mdlArgs.topic = args[0]
@@ -119,8 +119,8 @@ func recallMessages(rtArgs *internal.RootArgs, mdlArgs *messagesArgs, cmdArgs *r
 	}, handleFunc)
 	wg.Wait()
 	if cmdArgs.publishBatchEnable {
-		logrus.Infof("recall done => \n%v, async done: %v\n", res.PrettyString(), asyncHandleDone.Load())
+		logrus.Infof("recall done =>>>>>> \n%v, async done: %v\n", res.PrettyString(), asyncHandleDone.Load())
 	} else {
-		logrus.Infof("recall done => \n%v\n", res.PrettyString())
+		logrus.Infof("recall done =>>>>>> \n%v\n", res.PrettyString())
 	}
 }

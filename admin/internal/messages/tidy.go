@@ -44,11 +44,11 @@ func newTidyCommand(rtArgs *internal.RootArgs, mdlArgs *messagesArgs) *cobra.Com
 			"  <tenant>/<namespace>/<topic>\n" +
 			"  <topic>",
 
-		Example: "(1) soften-admin messages tidy test -c '" + SampleConditionAgeLessEqualThan10 + "'\n" +
-			"(2) soften-admin messages tidy public/default/test -c '" + SampleConditionUidRangeAndNameStartsWithNo12 + "'\n" +
-			"(3) soften-admin messages tidy persistent://business/finance/equity -c '" + SampleConditionSpouseAgeLessThan40 + "'\n" +
-			"(4) soften-admin messages tidy test -c '" + SampleConditionFriendsHasOneOfAgeLessEqualThan10 + "'\n" +
-			"(5) soften-admin messages tidy test -c '" + SampleConditionAgeLessEqualThan10OrNameStartsWithNo12 + "'",
+		Example: "(1) soften-admin messages tidy test01 -S sub -c '" + SampleConditionAgeLessEqualThan10 + "' --matched-to=test02 --unmatched-to=test01\n" +
+			"(2) soften-admin messages tidy public/default/test01 -S sub -c '" + SampleConditionUidRangeAndNameStartsWithNo12 + "' --matched-as-discard --unmatched-to=test01\n" +
+			"(3) soften-admin messages tidy persistent://business/finance/equity -S sub -c '" + SampleConditionSpouseAgeLessThan40 + "' --matched-to=test02 --unmatched-as-discard\n" +
+			"(4) soften-admin messages tidy test03 -S sub -c '" + SampleConditionFriendsHasOneOfAgeLessEqualThan10 + "' --matched-to=test02 --unmatched-to=test03\n" +
+			"(5) soften-admin messages tidy test03 -S sub -c '" + SampleConditionAgeLessEqualThan10OrNameStartsWithNo12 + "' --matched-to=test02 --unmatched-to=test03",
 		Args: cobra.MinimumNArgs(1),
 		Run: func(cmd *cobra.Command, args []string) {
 			mdlArgs.topic = args[0]
@@ -58,7 +58,7 @@ func newTidyCommand(rtArgs *internal.RootArgs, mdlArgs *messagesArgs) *cobra.Com
 	// parse variables for source
 	cmd.Flags().Uint64Var(&cmdArgs.printProgressIterateInterval, "print-progress-iterate-interval", 10000, constant.PrintProgressIterateIntervalUsage)
 	cmd.Flags().StringVarP(&cmdArgs.subscription, "subscription", "S", "", constant.SingleSubscriptionUsage)
-	cmd.Flags().Uint32Var(&cmdArgs.iterateTimeout, "iterate-timeout", 15, "iterate timeout")
+	cmd.Flags().Uint32Var(&cmdArgs.iterateTimeout, "iterate-timeout", 12, "iterate timeout")
 	cmd.Flags().Uint32Var(&cmdArgs.matchTimeout, "match-timeout", 0, "match timeout")
 	cmd.Flags().StringVar(&cmdArgs.endPublishTime, "end-publish-time", "now()", constant.EndPublishTimeUsage)
 	cmd.Flags().StringVar(&cmdArgs.endEventTime, "end-event-time", "", constant.EndEventTimeUsage)
@@ -79,7 +79,7 @@ func tidyMessages(rtArgs *internal.RootArgs, mdlArgs *messagesArgs, cmdArgs *tid
 	parsedMdlVars := parseAndValidateMessagesVars(rtArgs, mdlArgs)
 	// valid subs
 	if cmdArgs.subscription == "" {
-		logrus.Fatalf("missing subscription option. please specify one with --subscription or -s\n")
+		logrus.Fatalf("missing subscription option. please specify one with --subscription or -S\n")
 	} else if strings.Contains(cmdArgs.subscription, ",") {
 		logrus.Fatalf("multiple subscription names are not supported for this command\n")
 	}
@@ -207,8 +207,8 @@ func tidyMessages(rtArgs *internal.RootArgs, mdlArgs *messagesArgs, cmdArgs *tid
 	wg.Wait()
 
 	if cmdArgs.publishBatchEnable {
-		logrus.Infof("recall done => \n%v, async done: %v\n", res.PrettyString(), asyncHandleDone.Load())
+		logrus.Infof("recall done =>>>>>> \n%v, async done: %v\n", res.PrettyString(), asyncHandleDone.Load())
 	} else {
-		logrus.Infof("recall done => \n%v\n", res.PrettyString())
+		logrus.Infof("recall done =>>>>>> \n%v\n", res.PrettyString())
 	}
 }

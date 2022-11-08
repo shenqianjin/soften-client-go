@@ -31,7 +31,7 @@ func newCreateCommand(rtArgs *internal.RootArgs, mdlArgs *topicsArgs) *cobra.Com
 			"  <schema>://<tenant>/<namespace>/<topic>\n" +
 			"  <tenant>/<namespace>/<topic>\n" +
 			"  <topic>",
-		Example: "(1) soften-admin topics create test\n" +
+		Example: "(1) soften-admin topics create test01\n" +
 			"(2) soften-admin topics create public/default/test02 -P\n" +
 			"(3) soften-admin topics create test03 -Pp 4 -l L1,L2,L3,B1 -s Ready,Pending,Retrying,Dead -S sub\n" +
 			"(4) soften-admin topics create persistent://business/finance/equity -Pp 8",

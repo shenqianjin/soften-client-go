@@ -27,8 +27,8 @@ func newUpdateCommand(rtArgs *internal.RootArgs, mdlArgs *topicsArgs) *cobra.Com
 			"  <schema>://<tenant>/<namespace>/<topic>\n" +
 			"  <tenant>/<namespace>/<topic>\n" +
 			"  <topic>",
-		Example: "(1) soften-admin topics update public/default/test -p 12\n" +
-			"(2) soften-admin topics update persistent://business/finance/equity -Ap 24",
+		Example: "(1) soften-admin topics update public/default/test02 -p 12\n" +
+			"(2) soften-admin topics update persistent://business/finance/equity -p 24",
 		Args: cobra.MinimumNArgs(1),
 		Run: func(cmd *cobra.Command, args []string) {
 			cmdArgs.groundTopic = args[0]

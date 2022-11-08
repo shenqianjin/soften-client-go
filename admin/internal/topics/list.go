@@ -33,7 +33,8 @@ func newListCommand(rtArgs *internal.RootArgs, mdlArgs *topicsArgs) *cobra.Comma
 			"  <tenant>/<namespace>/<topic>\n" +
 			"  <topic>",
 		Example: "(1) soften-admin topics list public/default\n" +
-			"(2) soften-admin topics list persistent://business/finance/equity -P",
+			"(2) soften-admin topics list test03 -P\n" +
+			"(3) soften-admin topics list persistent://business/finance/equity -P",
 		Args: cobra.ExactArgs(1),
 		Run: func(cmd *cobra.Command, args []string) {
 			cmdArgs.namespaceOrTopic = args[0]

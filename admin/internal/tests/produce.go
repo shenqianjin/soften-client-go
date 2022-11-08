@@ -37,10 +37,9 @@ func newProduceCommand(rtArgs *internal.RootArgs, mdlArgs *testsArgs) *cobra.Com
 			"\n" +
 			"Please note that mocked string payload looks like:\n" +
 			"  " + mockedDataSample,
-		Example: "1. produce 6000 messages into 'TEST' topic with 2500 by send and 3500 by send async (in batch):\n" +
-			"produce TEST --send-count 2500 --send-async-count 3500\n" +
-			"2. produce messages into 'TEST' topic within print message details:\n" +
-			"produce TEST print-mode 2\n",
+		Example: "(1) soften-admin tests produce test01 --send-count 2500 --send-async-count 3500\n" +
+			"(2) soften-admin tests produce test03 --print-mode=2\n" +
+			"(3) soften-admin tests produce persistent://business/finance/equity",
 
 		Args: cobra.MinimumNArgs(1),
 
@@ -119,7 +118,7 @@ func produceMessages(rtArgs *internal.RootArgs, mdlArgs *testsArgs, cmdArgs *pro
 		}(uid)
 	}
 	wg.Wait()
-	logrus.Infof("end to mock produce messages into %v. sent: %v, sentAysnc: %v \n", mdlArgs.topic, cmdArgs.sendCount, cmdArgs.sendAsyncCount)
+	logrus.Infof("end to mock produce messages into %v =>>>>>> sent: %v, sentAysnc: %v \n", mdlArgs.topic, cmdArgs.sendCount, cmdArgs.sendAsyncCount)
 }
 
 func printWhenMockProduceDone(msg *pulsar.ProducerMessage, mid pulsar.MessageID, cmdArgs *produceArgs) {

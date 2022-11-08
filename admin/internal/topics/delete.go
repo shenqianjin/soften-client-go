@@ -26,8 +26,9 @@ func newDeleteCommand(rtArgs *internal.RootArgs, mdlArgs *topicsArgs) *cobra.Com
 			"  <schema>://<tenant>/<namespace>/<topic>\n" +
 			"  <tenant>/<namespace>/<topic>\n" +
 			"  <topic>",
-		Example: "(1) soften-admin topics delete public/default/test\n" +
-			"(2) soften-admin topics delete persistent://business/finance/equity -A",
+		Example: "(1) soften-admin topics delete public/default/test01\n" +
+			"(2) soften-admin topics delete test02 -P\n" +
+			"(3) soften-admin topics delete persistent://business/finance/equity -P",
 		Args: cobra.MinimumNArgs(1),
 		Run: func(cmd *cobra.Command, args []string) {
 			cmdArgs.groundTopic = args[0]

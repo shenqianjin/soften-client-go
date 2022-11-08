@@ -28,7 +28,7 @@ func newStatCommand(rtArgs *internal.RootArgs, mdlArgs *topicsArgs) *cobra.Comma
 			"  <schema>://<tenant>/<namespace>/<topic>\n" +
 			"  <tenant>/<namespace>/<topic>\n" +
 			"  <topic>",
-		Example: "(1) soften-admin topics stats public/default/test\n" +
+		Example: "(1) soften-admin topics stats public/default/test01\n" +
 			"(2) soften-admin topics stats persistent://business/finance/equity -A",
 		Args: cobra.MinimumNArgs(1),
 		Run: func(cmd *cobra.Command, args []string) {
