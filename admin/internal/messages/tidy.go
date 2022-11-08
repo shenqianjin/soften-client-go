@@ -57,10 +57,10 @@ func newTidyCommand(rtArgs *internal.RootArgs, mdlArgs *messagesArgs) *cobra.Com
 	}
 	// parse variables for source
 	cmd.Flags().Uint64Var(&cmdArgs.printProgressIterateInterval, "print-progress-iterate-interval", 10000, constant.PrintProgressIterateIntervalUsage)
-	cmd.Flags().StringVarP(&cmdArgs.subscription, "subscription", "s", "", constant.SingleSubscriptionUsage)
-	cmd.Flags().Uint32Var(&cmdArgs.iterateTimeout, "iterate-timeout", 0, "iterate timeout")
+	cmd.Flags().StringVarP(&cmdArgs.subscription, "subscription", "S", "", constant.SingleSubscriptionUsage)
+	cmd.Flags().Uint32Var(&cmdArgs.iterateTimeout, "iterate-timeout", 15, "iterate timeout")
 	cmd.Flags().Uint32Var(&cmdArgs.matchTimeout, "match-timeout", 0, "match timeout")
-	cmd.Flags().StringVar(&cmdArgs.endPublishTime, "end-publish-time", "", constant.EndPublishTimeUsage)
+	cmd.Flags().StringVar(&cmdArgs.endPublishTime, "end-publish-time", "now()", constant.EndPublishTimeUsage)
 	cmd.Flags().StringVar(&cmdArgs.endEventTime, "end-event-time", "", constant.EndEventTimeUsage)
 
 	// parse variables for destination
@@ -69,7 +69,7 @@ func newTidyCommand(rtArgs *internal.RootArgs, mdlArgs *messagesArgs) *cobra.Com
 	cmd.Flags().BoolVar(&cmdArgs.matchedAsDiscard, "matched-as-discard", false, "whether discards these matched messages, it is ignored if '--matched-to' is not empty")
 	cmd.Flags().BoolVar(&cmdArgs.unmatchedAsDiscard, "unmatched-as-discard", false, "whether discards these unmatched messages, it is ignored if '--unmatched-to' is not empty")
 	cmd.Flags().BoolVarP(&cmdArgs.publishBatchEnable, "publish-batch-enable", "b", false, constant.BatchEnableUsage)
-	cmd.Flags().Uint64Var(&cmdArgs.publishMaxTimes, "publish-max-times", 0, constant.PublishMaxTimesUsage)
+	cmd.Flags().Uint64Var(&cmdArgs.publishMaxTimes, "publish-max-times", 1, constant.PublishMaxTimesUsage)
 
 	return cmd
 }
@@ -132,13 +132,22 @@ func tidyMessages(rtArgs *internal.RootArgs, mdlArgs *messagesArgs, cmdArgs *tid
 		// check to discard
 		if matched {
 			if matchedProducer == nil && cmdArgs.matchedAsDiscard {
-				msg.Consumer.Nack(msg.Message)
+				err := msg.Consumer.Ack(msg.Message)
+				if err != nil {
+					logrus.Fatal(err)
+				}
 				logrus.Infof("discard matched mid: %v\n", msg.ID())
+				return true
 			}
 			producer = matchedProducer
 		} else {
 			if unmatchedProducer == nil && cmdArgs.unmatchedAsDiscard {
+				msg.Consumer.Ack(msg.Message)
+				if err != nil {
+					logrus.Fatal(err)
+				}
 				logrus.Infof("discard unmatched mid: %v\n", msg.ID())
+				return true
 			}
 			producer = unmatchedProducer
 		}
@@ -179,8 +188,9 @@ func tidyMessages(rtArgs *internal.RootArgs, mdlArgs *messagesArgs, cmdArgs *tid
 
 	logrus.Printf("started to tidy %v: (matched-to: %v, unmatched-to: %v)\n", mdlArgs.topic, cmdArgs.matchedTo, cmdArgs.unmatchedTo)
 	logrus.Printf("conditions: %v\n", mdlArgs.condition)
-	res := iterateInternalByConsumer(iterateOptions{
+	res := iterateByConsumer(iterateOptions{
 		brokerUrl:                    mdlArgs.BrokerUrl,
+		webUrl:                       mdlArgs.WebUrl,
 		topic:                        mdlArgs.topic,
 		conditions:                   parsedMdlVars.conditions,
 		startPublishTime:             parsedMdlVars.startPublishTime,
@@ -193,6 +203,8 @@ func tidyMessages(rtArgs *internal.RootArgs, mdlArgs *messagesArgs, cmdArgs *tid
 		endPublishTime: endPublishTime,
 		endEventTime:   endEventTime,
 	}, handleFunc)
+	// wait send async callback
+	wg.Wait()
 
 	if cmdArgs.publishBatchEnable {
 		logrus.Infof("recall done => \n%v, async done: %v\n", res.PrettyString(), asyncHandleDone.Load())

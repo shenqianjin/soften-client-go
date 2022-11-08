@@ -44,7 +44,7 @@ func newListCommand(rtArgs *internal.RootArgs, mdlArgs *topicsArgs) *cobra.Comma
 	flags := cmd.Flags()
 	// parse partition
 	flags.BoolVarP(&cmdArgs.partitioned, "partitioned", "P", false, constant.PartitionedUsage)
-	flags.BoolVarP(&cmdArgs.all, "all", "A", false, constant.AllUsage)
+	flags.BoolVar(&cmdArgs.all, "all", true, constant.AllUsage)
 
 	return cmd
 }

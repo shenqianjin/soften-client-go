@@ -108,7 +108,7 @@ func recallMessages(rtArgs *internal.RootArgs, mdlArgs *messagesArgs, cmdArgs *r
 	// iterate to recall
 	logrus.Printf("started to recall %v to %v\n", mdlArgs.topic, cmdArgs.destTopic)
 	logrus.Printf("conditions: %v\n", mdlArgs.condition)
-	res := iterateInternalByReader(iterateOptions{
+	res := iterateByReader(iterateOptions{
 		brokerUrl:                    mdlArgs.BrokerUrl,
 		webUrl:                       mdlArgs.WebUrl,
 		topic:                        mdlArgs.topic,

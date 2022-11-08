@@ -32,8 +32,9 @@ func newCreateCommand(rtArgs *internal.RootArgs, mdlArgs *topicsArgs) *cobra.Com
 			"  <tenant>/<namespace>/<topic>\n" +
 			"  <topic>",
 		Example: "(1) soften-admin topics create test\n" +
-			"(2) soften-admin topics create public/default/test -P\n" +
-			"(3) soften-admin topics create persistent://business/finance/equity -Pp 8",
+			"(2) soften-admin topics create public/default/test02 -P\n" +
+			"(3) soften-admin topics create test03 -Pp 4 -l L1,L2,L3,B1 -s Ready,Pending,Retrying,Dead -S sub\n" +
+			"(4) soften-admin topics create persistent://business/finance/equity -Pp 8",
 		Args: cobra.ExactArgs(1),
 		Run: func(cmd *cobra.Command, args []string) {
 			cmdArgs.groundTopic = args[0]

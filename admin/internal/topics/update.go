@@ -1,8 +1,6 @@
 package topics
 
 import (
-	"errors"
-
 	"github.com/shenqianjin/soften-client-go/admin/internal"
 	"github.com/shenqianjin/soften-client-go/admin/internal/support/constant"
 	"github.com/shenqianjin/soften-client-go/admin/internal/support/util"
@@ -39,21 +37,22 @@ func newUpdateCommand(rtArgs *internal.RootArgs, mdlArgs *topicsArgs) *cobra.Com
 	}
 	// parse variables
 	cmd.Flags().UintVarP(&cmdArgs.partitions, "partitions", "p", 0, constant.PartitionsUsage4Update)
-	cmd.Flags().BoolVarP(&cmdArgs.all, "all", "A", false, constant.AllUsage)
+	cmd.Flags().BoolVar(&cmdArgs.all, "all", true, constant.AllUsage)
 
 	return cmd
 }
 
 func updateTopics(rtArgs *internal.RootArgs, mdlArgs *topicsArgs, cmdArgs *updateArgs) {
 	if cmdArgs.partitions <= 0 {
-		logrus.Fatal("please specify the partitions (with -P or --partitions options) " +
+		logrus.Fatal("please specify the partitions (with -p or --partitions options) " +
 			"and make sure it is more than the original value")
 	}
 	namespaceTopic, err := util.ParseNamespaceTopic(cmdArgs.groundTopic)
 	if err != nil {
-		logrus.Fatalf("list \"%s\" failed: %v\n", cmdArgs.groundTopic, err)
-	} else if namespaceTopic.ShortTopic == "" {
-		logrus.Fatalf("list \"%s\" failed: %v\n", cmdArgs.groundTopic, "not found topic")
+		logrus.Fatalf("update \"%s\" failed: %v\n", cmdArgs.groundTopic, err)
+	}
+	if namespaceTopic.ShortTopic == "" {
+		logrus.Fatalf("update \"%s\" failed: %v\n", cmdArgs.groundTopic, "invalid topic name")
 	}
 	var topics []string
 	if cmdArgs.all {
@@ -63,11 +62,8 @@ func updateTopics(rtArgs *internal.RootArgs, mdlArgs *topicsArgs, cmdArgs *updat
 			namespaceTopic: *namespaceTopic,
 			partitioned:    true,
 		})
-		if err == nil && len(topics) == 0 {
-			err = errors.New("topic not existed")
-		}
 		if err != nil {
-			logrus.Fatalf("updated \"%s\" failed: %v\n", cmdArgs.groundTopic, err)
+			logrus.Fatalf("update \"%s\" failed: %v\n", cmdArgs.groundTopic, err)
 		}
 	} else {
 		// filter by options
@@ -86,7 +82,7 @@ func updateTopics(rtArgs *internal.RootArgs, mdlArgs *topicsArgs, cmdArgs *updat
 		if err != nil {
 			logrus.Warnf("updated \"%s\" failed: %v\n", topic, err)
 		} else {
-			logrus.Fatalf("updated \"%s\" successfully, partitions is %v now\n", topic, cmdArgs.partitions)
+			logrus.Infof("updated \"%s\" successfully, partitions is %v now\n", topic, cmdArgs.partitions)
 		}
 	}
 }

@@ -1,8 +1,6 @@
 package topics
 
 import (
-	"errors"
-
 	"github.com/shenqianjin/soften-client-go/admin/internal"
 	"github.com/shenqianjin/soften-client-go/admin/internal/support/constant"
 	"github.com/shenqianjin/soften-client-go/admin/internal/support/util"
@@ -38,7 +36,7 @@ func newDeleteCommand(rtArgs *internal.RootArgs, mdlArgs *topicsArgs) *cobra.Com
 	}
 	// parse variables
 	cmd.Flags().BoolVarP(&cmdArgs.partitioned, "partitioned", "P", false, constant.PartitionedUsage)
-	cmd.Flags().BoolVarP(&cmdArgs.all, "all", "A", false, constant.AllUsage)
+	cmd.Flags().BoolVar(&cmdArgs.all, "all", true, constant.AllUsage)
 
 	return cmd
 }
@@ -46,9 +44,10 @@ func newDeleteCommand(rtArgs *internal.RootArgs, mdlArgs *topicsArgs) *cobra.Com
 func deleteTopics(rtArgs *internal.RootArgs, mdlArgs *topicsArgs, cmdArgs *deleteArgs) {
 	namespaceTopic, err := util.ParseNamespaceTopic(cmdArgs.groundTopic)
 	if err != nil {
-		logrus.Fatalf("list \"%s\" failed: %v\n", cmdArgs.groundTopic, err)
-	} else if namespaceTopic.ShortTopic == "" {
-		logrus.Fatalf("list \"%s\" failed: %v\n", cmdArgs.groundTopic, "not found topic")
+		logrus.Fatalf("delete \"%s\" failed: %v\n", cmdArgs.groundTopic, err)
+	}
+	if namespaceTopic.ShortTopic == "" {
+		logrus.Fatalf("delete \"%s\" failed: %v\n", cmdArgs.groundTopic, "invalid topic name")
 	}
 	var topics []string
 	if cmdArgs.all {
@@ -58,9 +57,6 @@ func deleteTopics(rtArgs *internal.RootArgs, mdlArgs *topicsArgs, cmdArgs *delet
 			namespaceTopic: *namespaceTopic,
 			partitioned:    cmdArgs.partitioned,
 		})
-		if err == nil && len(topics) == 0 {
-			err = errors.New("topic not existed")
-		}
 		if err != nil {
 			logrus.Fatalf("delete \"%s\" failed: %v\n", cmdArgs.groundTopic, err)
 		}

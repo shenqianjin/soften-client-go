@@ -2,7 +2,6 @@ package topics
 
 import (
 	"encoding/json"
-	"errors"
 
 	"github.com/shenqianjin/soften-client-go/admin/internal"
 	"github.com/shenqianjin/soften-client-go/admin/internal/support/constant"
@@ -39,7 +38,7 @@ func newStatCommand(rtArgs *internal.RootArgs, mdlArgs *topicsArgs) *cobra.Comma
 	}
 	// parse variables
 	cmd.Flags().BoolVarP(&cmdArgs.partitioned, "partitioned", "P", false, constant.PartitionedUsage)
-	cmd.Flags().BoolVarP(&cmdArgs.all, "all", "A", false, constant.AllUsage)
+	cmd.Flags().BoolVar(&cmdArgs.all, "all", true, constant.AllUsage)
 
 	return cmd
 }
@@ -59,9 +58,6 @@ func statTopics(rtArgs *internal.RootArgs, mdlArgs *topicsArgs, cmdArgs *statArg
 			namespaceTopic: *namespaceTopic,
 			partitioned:    cmdArgs.partitioned,
 		})
-		if err == nil && len(topics) == 0 {
-			err = errors.New("topic not existed")
-		}
 		if err != nil {
 			logrus.Fatalf("stats \"%s\" failed: %v\n", cmdArgs.groundTopic, err)
 		}

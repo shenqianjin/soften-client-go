@@ -4,12 +4,14 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"strconv"
 	"strings"
 	"time"
 
 	"github.com/antonmedv/expr"
 	"github.com/antonmedv/expr/vm"
 	"github.com/apache/pulsar-client-go/pulsar"
+	"github.com/shenqianjin/soften-client-go/soften/admin"
 	"github.com/sirupsen/logrus"
 )
 
@@ -118,12 +120,33 @@ func publishAsync(producer pulsar.Producer, producerMsg *pulsar.ProducerMessage,
 	producer.SendAsync(context.Background(), producerMsg, callbackNew)
 }
 
+func querySinglePartitionTopics(webUrl string, topic string) []string {
+	topics := make([]string, 0)
+	nonPartitionedManager := admin.NewNonPartitionedTopicManager(webUrl)
+	_, err := nonPartitionedManager.Stats(topic)
+	if err == nil {
+		topics = append(topics, topic)
+	} else if strings.Contains(err.Error(), admin.Err404NotFound) {
+		partitionedManager := admin.NewPartitionedTopicManager(webUrl)
+		stat2, err2 := partitionedManager.Stats(topic)
+		if err2 != nil || stat2.Metadata.Partitions <= 0 {
+			logrus.Fatal("failed to stats to get partitions metadata. err: %v", err)
+		}
+		for i := 0; i < stat2.Metadata.Partitions; i++ {
+			topics = append(topics, topic+"-partition-"+strconv.Itoa(i))
+		}
+	} else {
+		logrus.Fatal(err)
+	}
+	return topics
+}
+
 // ------ helpers ------
 
 const (
-	SampleConditionAgeLessEqualThan10                     = "age != nil && age <= 10"
-	SampleConditionUidRangeAndNameStartsWithNo12          = "uid > 100 && uid < 200 && name startsWith \"No12\""
-	SampleConditionSpouseAgeLessThan40                    = "spouse != nil && spouse.age != nil && spouse.age < 40"
-	SampleConditionFriendsHasOneOfAgeLessEqualThan10      = "friends != nil && any(friends, #.age <= 10)"
-	SampleConditionAgeLessEqualThan10OrNameStartsWithNo12 = "age != nil && age <= 10\nname startsWith \"No12\""
+	SampleConditionAgeLessEqualThan10                     = `age != nil && age <= 10`
+	SampleConditionUidRangeAndNameStartsWithNo12          = `uid > 100 && uid < 200 && name startsWith "No12"`
+	SampleConditionSpouseAgeLessThan40                    = `spouse != nil && spouse.age != nil && spouse.age < 40`
+	SampleConditionFriendsHasOneOfAgeLessEqualThan10      = `friends != nil && any(friends, {#.age != nil && #.age <= 10})`
+	SampleConditionAgeLessEqualThan10OrNameStartsWithNo12 = `age != nil && age <= 10 \n name startsWith "No12"`
 )
