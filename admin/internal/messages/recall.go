@@ -110,7 +110,7 @@ func recallMessages(rtArgs *internal.RootArgs, mdlArgs *messagesArgs, cmdArgs *r
 	logrus.Printf("conditions: %v\n", mdlArgs.condition)
 	res := iterateByReader(iterateOptions{
 		brokerUrl:                    mdlArgs.BrokerUrl,
-		webUrl:                       mdlArgs.WebUrl,
+		webUrl:                       rtArgs.WebUrl,
 		topic:                        mdlArgs.topic,
 		conditions:                   parsedMdlVars.conditions,
 		startPublishTime:             parsedMdlVars.startPublishTime,

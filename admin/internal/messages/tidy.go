@@ -190,7 +190,7 @@ func tidyMessages(rtArgs *internal.RootArgs, mdlArgs *messagesArgs, cmdArgs *tid
 	logrus.Printf("conditions: %v\n", mdlArgs.condition)
 	res := iterateByConsumer(iterateOptions{
 		brokerUrl:                    mdlArgs.BrokerUrl,
-		webUrl:                       mdlArgs.WebUrl,
+		webUrl:                       rtArgs.WebUrl,
 		topic:                        mdlArgs.topic,
 		conditions:                   parsedMdlVars.conditions,
 		startPublishTime:             parsedMdlVars.startPublishTime,

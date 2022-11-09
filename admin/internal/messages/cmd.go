@@ -13,7 +13,6 @@ import (
 
 type messagesArgs struct {
 	BrokerUrl        string
-	WebUrl           string
 	topic            string
 	condition        string
 	startPublishTime string // 通过消息时间比较, 非Reader Seek, 支持纳秒精度
@@ -31,7 +30,6 @@ func NewModuleCmd(rootArgs *internal.RootArgs) *cobra.Command {
 	// parser variables
 	flags := cmd.PersistentFlags()
 	flags.StringVar(&moduleArgs.BrokerUrl, "broker-url", "pulsar://localhost:6650", "broker url")
-	flags.StringVar(&moduleArgs.WebUrl, "web-url", "http://localhost:8080", "broker web url")
 	flags.StringVarP(&moduleArgs.condition, "condition", "c", "", constant.ConditionsUsage)
 	flags.StringVar(&moduleArgs.startPublishTime, "start-publish-time", "", constant.StartPublishTimeUsage)
 	flags.StringVar(&moduleArgs.startEventTime, "start-event-time", "", constant.StartEventTimeUsage)

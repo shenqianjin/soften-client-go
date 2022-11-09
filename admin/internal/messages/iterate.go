@@ -67,7 +67,7 @@ func iterateMessages(rtArgs *internal.RootArgs, mdlArgs *messagesArgs, cmdArgs *
 	logrus.Infof("conditions: %v\n", mdlArgs.condition)
 	res := iterateByReader(iterateOptions{
 		brokerUrl:                    mdlArgs.BrokerUrl,
-		webUrl:                       mdlArgs.WebUrl,
+		webUrl:                       rtArgs.WebUrl,
 		topic:                        mdlArgs.topic,
 		conditions:                   parsedMdlVars.conditions,
 		startPublishTime:             parsedMdlVars.startPublishTime,
