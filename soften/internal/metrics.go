@@ -14,7 +14,9 @@ import (
 // consume  : receive -> listen -> prev check -> handle -> post check -> decide
 // note that publish time is generated in 'publish' stage before set the message into events chan.
 type MetricsProvider struct {
-	metricsLevel int
+	metricsLevel     int
+	metricsTopicMode string
+	metricsBuckets   *MetricsBuckets
 
 	// client labels: {url=}
 	clientsMetricsMap sync.Map // map[{url=}]*internal.ClientMetrics
@@ -92,7 +94,7 @@ type MetricsProvider struct {
 	messageEndLatencyFromEvent   *prometheus.HistogramVec
 }
 
-func NewMetricsProvider(metricsLevel int, userDefinedLabels map[string]string) *MetricsProvider {
+func NewMetricsProvider(metricsLevel int, userDefinedLabels map[string]string, topicMode string, buckets *MetricsBuckets) *MetricsProvider {
 	constLabels := map[string]string{
 		"client": "soften",
 	}
@@ -100,7 +102,7 @@ func NewMetricsProvider(metricsLevel int, userDefinedLabels map[string]string) *
 		constLabels[k] = v
 	}
 
-	metrics := &MetricsProvider{metricsLevel: metricsLevel}
+	metrics := &MetricsProvider{metricsLevel: metricsLevel, metricsTopicMode: topicMode}
 
 	// client labels: {url=}
 	clientLabels := []string{"url"}
@@ -131,18 +133,13 @@ func NewMetricsProvider(metricsLevel int, userDefinedLabels map[string]string) *
 		Name:        "soften_producer_publish_latency_from_PCheck",
 		Help:        "Publish latency from prev-check start time to the server response time",
 		ConstLabels: constLabels,
-		Buckets: []float64{.0005, .001, .005, .01, .025, .05, .1, .25, .5, 1, 2.5, 5, 10, 20, 30, 40, 50,
-			60, 1.5 * 60, 2 * 60, 3 * 60, 4 * 60, 5 * 60, 6 * 60, 7 * 60, 8 * 60, 9 * 60,
-			600},
+		Buckets:     buckets.ProduceCheckLatencies,
 	}, producerLabels))
 	metrics.producerPublishLatencyFromEvent = metrics.tryRegisterHistogram(prometheus.NewHistogramVec(prometheus.HistogramOpts{
 		Name:        "soften_producer_publish_latency_from_Event",
 		Help:        "Publish latency from event time to the server response time",
 		ConstLabels: constLabels,
-		Buckets: []float64{.0005, .001, .005, .01, .025, .05, .1, .25, .5, 1, 2.5, 5, 10, 20, 30, 40, 50,
-			60, 1.5 * 60, 2 * 60, 3 * 60, 4 * 60, 5 * 60, 6 * 60, 7 * 60, 8 * 60, 9 * 60,
-			600, 1.5 * 600, 2 * 600, 3 * 600, 4 * 600, 5 * 600,
-			3600},
+		Buckets:     buckets.ProduceEventLatencies,
 	}, producerLabels))
 
 	// producer checker label: {ground_topic=, topic=, check_type=}
@@ -166,10 +163,7 @@ func NewMetricsProvider(metricsLevel int, userDefinedLabels map[string]string) *
 		Name:        "soften_producer_check_latency",
 		Help:        "Check latency experienced by produce checkers",
 		ConstLabels: constLabels,
-		Buckets: []float64{.0005, .001, .005, .01, .025, .05, .1, .25, .5, 1, 2.5, 5, 10, 20, 30, 40, 50,
-			60, 1.5 * 60, 2 * 60, 3 * 60, 4 * 60, 5 * 60, 6 * 60, 7 * 60, 8 * 60, 9 * 60,
-			600, 1.5 * 600, 2 * 600, 3 * 600, 4 * 600, 5 * 600,
-			3600},
+		Buckets:     buckets.ProduceCheckLatencies,
 	}, produceCheckerLabels))
 
 	// producer decider labels: {ground_topic=, topic=, goto=}
@@ -226,21 +220,13 @@ func NewMetricsProvider(metricsLevel int, userDefinedLabels map[string]string) *
 		Name:        "soften_consumer_listen_latency",
 		Help:        "Listen latency from receive time to listen time",
 		ConstLabels: constLabels,
-		Buckets: []float64{.0005, .001, .005, .01, .025, .05, .1, .25, .5, 1, 2.5, 5, 10, 20, 30, 40, 50,
-			60, 1.5 * 60, 2 * 60, 3 * 60, 4 * 60, 5 * 60, 6 * 60, 7 * 60, 8 * 60, 9 * 60,
-			600, 1.5 * 600, 2 * 600, 3 * 600, 4 * 600, 5 * 600,
-			3600, 1.5 * 3600, 2 * 3600, 3 * 3600, 4 * 3600, 5 * 3600, 6 * 3600, 7 * 3600, 8 * 3600, 9 * 3600, 10 * 3600, 11 * 3600, 12 * 3600,
-			24 * 3600, 2 * 24 * 3600, 3 * 24 * 3600, 4 * 24 * 3600, 5 * 24 * 3600, 6 * 24 * 3600, 7 * 24 * 3600, 15 * 24 * 3600, 30 * 24 * 3600},
+		Buckets:     buckets.ConsumeListenLatencies,
 	}, listenerConsumerLabels))
 	metrics.consumerListenLatencyFromEvent = metrics.tryRegisterHistogram(prometheus.NewHistogramVec(prometheus.HistogramOpts{
 		Name:        "soften_consumer_listen_latency_from_Event",
 		Help:        "Listen latency from event time to listen time",
 		ConstLabels: constLabels,
-		Buckets: []float64{.0005, .001, .005, .01, .025, .05, .1, .25, .5, 1, 2.5, 5, 10, 20, 30, 40, 50,
-			60, 1.5 * 60, 2 * 60, 3 * 60, 4 * 60, 5 * 60, 6 * 60, 7 * 60, 8 * 60, 9 * 60,
-			600, 1.5 * 600, 2 * 600, 3 * 600, 4 * 600, 5 * 600,
-			3600, 1.5 * 3600, 2 * 3600, 3 * 3600, 4 * 3600, 5 * 3600, 6 * 3600, 7 * 3600, 8 * 3600, 9 * 3600, 10 * 3600, 11 * 3600, 12 * 3600,
-			24 * 3600, 2 * 24 * 3600, 3 * 24 * 3600, 4 * 24 * 3600, 5 * 24 * 3600, 6 * 24 * 3600, 7 * 24 * 3600, 15 * 24 * 3600, 30 * 24 * 3600},
+		Buckets:     buckets.ConsumeEventLatencies,
 	}, listenerConsumerLabels))
 	metrics.consumerConsumeMessageAcks = metrics.tryRegisterCounter(prometheus.NewCounterVec(prometheus.CounterOpts{
 		Name:        "soften_consumer_consume_messages_acks",
@@ -286,10 +272,7 @@ func NewMetricsProvider(metricsLevel int, userDefinedLabels map[string]string) *
 		Name:        "soften_consumer_check_latency",
 		Help:        "Check latency experienced by consume checkers",
 		ConstLabels: constLabels,
-		Buckets: []float64{.0005, .001, .005, .01, .025, .05, .1, .25, .5, 1, 2.5, 5, 10, 20, 30, 40, 50,
-			60, 1.5 * 60, 2 * 60, 3 * 60, 4 * 60, 5 * 60, 6 * 60, 7 * 60, 8 * 60, 9 * 60,
-			600, 1.5 * 600, 2 * 600, 3 * 600, 4 * 600, 5 * 600,
-			3600},
+		Buckets:     buckets.ConsumeCheckLatencies,
 	}, listenerCheckerLabels))
 
 	// listener consumer handle labels: {ground_topic=, level, status, subscription, topic, goto}
@@ -298,18 +281,13 @@ func NewMetricsProvider(metricsLevel int, userDefinedLabels map[string]string) *
 		Name:        "soften_consumer_handle_latency",
 		Help:        "Handle latency experienced by consume handlers",
 		ConstLabels: constLabels,
-		Buckets: []float64{.0005, .001, .005, .01, .025, .05, .1, .25, .5, 1, 2.5, 5, 10, 20, 30, 40, 50,
-			60, 1.5 * 60, 2 * 60, 3 * 60, 4 * 60, 5 * 60, 6 * 60, 7 * 60, 8 * 60, 9 * 60,
-			600, 1.5 * 600, 2 * 600, 3 * 600, 4 * 600, 5 * 600,
-			3600, 1.5 * 3600, 2 * 3600, 3 * 3600, 4 * 3600, 5 * 3600, 6 * 3600, 7 * 3600, 8 * 3600, 9 * 3600, 10 * 3600, 11 * 3600, 12 * 3600,
-			24 * 3600},
+		Buckets:     buckets.ConsumeHandleLatencies,
 	}, consumerHandlerLabels))
 	metrics.consumerHandleConsumes = metrics.tryRegisterHistogram(prometheus.NewHistogramVec(prometheus.HistogramOpts{
 		Name:        "soften_consumer_handle_messages_consumes",
 		Help:        "Consume times experienced by consume handlers",
 		ConstLabels: constLabels,
-		Buckets: []float64{1, 2, 3, 5, 8, 10, 13, 17, 20, 30, 40, 50,
-			60, 80, 100, 150, 200, 250, 300, 350, 400, 500, 600, 700, 800, 900, 1000},
+		Buckets:     buckets.MessageConsumeTimes,
 	}, consumerHandlerLabels))
 
 	// consumer decide labels: {ground_topic=, subscription, goto}
@@ -341,31 +319,19 @@ func NewMetricsProvider(metricsLevel int, userDefinedLabels map[string]string) *
 		Name:        "soften_consumer_decide_latency_from_Receive",
 		Help:        "Decide latency from receive time to decided time",
 		ConstLabels: constLabels,
-		Buckets: []float64{.0005, .001, .005, .01, .025, .05, .1, .25, .5, 1, 2.5, 5, 10, 20, 30, 40, 50,
-			60, 1.5 * 60, 2 * 60, 3 * 60, 4 * 60, 5 * 60, 6 * 60, 7 * 60, 8 * 60, 9 * 60,
-			600, 1.5 * 600, 2 * 600, 3 * 600, 4 * 600, 5 * 600,
-			3600, 1.5 * 3600, 2 * 3600, 3 * 3600, 4 * 3600, 5 * 3600, 6 * 3600, 7 * 3600, 8 * 3600, 9 * 3600, 10 * 3600, 11 * 3600, 12 * 3600,
-			24 * 3600, 2 * 24 * 3600, 3 * 24 * 3600, 4 * 24 * 3600, 5 * 24 * 3600, 6 * 24 * 3600, 7 * 24 * 3600, 15 * 24 * 3600, 30 * 24 * 3600},
+		Buckets:     buckets.ConsumeRoundLatencies,
 	}, consumerDeciderLabels))
 	metrics.consumerDecideLatencyFromListen = metrics.tryRegisterHistogram(prometheus.NewHistogramVec(prometheus.HistogramOpts{
 		Name:        "soften_consumer_decide_latency_from_Listen",
 		Help:        "Decide latency from listen time to decided time",
 		ConstLabels: constLabels,
-		Buckets: []float64{.0005, .001, .005, .01, .025, .05, .1, .25, .5, 1, 2.5, 5, 10, 20, 30, 40, 50,
-			60, 1.5 * 60, 2 * 60, 3 * 60, 4 * 60, 5 * 60, 6 * 60, 7 * 60, 8 * 60, 9 * 60,
-			600, 1.5 * 600, 2 * 600, 3 * 600, 4 * 600, 5 * 600,
-			3600, 1.5 * 3600, 2 * 3600, 3 * 3600, 4 * 3600, 5 * 3600, 6 * 3600, 7 * 3600, 8 * 3600, 9 * 3600, 10 * 3600, 11 * 3600, 12 * 3600,
-			24 * 3600},
+		Buckets:     buckets.ConsumeRoundLatencies,
 	}, consumerDeciderLabels))
 	metrics.consumerDecideLatencyFromLPCheck = metrics.tryRegisterHistogram(prometheus.NewHistogramVec(prometheus.HistogramOpts{
 		Name:        "soften_consumer_decide_latency_from_LPCheck",
 		Help:        "Decide latency from listen prev-check start time to decided time",
 		ConstLabels: constLabels,
-		Buckets: []float64{.0005, .001, .005, .01, .025, .05, .1, .25, .5, 1, 2.5, 5, 10, 20, 30, 40, 50,
-			60, 1.5 * 60, 2 * 60, 3 * 60, 4 * 60, 5 * 60, 6 * 60, 7 * 60, 8 * 60, 9 * 60,
-			600, 1.5 * 600, 2 * 600, 3 * 600, 4 * 600, 5 * 600,
-			3600, 1.5 * 3600, 2 * 3600, 3 * 3600, 4 * 3600, 5 * 3600, 6 * 3600, 7 * 3600, 8 * 3600, 9 * 3600, 10 * 3600, 11 * 3600, 12 * 3600,
-			24 * 3600},
+		Buckets:     buckets.ConsumeRoundLatencies,
 	}, consumerDeciderLabels))
 
 	// listener consumer handle labels: {ground_topic=, level, status, subscription, topic, goto}
@@ -374,21 +340,13 @@ func NewMetricsProvider(metricsLevel int, userDefinedLabels map[string]string) *
 		Name:        "soften_message_end_latency_from_Publish",
 		Help:        "Message end latency from publish time to end time (discard, done, dead)",
 		ConstLabels: constLabels,
-		Buckets: []float64{.0005, .001, .005, .01, .025, .05, .1, .25, .5, 1, 2.5, 5, 10, 20, 30, 40, 50,
-			60, 1.5 * 60, 2 * 60, 3 * 60, 4 * 60, 5 * 60, 6 * 60, 7 * 60, 8 * 60, 9 * 60,
-			600, 1.5 * 600, 2 * 600, 3 * 600, 4 * 600, 5 * 600,
-			3600, 1.5 * 3600, 2 * 3600, 3 * 3600, 4 * 3600, 5 * 3600, 6 * 3600, 7 * 3600, 8 * 3600, 9 * 3600, 10 * 3600, 11 * 3600, 12 * 3600,
-			24 * 3600, 2 * 24 * 3600, 3 * 24 * 3600, 4 * 24 * 3600, 5 * 24 * 3600, 6 * 24 * 3600, 7 * 24 * 3600, 15 * 24 * 3600, 30 * 24 * 3600},
+		Buckets:     buckets.ConsumeEventLatencies,
 	}, listenerMessagesLabels))
 	metrics.messageEndLatencyFromEvent = metrics.tryRegisterHistogram(prometheus.NewHistogramVec(prometheus.HistogramOpts{
 		Name:        "soften_message_end_latency_from_Event",
 		Help:        "Message end latency from event time to end time (discard, done, dead)",
 		ConstLabels: constLabels,
-		Buckets: []float64{.0005, .001, .005, .01, .025, .05, .1, .25, .5, 1, 2.5, 5, 10, 20, 30, 40, 50,
-			60, 1.5 * 60, 2 * 60, 3 * 60, 4 * 60, 5 * 60, 6 * 60, 7 * 60, 8 * 60, 9 * 60,
-			600, 1.5 * 600, 2 * 600, 3 * 600, 4 * 600, 5 * 600,
-			3600, 1.5 * 3600, 2 * 3600, 3 * 3600, 4 * 3600, 5 * 3600, 6 * 3600, 7 * 3600, 8 * 3600, 9 * 3600, 10 * 3600, 11 * 3600, 12 * 3600,
-			24 * 3600, 2 * 24 * 3600, 3 * 24 * 3600, 4 * 24 * 3600, 5 * 24 * 3600, 6 * 24 * 3600, 7 * 24 * 3600, 15 * 24 * 3600, 30 * 24 * 3600},
+		Buckets:     buckets.ConsumeEventLatencies,
 	}, listenerMessagesLabels))
 
 	return metrics
@@ -433,6 +391,7 @@ func (v *MetricsProvider) GetClientMetrics(url string) *ClientMetrics {
 }
 
 func (v *MetricsProvider) GetProducerMetrics(groundTopic, topic string) *ProducerMetrics {
+	topic = v.formatMetricsTopic(groundTopic, DefaultGroundTopicLevelL1, topic)
 	labels := prometheus.Labels{"ground_topic": groundTopic, "topic": topic}
 	key := v.convertLabelsToKey(labels)
 	metrics, _ := v.producersMetricsMap.LoadOrStore(key, &ProducerMetrics{
@@ -446,6 +405,7 @@ func (v *MetricsProvider) GetProducerMetrics(groundTopic, topic string) *Produce
 }
 
 func (v *MetricsProvider) GetProducerCheckersMetrics(groundTopic, topic string, checkType string) *ProducerCheckersMetrics {
+	topic = v.formatMetricsTopic(groundTopic, DefaultGroundTopicLevelL1, topic)
 	labels := prometheus.Labels{"ground_topic": groundTopic, "topic": topic, "check_type": checkType}
 	key := v.convertLabelsToKey(labels)
 	metrics, _ := v.producerCheckersMetricsMap.LoadOrStore(key, &ProducerCheckersMetrics{
@@ -455,6 +415,7 @@ func (v *MetricsProvider) GetProducerCheckersMetrics(groundTopic, topic string, 
 }
 
 func (v *MetricsProvider) GetProducerCheckerMetrics(groundTopic, topic string, checkType string) *ProducerCheckerMetrics {
+	topic = v.formatMetricsTopic(groundTopic, DefaultGroundTopicLevelL1, topic)
 	labels := prometheus.Labels{"ground_topic": groundTopic, "topic": topic, "check_type": checkType}
 	key := v.convertLabelsToKey(labels)
 	metrics, _ := v.producerCheckMetricsMap.LoadOrStore(key, &ProducerCheckerMetrics{
@@ -466,6 +427,7 @@ func (v *MetricsProvider) GetProducerCheckerMetrics(groundTopic, topic string, c
 }
 
 func (v *MetricsProvider) GetProducerDeciderMetrics(groundTopic, topic, handleGoto string) *ProducerDeciderMetrics {
+	topic = v.formatMetricsTopic(groundTopic, DefaultGroundTopicLevelL1, topic)
 	labels := prometheus.Labels{"ground_topic": groundTopic, "topic": topic, "goto": handleGoto}
 	key := v.convertLabelsToKey(labels)
 	metrics, _ := v.producerDecideMetricsMap.LoadOrStore(key, &ProducerDeciderMetrics{
@@ -498,6 +460,7 @@ func (v *MetricsProvider) GetListenerCheckersMetrics(groundTopic string, subscri
 }
 
 func (v *MetricsProvider) GetListenerCheckerMetrics(groundTopic string, level TopicLevel, status MessageStatus, subscription string, topic string, checkType string) *ListenerCheckerMetrics {
+	topic = v.formatMetricsTopic(groundTopic, level, topic)
 	labels := prometheus.Labels{"ground_topic": groundTopic, "level": level.String(), "status": status.String(),
 		"subscription": subscription, "topic": topic, "check_type": checkType}
 	key := v.convertLabelsToKey(labels)
@@ -510,6 +473,7 @@ func (v *MetricsProvider) GetListenerCheckerMetrics(groundTopic string, level To
 }
 
 func (v *MetricsProvider) GetListenerConsumerMetrics(groundTopic string, level TopicLevel, status MessageStatus, subscription string, topic string) *ListenerConsumerMetrics {
+	topic = v.formatMetricsTopic(groundTopic, level, topic)
 	labels := prometheus.Labels{"ground_topic": groundTopic, "level": level.String(), "status": status.String(),
 		"subscription": subscription, "topic": topic}
 	key := v.convertLabelsToKey(labels)
@@ -528,6 +492,7 @@ func (v *MetricsProvider) GetListenerConsumerMetrics(groundTopic string, level T
 }
 
 func (v *MetricsProvider) GetListenerHandleMetrics(groundTopic string, level TopicLevel, status MessageStatus, subscription, topic string, msgGoto DecideGoto) *ListenerHandlerMetrics {
+	topic = v.formatMetricsTopic(groundTopic, level, topic)
 	labels := prometheus.Labels{"ground_topic": groundTopic, "level": level.String(), "status": status.String(),
 		"subscription": subscription, "topic": topic, "goto": msgGoto.String()}
 	key := v.convertLabelsToKey(labels)
@@ -548,6 +513,7 @@ func (v *MetricsProvider) GetListenerDecidersMetrics(groundTopic, subscription s
 }
 
 func (v *MetricsProvider) GetListenerDecideMetrics(groundTopic string, level TopicLevel, status MessageStatus, subscription, topic string, msgGoto DecideGoto) *ListenerDeciderMetrics {
+	topic = v.formatMetricsTopic(groundTopic, level, topic)
 	labels := prometheus.Labels{"ground_topic": groundTopic, "level": level.String(), "status": status.String(),
 		"subscription": subscription, "goto": msgGoto.String(), "topic": topic}
 	key := v.convertLabelsToKey(labels)
@@ -563,6 +529,7 @@ func (v *MetricsProvider) GetListenerDecideMetrics(groundTopic string, level Top
 }
 
 func (v *MetricsProvider) GetListenerMessagesMetrics(groundTopic string, level TopicLevel, status MessageStatus, subscription, topic string, msgGoto DecideGoto) *ListenerMessagesMetrics {
+	topic = v.formatMetricsTopic(groundTopic, level, topic)
 	labels := prometheus.Labels{"ground_topic": groundTopic, "level": level.String(), "status": status.String(),
 		"subscription": subscription, "goto": msgGoto.String(), "topic": topic}
 	key := v.convertLabelsToKey(labels)
@@ -580,6 +547,25 @@ func (v *MetricsProvider) convertLabelsToKey(labels prometheus.Labels) string {
 	}
 	sort.Strings(kvs)
 	return strings.Join(kvs, "; ")
+}
+
+func (v *MetricsProvider) formatMetricsTopic(groundTopic string, level TopicLevel, msgTopic string) string {
+	switch v.metricsTopicMode {
+	case "Grounded":
+		return groundTopic
+	case "Leveled":
+		return groundTopic + level.TopicSuffix()
+	case "General":
+		idx := strings.LastIndex(msgTopic, partitionedTopicSuffix)
+		if idx > 0 {
+			return msgTopic[:idx]
+		}
+		return msgTopic
+	case "Indexed":
+		return msgTopic
+	default:
+		panic("invalid metrics topic mode")
+	}
 }
 
 // ------ helper ------
@@ -676,4 +662,15 @@ type CheckerMetrics struct {
 	CheckPassed   prometheus.Counter // counter of produce check passed
 	CheckRejected prometheus.Counter // counter of produce check rejected
 	CheckLatency  prometheus.Observer
+}
+
+type MetricsBuckets struct {
+	ProduceCheckLatencies  []float64 // check latency buckets used for publishing
+	ProduceEventLatencies  []float64 // event latency buckets used for publishing
+	ConsumeListenLatencies []float64 // listen latency buckets used for consuming
+	ConsumeCheckLatencies  []float64 // check latency buckets used for consuming
+	ConsumeHandleLatencies []float64 // handle latency buckets used for consuming
+	ConsumeEventLatencies  []float64 // event latency buckets used for consuming
+	ConsumeRoundLatencies  []float64 // consume round latency buckets used for consuming
+	MessageConsumeTimes    []float64 // message consume times buckets used for consuming
 }

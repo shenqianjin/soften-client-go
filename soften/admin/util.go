@@ -7,6 +7,7 @@ import (
 	"io"
 	"net/http"
 	"net/http/httputil"
+	"strings"
 
 	"github.com/shenqianjin/soften-client-go/soften/config"
 )
@@ -34,14 +35,18 @@ func callWithRet(c *http.Client, req *http.Request, ret interface{}) error {
 		return nil
 	}
 	// failed
+	statusDesc := resp.Status
+	if !strings.Contains(statusDesc, http.StatusText(resp.StatusCode)) {
+		statusDesc = fmt.Sprintf("%d %s [%s]", resp.StatusCode, http.StatusText(resp.StatusCode), statusDesc)
+	}
 	if resp.ContentLength != 0 {
 		if respData, err1 := io.ReadAll(resp.Body); err1 != nil {
 			err = err1
 		} else {
-			err = errors.New(fmt.Sprintf("%s => %s", resp.Status, string(respData)))
+			err = errors.New(fmt.Sprintf("%s => %s", statusDesc, string(respData)))
 		}
 	} else {
-		err = errors.New(fmt.Sprintf("%s", resp.Status))
+		err = errors.New(statusDesc)
 	}
 	return err
 }

@@ -103,7 +103,7 @@ func (r *router) initializeProducer() {
 
 			if err != nil {
 				if strings.Contains(err.Error(), "Topic Not Found") {
-					panic(fmt.Sprintf("Failed to create producer for topic: %s", r.options.Topic))
+					panic(fmt.Sprintf("Failed to create producer for topic: %s, err: %v", r.options.Topic, err))
 				}
 				r.logger.WithError(err).Errorf("Failed to create producer for topic: %s", r.options.Topic)
 				time.Sleep(backoffPolicy.Next())

@@ -54,7 +54,8 @@ func NewClient(conf config.ClientConfig) (*client, error) {
 	if err != nil {
 		return nil, err
 	}
-	metricsProvider := internal.NewMetricsProvider(2, nil)
+	metricsProvider := internal.NewMetricsProvider(2, nil,
+		string(conf.MetricsPolicy.MetricsTopicMode), conf.MetricsPolicy.MetricsBuckets)
 	// create client
 	cli := &client{Client: pulsarClient, logger: conf.Logger, metricsProvider: metricsProvider, url: conf.URL}
 	cli.metricsProvider.GetClientMetrics(cli.url).ClientsOpened.Inc()

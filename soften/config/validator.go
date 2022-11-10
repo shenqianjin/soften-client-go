@@ -31,7 +31,57 @@ func (v *validator) ValidateAndDefaultClientConfig(conf *ClientConfig) error {
 	if conf.MetricsCardinality == 0 {
 		conf.MetricsCardinality = pulsar.MetricsCardinalityTopic
 	}
+	// default and validate metrics policy
+	if conf.MetricsPolicy == nil {
+		conf.MetricsPolicy = newDefaultMetricsPolicy()
+	}
+	if err := v.validateAndDefaultMetricsPolicy(conf.MetricsPolicy, newDefaultMetricsPolicy()); err != nil {
+		return err
+	}
+	return nil
+}
 
+func (v *validator) validateAndDefaultMetricsPolicy(configuredPolicy *MetricsPolicy, defaultPolicy *MetricsPolicy) error {
+	if configuredPolicy.MetricsTopicMode == "" {
+		configuredPolicy.MetricsTopicMode = defaultPolicy.MetricsTopicMode
+	}
+	switch configuredPolicy.MetricsTopicMode {
+	case MetricsTopicGrounded:
+	case MetricsTopicLeveled:
+	case MetricsTopicGeneral:
+	case MetricsTopicIndexed:
+	default:
+		return errors.New(fmt.Sprintf("invalid metrics topic mode: %v", configuredPolicy.MetricsTopicMode))
+	}
+	// validate buckets
+	if configuredPolicy.MetricsBuckets == nil {
+		configuredPolicy.MetricsBuckets = defaultPolicy.MetricsBuckets
+		return nil
+	}
+	if len(configuredPolicy.MetricsBuckets.ProduceCheckLatencies) == 0 {
+		configuredPolicy.MetricsBuckets.ProduceCheckLatencies = defaultPolicy.MetricsBuckets.ProduceCheckLatencies
+	}
+	if len(configuredPolicy.MetricsBuckets.ProduceEventLatencies) == 0 {
+		configuredPolicy.MetricsBuckets.ProduceEventLatencies = defaultPolicy.MetricsBuckets.ProduceEventLatencies
+	}
+	if len(configuredPolicy.MetricsBuckets.ConsumeListenLatencies) == 0 {
+		configuredPolicy.MetricsBuckets.ConsumeListenLatencies = defaultPolicy.MetricsBuckets.ConsumeListenLatencies
+	}
+	if len(configuredPolicy.MetricsBuckets.ConsumeCheckLatencies) == 0 {
+		configuredPolicy.MetricsBuckets.ConsumeCheckLatencies = defaultPolicy.MetricsBuckets.ConsumeCheckLatencies
+	}
+	if len(configuredPolicy.MetricsBuckets.ConsumeHandleLatencies) == 0 {
+		configuredPolicy.MetricsBuckets.ConsumeHandleLatencies = defaultPolicy.MetricsBuckets.ConsumeHandleLatencies
+	}
+	if len(configuredPolicy.MetricsBuckets.ConsumeEventLatencies) == 0 {
+		configuredPolicy.MetricsBuckets.ConsumeEventLatencies = defaultPolicy.MetricsBuckets.ConsumeEventLatencies
+	}
+	if len(configuredPolicy.MetricsBuckets.ConsumeRoundLatencies) == 0 {
+		configuredPolicy.MetricsBuckets.ConsumeRoundLatencies = defaultPolicy.MetricsBuckets.ConsumeRoundLatencies
+	}
+	if len(configuredPolicy.MetricsBuckets.MessageConsumeTimes) == 0 {
+		configuredPolicy.MetricsBuckets.MessageConsumeTimes = defaultPolicy.MetricsBuckets.MessageConsumeTimes
+	}
 	return nil
 }
 

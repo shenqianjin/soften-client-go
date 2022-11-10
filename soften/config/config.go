@@ -38,6 +38,8 @@ type ClientConfig struct {
 	// Specify metric cardinality to the tenant, namespace or topic levels, or remove it completely.
 	// Default: pulsar.MetricsCardinalityNamespace --> pulsar.MetricsCardinalityTopic
 	MetricsCardinality pulsar.MetricsCardinality `json:"metrics_cardinality"`
+
+	MetricsPolicy *MetricsPolicy // Optional: metrics policy to custom metrics such as histogram buckets and metrics topic mode
 }
 
 // ------ producer configuration ------
@@ -237,4 +239,20 @@ const (
 
 	// EscapeAsNack negatively acknowledges these escaped messages, logging it in warn level
 	EscapeAsNack
+)
+
+// ------ metrics policy ------
+
+type MetricsPolicy struct {
+	MetricsTopicMode MetricsTopicMode
+	MetricsBuckets   *internal.MetricsBuckets
+}
+
+type MetricsTopicMode string
+
+const (
+	MetricsTopicIndexed  MetricsTopicMode = "Indexed"  // original indexed topics within partition parts or general non-partition topic
+	MetricsTopicGeneral  MetricsTopicMode = "General"  // general topic name union partition parts, or general non-partitioned topic name
+	MetricsTopicLeveled  MetricsTopicMode = "Leveled"  // leveled topic name union all statuses
+	MetricsTopicGrounded MetricsTopicMode = "Grounded" // grounded topic name union all levels and statuses.
 )

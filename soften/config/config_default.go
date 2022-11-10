@@ -164,6 +164,87 @@ var (
 	}
 )
 
+// ------ default metrics policy ------
+
+func newDefaultMetricsPolicy() *MetricsPolicy {
+	return &MetricsPolicy{
+		MetricsTopicMode: MetricsTopicGeneral,
+		MetricsBuckets: &internal.MetricsBuckets{
+			ProduceCheckLatencies:  defaultProduceCheckLatencies,
+			ProduceEventLatencies:  defaultProduceEventLatencies,
+			ConsumeListenLatencies: defaultConsumeListenLatencies,
+			ConsumeCheckLatencies:  defaultConsumeCheckLatencies,
+			ConsumeHandleLatencies: defaultConsumeHandleLatencies,
+			ConsumeEventLatencies:  defaultConsumeEventLatencies,
+			ConsumeRoundLatencies:  defaultConsumeRoundLatencies,
+			MessageConsumeTimes:    defaultMessageConsumeTimes,
+		},
+	}
+}
+
+var (
+	// defaultProduceCheckLatencies 生产检查默认延迟桶
+	defaultProduceCheckLatencies = []float64{
+		.0005, .001, .005, .01, .025, .05, .1, .25, .5, 1, 2.5, 5, 10, 20, 30, 40, 50,
+		60, 1.5 * 60, 2 * 60, 3 * 60, 4 * 60, 5 * 60, 6 * 60, 7 * 60, 8 * 60, 9 * 60,
+		600,
+	}
+
+	// defaultProduceEventLatencies 生产完成默认事件处理延迟桶
+	defaultProduceEventLatencies = []float64{
+		.0005, .001, .005, .01, .025, .05, .1, .25, .5, 1, 2.5, 5, 10, 20, 30, 40, 50,
+		60, 1.5 * 60, 2 * 60, 3 * 60, 4 * 60, 5 * 60, 6 * 60, 7 * 60, 8 * 60, 9 * 60,
+		600, 1.5 * 600, 2 * 600, 3 * 600, 4 * 600, 5 * 600,
+		3600, 1.5 * 3600, 2 * 3600, 3 * 3600, 4 * 3600, 5 * 3600, 6 * 3600,
+	}
+
+	// defaultConsumeListenLatencies 消费监听(等待)默认延迟桶
+	defaultConsumeListenLatencies = []float64{
+		.0005, .001, .005, .01, .025, .05, .1, .25, .5, 1, 2.5, 5, 10, 20, 30, 40, 50,
+		60, 1.5 * 60, 2 * 60, 3 * 60, 4 * 60, 5 * 60, 6 * 60, 7 * 60, 8 * 60, 9 * 60,
+		600, 1.5 * 600, 2 * 600, 3 * 600, 4 * 600, 5 * 600,
+		3600, 1.5 * 3600, 2 * 3600, 3 * 3600, 4 * 3600, 5 * 3600, 6 * 3600, 7 * 3600, 8 * 3600, 9 * 3600, 10 * 3600, 11 * 3600, 12 * 3600,
+		24 * 3600, 2 * 24 * 3600,
+	}
+
+	// defaultConsumeCheckLatencies 消费检查默认延迟桶
+	defaultConsumeCheckLatencies = defaultProduceCheckLatencies
+
+	// defaultConsumeListenLatencies 消费消息处理默认延迟桶
+	defaultConsumeHandleLatencies = []float64{
+		.0005, .001, .005, .01, .025, .05, .1, .25, .5, 1, 2.5, 5, 10, 20, 30, 40, 50,
+		60, 1.5 * 60, 2 * 60, 3 * 60, 4 * 60, 5 * 60, 6 * 60, 7 * 60, 8 * 60, 9 * 60,
+		600, 1.5 * 600, 2 * 600, 3 * 600, 4 * 600, 5 * 600,
+		3600, 1.5 * 3600, 2 * 3600, 3 * 3600, 4 * 3600, 5 * 3600, 6 * 3600, 7 * 3600, 8 * 3600, 9 * 3600, 10 * 3600, 11 * 3600, 12 * 3600,
+		24 * 3600, 2 * 24 * 3600,
+	}
+
+	// defaultConsumeListenLatencies 消费完成默认事件处理延迟桶
+	defaultConsumeEventLatencies = []float64{
+		.0005, .001, .005, .01, .025, .05, .1, .25, .5, 1, 2.5, 5, 10, 20, 30, 40, 50,
+		60, 1.5 * 60, 2 * 60, 3 * 60, 4 * 60, 5 * 60, 6 * 60, 7 * 60, 8 * 60, 9 * 60,
+		600, 1.5 * 600, 2 * 600, 3 * 600, 4 * 600, 5 * 600,
+		3600, 1.5 * 3600, 2 * 3600, 3 * 3600, 4 * 3600, 5 * 3600, 6 * 3600, 7 * 3600, 8 * 3600, 9 * 3600, 10 * 3600, 11 * 3600, 12 * 3600,
+		24 * 3600, 2 * 24 * 3600, 3 * 24 * 3600, 4 * 24 * 3600, 5 * 24 * 3600, 6 * 24 * 3600, 7 * 24 * 3600, 15 * 24 * 3600, 30 * 24 * 3600,
+	}
+
+	// defaultConsumeRoundLatencies  消费每轮处理默认延迟桶
+	defaultConsumeRoundLatencies = []float64{
+		.0005, .001, .005, .01, .025, .05, .1, .25, .5, 1, 2.5, 5, 10, 20, 30, 40, 50,
+		60, 1.5 * 60, 2 * 60, 3 * 60, 4 * 60, 5 * 60, 6 * 60, 7 * 60, 8 * 60, 9 * 60,
+		600, 1.5 * 600, 2 * 600, 3 * 600, 4 * 600, 5 * 600,
+		3600, 1.5 * 3600, 2 * 3600, 3 * 3600, 4 * 3600, 5 * 3600, 6 * 3600, 7 * 3600, 8 * 3600, 9 * 3600, 10 * 3600, 11 * 3600, 12 * 3600,
+		24 * 3600, 2 * 24 * 3600,
+	}
+
+	// defaultMessageConsumeTimes 消费消息处理次数桶
+	defaultMessageConsumeTimes = []float64{
+		1, 2, 3, 5, 8, 10, 13, 17, 20, 30, 40, 50,
+		60, 80, 100, 150, 200, 250, 300, 350, 400, 500, 600, 700, 800, 900,
+		1000, 1500, 2000, 3000, 4000, 5000,
+	}
+)
+
 // ------ helper ------
 
 func ToPointer[T any](v T) *T {

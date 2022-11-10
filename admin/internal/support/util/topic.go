@@ -2,7 +2,6 @@ package util
 
 import (
 	"errors"
-	"fmt"
 	"strconv"
 	"strings"
 
@@ -56,7 +55,10 @@ func ParseNamespaceTopic(namespaceOrTopic string) (*NamespaceTopic, error) {
 		shortNamespace = segments[1]
 		shortTopic = segments[2]
 	default:
-		return nil, errors.New(fmt.Sprintf("invalid namespace or topic name: %v", namespace))
+		namespace = strings.Join(segments[0:2], "/")
+		tenant = segments[0]
+		shortNamespace = segments[1]
+		shortTopic = strings.Join(segments[0:2], "/")
 	}
 	nt := &NamespaceTopic{
 		Schema:         schema,
