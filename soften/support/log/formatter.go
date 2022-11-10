@@ -3,37 +3,25 @@ package log
 import (
 	"bytes"
 	"fmt"
-	"os"
 	"runtime"
 	"strings"
 
 	"github.com/sirupsen/logrus"
 )
 
-var workingDir string
-var workingDirLen int
 var defaultTimeFormatter = "2006/01/02 15:04:05.000000"
 
-func init() {
-	if wd, err := os.Getwd(); err != nil {
-		panic(err)
-	} else {
-		workingDir = wd
-		workingDirLen = len(workingDir)
-	}
-}
-
-var CallerPrettyFunc = func(frame *runtime.Frame) (function string, file string) {
+var callerPrettyFunc = func(frame *runtime.Frame) (function string, file string) {
 	funcName := frame.Function
 	// either file or function is displayed
 	formattedName := frame.File
-	if strings.HasPrefix(frame.File, workingDir) {
-		formattedName = frame.File[workingDirLen+1:]
+	if idx := strings.Index(frame.File, "soften-client-go/"); idx > 0 {
+		formattedName = frame.File[idx+17:]
 	} else if lastSlash := strings.LastIndex(funcName, "/"); lastSlash > 0 {
 		fileName := frame.File
 		fLastSlash := strings.LastIndex(fileName, "/")
 		fLastButOneSlash := strings.LastIndex(fileName[0:fLastSlash], "/")
-		formattedName = funcName[:lastSlash-1] + fileName[fLastButOneSlash:]
+		formattedName = funcName[:lastSlash] + fileName[fLastButOneSlash:]
 	}
 	return "", fmt.Sprintf("%s:%d", formattedName, frame.Line)
 }
@@ -42,9 +30,9 @@ type TextFormatter struct {
 	*logrus.TextFormatter
 }
 
-func NewTextFormatter(oriFormatter *logrus.TextFormatter) *TextFormatter {
+func WrapTextFormatter(oriFormatter *logrus.TextFormatter) *TextFormatter {
 	if oriFormatter.CallerPrettyfier == nil {
-		oriFormatter.CallerPrettyfier = CallerPrettyFunc
+		oriFormatter.CallerPrettyfier = callerPrettyFunc
 	}
 	if oriFormatter.TimestampFormat == "" {
 		oriFormatter.TimestampFormat = defaultTimeFormatter
@@ -72,7 +60,7 @@ func (f *TextFormatter) Format(entry *logrus.Entry) ([]byte, error) {
 		reqId = fmt.Sprintf("%v", r)
 	}
 	level := strings.ToUpper(entry.Level.String())
-	_, fileLine := CallerPrettyFunc(entry.Caller)
+	_, fileLine := callerPrettyFunc(entry.Caller)
 
 	labelBytes := make([]string, 0)
 	for key, val := range entry.Data {

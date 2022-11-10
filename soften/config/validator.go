@@ -9,6 +9,7 @@ import (
 	"github.com/shenqianjin/soften-client-go/soften/internal"
 	"github.com/shenqianjin/soften-client-go/soften/internal/backoff"
 	"github.com/shenqianjin/soften-client-go/soften/message"
+	slog "github.com/shenqianjin/soften-client-go/soften/support/log"
 	"github.com/sirupsen/logrus"
 )
 
@@ -25,7 +26,17 @@ func (v *validator) ValidateAndDefaultClientConfig(conf *ClientConfig) error {
 	}
 	// default logger
 	if conf.Logger == nil {
-		conf.Logger = log.NewLoggerWithLogrus(logrus.StandardLogger())
+		if conf.LogLevel == "" {
+			conf.LogLevel = "info"
+		}
+		logger := logrus.New()
+		if logLvl, err := logrus.ParseLevel(conf.LogLevel); err != nil {
+			return err
+		} else {
+			logger.SetLevel(logLvl)
+		}
+		logger.SetFormatter(slog.WrapTextFormatter(&logrus.TextFormatter{}))
+		conf.Logger = log.NewLoggerWithLogrus(logger)
 	}
 	// default metrics cardinality
 	if conf.MetricsCardinality == 0 {

@@ -75,7 +75,7 @@ func initLogger(debug bool) {
 		FullTimestamp:   true,
 		TimestampFormat: "2006/01/02 15:04:05.000000",
 	}
-	softenLogFormatter := log.NewTextFormatter(formatter)
+	softenLogFormatter := log.WrapTextFormatter(formatter)
 	//softenLogFormatter := formatter
 
 	logrus.SetFormatter(softenLogFormatter)

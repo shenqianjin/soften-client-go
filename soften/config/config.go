@@ -32,7 +32,7 @@ type ClientConfig struct {
 	TLSTrustCertsFilePath   string                `json:"tls_trust_certs_file_path"`  // Optional: trusted TLS certificate file
 	Authentication          pulsar.Authentication `json:"-"`                          // Optional: custom authentication interface
 
-	LogLevel int        `json:"log_level"` // log trace level (logrus): 0 panic; 1 Fatal; 2 Error; 3 Warn; 4 Info; 5 Debug; 6 Trace
+	LogLevel string     `json:"log_level"` // log level enum: panic; fatal; error; warn/warning; info; debug; trace
 	Logger   log.Logger `json:"-"`
 
 	// Specify metric cardinality to the tenant, namespace or topic levels, or remove it completely.
