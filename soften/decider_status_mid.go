@@ -140,7 +140,7 @@ func (d *statusDecider) Reentrant(ctx context.Context, msg consumerMessage, prop
 			msg.Consumer.Nack(msg)
 			msg.internalExtra.consumerMetrics.ConsumeMessageNacks.Inc()
 		} else {
-			logEntry.WithField("msgID", msg.ID()).Debugf("Succeed to send message to topic: %s", d.router.options.Topic)
+			logEntry.WithField("msgID", msg.ID()).Infof("Succeed to send message to topic: %s", d.router.options.Topic)
 			msg.Ack()
 			msg.internalExtra.consumerMetrics.ConsumeMessageAcks.Inc()
 		}

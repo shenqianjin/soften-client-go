@@ -170,9 +170,19 @@ func (d *producerTransferDecider) DecideAsync(ctx context.Context, msg *pulsar.P
 		}
 	}
 	// send
+	callbackNew := func(mid pulsar.MessageID, msg *pulsar.ProducerMessage, err error) {
+		if err != nil {
+			logEntry.WithField("msgID", mid).Errorf("Failed to send message to topic: %s, message: %v, err: %v",
+				rtr.options.Topic, formatPayloadLogContent(msg.Payload), err)
+		} else {
+			logEntry.WithField("msgID", mid).Infof("Succeed to send message to topic: %s, message: %v",
+				rtr.options.Topic, formatPayloadLogContent(msg.Payload))
+		}
+		callback(mid, msg, err)
+	}
 	rtr.Chan() <- &RouteMessage{
 		producerMsg: msg,
-		callback:    callback,
+		callback:    callbackNew,
 	}
 
 	return true

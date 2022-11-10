@@ -120,7 +120,7 @@ func (d *transferDecider) Decide(ctx context.Context, msg consumerMessage, cheSt
 			msg.Consumer.Nack(msg)
 			msg.internalExtra.consumerMetrics.ConsumeMessageNacks.Inc()
 		} else {
-			logEntry.WithField("msgID", msg.ID()).Debugf("Succeed to send message to topic: %s", rtr.options.Topic)
+			logEntry.WithField("msgID", msg.ID()).Infof("Succeed to send message to topic: %s", rtr.options.Topic)
 			msg.Ack()
 			msg.internalExtra.consumerMetrics.ConsumeMessageAcks.Inc()
 		}
