@@ -19,9 +19,11 @@ var callerPrettyFunc = func(frame *runtime.Frame) (function string, file string)
 		formattedName = frame.File[idx+17:]
 	} else if lastSlash := strings.LastIndex(funcName, "/"); lastSlash > 0 {
 		fileName := frame.File
-		fLastSlash := strings.LastIndex(fileName, "/")
-		fLastButOneSlash := strings.LastIndex(fileName[0:fLastSlash], "/")
-		formattedName = funcName[:lastSlash] + fileName[fLastButOneSlash:]
+		if fLastSlash := strings.LastIndex(fileName, "/"); fLastSlash > 0 {
+			if fLastButOneSlash := strings.LastIndex(fileName[0:fLastSlash], "/"); fLastButOneSlash > 0 {
+				formattedName = funcName[:lastSlash] + fileName[fLastButOneSlash:]
+			}
+		}
 	}
 	return "", fmt.Sprintf("%s:%d", formattedName, frame.Line)
 }
