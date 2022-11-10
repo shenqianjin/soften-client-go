@@ -153,3 +153,13 @@ var checkTypeGotoMap = map[checker.CheckType]internal.DecideGoto{
 	checker.ProduceCheckTypeShift:    decider.GotoShift,
 	checker.ProduceCheckTypeTransfer: decider.GotoTransfer,
 }
+
+// ------ log payload formatter ------
+
+func formatPayloadLogContent(payload []byte) string {
+	result := string(payload)
+	if len(result) > 1024 {
+		result = result[0:1024]
+	}
+	return result
+}

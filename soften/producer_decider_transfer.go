@@ -3,6 +3,7 @@ package soften
 import (
 	"context"
 	"errors"
+	"fmt"
 	"sync"
 	"sync/atomic"
 
@@ -61,7 +62,8 @@ func (d *producerTransferDecider) Decide(ctx context.Context, msg *pulsar.Produc
 	checkStatus checker.CheckStatus) (mid pulsar.MessageID, err error, decided bool) {
 	// valid check status
 	if !checkStatus.IsPassed() {
-		err = errors.New("transfer decider failed to execute as check status is not passed")
+		err = errors.New(fmt.Sprintf("Failed to decide message as transfer because check status is not passed. message: %v",
+			formatPayloadLogContent(msg.Payload)))
 		return nil, err, false
 	}
 	// parse log entry
@@ -72,7 +74,8 @@ func (d *producerTransferDecider) Decide(ctx context.Context, msg *pulsar.Produc
 		destTopic = d.options.transfer.Topic
 	}
 	if destTopic == "" {
-		err = errors.New("failed to transfer message because there is no topic is specified")
+		err := errors.New(fmt.Sprintf("Failed to transfer message because there is no topic is specified. message: %v",
+			formatPayloadLogContent(msg.Payload)))
 		return nil, err, false
 	}
 
@@ -117,9 +120,11 @@ func (d *producerTransferDecider) Decide(ctx context.Context, msg *pulsar.Produc
 	// wait for send request to finish
 	<-doneCh
 	if err != nil {
-		logEntry.Warnf("failed to Transfer message, payload size: %v, properties: %v", len(msg.Payload), msg.Properties)
+		d.logger.Warnf("Failed to send message to topic: %v. message: %v, err: %v",
+			destTopic, formatPayloadLogContent(msg.Payload), err)
 		return mid, err, false
 	}
+	logEntry.Warnf("Success to send message to topic: %v. message: %v", destTopic, formatPayloadLogContent(msg.Payload))
 	return mid, err, true
 }
 
@@ -127,7 +132,8 @@ func (d *producerTransferDecider) DecideAsync(ctx context.Context, msg *pulsar.P
 	callback func(pulsar.MessageID, *pulsar.ProducerMessage, error)) (decided bool) {
 	// valid check status
 	if !checkStatus.IsPassed() {
-		err := errors.New("transfer decider failed to execute as check status is not passed")
+		err := errors.New(fmt.Sprintf("Failed to decide message as transfer because check status is not passed. message: %v",
+			formatPayloadLogContent(msg.Payload)))
 		callback(nil, msg, err)
 		return false
 	}
@@ -139,7 +145,8 @@ func (d *producerTransferDecider) DecideAsync(ctx context.Context, msg *pulsar.P
 		destTopic = d.options.transfer.Topic
 	}
 	if destTopic == "" {
-		err := errors.New("failed to transfer message because there is no topic is specified")
+		err := errors.New(fmt.Sprintf("Failed to transfer message because there is no topic is specified. message: %v",
+			formatPayloadLogContent(msg.Payload)))
 		callback(nil, msg, err)
 		return false
 	}

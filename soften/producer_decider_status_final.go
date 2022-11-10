@@ -26,7 +26,7 @@ type producerFinalDecider struct {
 
 func newProducerFinalDecider(producer *producer, options *producerFinalDeciderOptions, metricsProvider *internal.MetricsProvider) (*producerFinalDecider, error) {
 	if options == nil {
-		return nil, errors.New("missing options for Transfer decider")
+		return nil, errors.New("missing options for producer final decider")
 	}
 
 	d := &producerFinalDecider{
@@ -43,14 +43,14 @@ func (d *producerFinalDecider) Decide(ctx context.Context, msg *pulsar.ProducerM
 	checkStatus checker.CheckStatus) (mid pulsar.MessageID, err error, decided bool) {
 	// valid check status
 	if !checkStatus.IsPassed() {
-		err = errors.New(fmt.Sprintf("%v decider failed to execute as check status is not passed", decider.GotoDiscard))
+		err = errors.New(fmt.Sprintf("Failed to decide message as discard as check status is not passed. message: %v", formatPayloadLogContent(msg.Payload)))
 		decided = false
 		return
 	}
 	// parse log entry
 	logEntry := util.ParseLogEntry(ctx, d.logger)
 	// discard
-	logEntry.Debugf("Decide message as discard. message: %v", string(msg.Payload))
+	logEntry.Debugf("Success to decide message as discard. message: %v", formatPayloadLogContent(msg.Payload))
 	return nil, nil, true
 }
 
@@ -58,7 +58,7 @@ func (d *producerFinalDecider) DecideAsync(ctx context.Context, msg *pulsar.Prod
 	callback func(pulsar.MessageID, *pulsar.ProducerMessage, error)) (decided bool) {
 	// valid check status
 	if !checkStatus.IsPassed() {
-		err := errors.New(fmt.Sprintf("%v decider failed to execute as check status is not passed", decider.GotoDiscard))
+		err := errors.New(fmt.Sprintf("Failed to decide message as discard as check status is not passed. message: %v", formatPayloadLogContent(msg.Payload)))
 		callback(nil, msg, err)
 		decided = false
 		return
@@ -66,7 +66,7 @@ func (d *producerFinalDecider) DecideAsync(ctx context.Context, msg *pulsar.Prod
 	// parse log entry
 	logEntry := util.ParseLogEntry(ctx, d.logger)
 	// discard
-	logEntry.Debugf("Decide message as discard. message: %v", string(msg.Payload))
+	logEntry.Debugf("Success to decide message as discard. message: %v", formatPayloadLogContent(msg.Payload))
 	callback(nil, msg, nil)
 	decided = true
 	return

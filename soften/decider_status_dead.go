@@ -86,8 +86,7 @@ func (d *deadDecider) Decide(ctx context.Context, msg consumerMessage, cheStatus
 			msg.Consumer.Nack(msg)
 			msg.internalExtra.consumerMetrics.ConsumeMessageNacks.Inc()
 		} else {
-			logContent := fmt.Sprintf("Succeed to send message to dead topic: %s, publish time: %v, properties: %v, payload: %v",
-				d.router.options.Topic, msg.PublishTime(), msg.Properties(), string(msg.Payload()))
+			logContent := fmt.Sprintf("publish time: %v, properties: %v, payload: %v", msg.PublishTime(), msg.Properties(), formatPayloadLogContent(msg.Payload()))
 			originalPublishTime := message.Parser.GetOriginalPublishTime(msg)
 			if !originalPublishTime.IsZero() {
 				logContent = fmt.Sprintf("%s, latency from original publish: %v", logContent, time.Now().Sub(originalPublishTime))
@@ -95,6 +94,7 @@ func (d *deadDecider) Decide(ctx context.Context, msg consumerMessage, cheStatus
 			if !msg.EventTime().IsZero() {
 				logContent = fmt.Sprintf("%s, latency from event: %v", logContent, time.Now().Sub(msg.EventTime()))
 			}
+			logEntry.WithField("msgID", msg.ID()).Warnf("Succeed to send message to topic (dead): %v, message: %v", d.router.options.Topic, logContent)
 			msg.Ack()
 			msg.internalExtra.consumerMetrics.ConsumeMessageAcks.Inc()
 		}

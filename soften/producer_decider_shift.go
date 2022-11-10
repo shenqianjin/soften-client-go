@@ -81,13 +81,14 @@ func (d *producerShiftDecider) Decide(ctx context.Context, msg *pulsar.ProducerM
 	checkStatus checker.CheckStatus) (mid pulsar.MessageID, err error, decided bool) {
 	// valid check status
 	if !checkStatus.IsPassed() {
-		err = errors.New(fmt.Sprintf("%v decider failed to execute as check status is not passed", d.options.msgGoto))
+		err = errors.New(fmt.Sprintf("Failed to decide message as %v because check status is not passed, message: %v",
+			d.options.msgGoto, formatPayloadLogContent(msg.Payload)))
 		return nil, err, false
 	}
 	// parse log entry
 	logEntry := util.ParseLogEntry(ctx, d.logger)
 	// format topic
-	routeTopic, err := d.internalFormatDestTopic(checkStatus, msg)
+	destTopic, err := d.internalFormatDestTopic(checkStatus, msg)
 	if err != nil {
 		logEntry.Error(err)
 	}
@@ -100,9 +101,9 @@ func (d *producerShiftDecider) Decide(ctx context.Context, msg *pulsar.ProducerM
 	message.Helper.InjectConsumeTime(msg.Properties, checkStatus.GetGotoExtra().ConsumeTime)
 
 	// get or create router
-	rtr, err := d.internalSafeGetRouter(routeTopic)
+	rtr, err := d.internalSafeGetRouter(destTopic)
 	if err != nil {
-		err = errors.New(fmt.Sprintf("failed to create router for topic: %s", routeTopic))
+		err = errors.New(fmt.Sprintf("failed to create router for topic: %s", destTopic))
 		return nil, err, false
 	}
 	if !rtr.ready {
@@ -111,7 +112,7 @@ func (d *producerShiftDecider) Decide(ctx context.Context, msg *pulsar.ProducerM
 			<-rtr.readyCh
 		} else {
 			// back to other router or main topic before the checked router is ready
-			logEntry.Warnf("skip to decide because router is still not ready for topic: %s", routeTopic)
+			logEntry.Warnf("skip to decide because router is still not ready for topic: %s", destTopic)
 			return nil, nil, false
 		}
 	}
@@ -133,9 +134,11 @@ func (d *producerShiftDecider) Decide(ctx context.Context, msg *pulsar.ProducerM
 	// wait for send request to finish
 	<-doneCh
 	if err != nil {
-		d.logger.Warnf("failed to Transfer message, payload size: %v, properties: %v", len(msg.Payload), msg.Properties)
+		d.logger.Warnf("Failed to send message to topic: %v. message: %v, err: %v",
+			destTopic, formatPayloadLogContent(msg.Payload), err)
 		return mid, err, false
 	}
+	logEntry.Warnf("Success to send message to topic: %v. message: %v", destTopic, formatPayloadLogContent(msg.Payload))
 	return mid, err, true
 }
 
@@ -143,7 +146,8 @@ func (d *producerShiftDecider) DecideAsync(ctx context.Context, msg *pulsar.Prod
 	callback func(pulsar.MessageID, *pulsar.ProducerMessage, error)) (decided bool) {
 	// valid check status
 	if !checkStatus.IsPassed() {
-		err := errors.New(fmt.Sprintf("%v decider failed to execute as check status is not passed", d.options.msgGoto))
+		err := errors.New(fmt.Sprintf("Failed to decide message as %v because check status is not passed, message: %v",
+			d.options.msgGoto, formatPayloadLogContent(msg.Payload)))
 		callback(nil, msg, err)
 		return false
 	}

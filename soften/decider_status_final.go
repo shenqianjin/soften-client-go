@@ -48,12 +48,12 @@ func (d *finalStatusDecider) Decide(ctx context.Context, msg consumerMessage, ch
 	case decider.GotoDone:
 		msg.Ack()
 		msg.internalExtra.consumerMetrics.ConsumeMessageAcks.Inc()
-		logEntry.Debugf("Decide message as done: %v", msg.Message.ID())
+		logEntry.Debugf("Success to decide message as done: %v", msg.Message.ID())
 		success = true
 	case decider.GotoDiscard:
 		msg.Ack()
 		msg.internalExtra.consumerMetrics.ConsumeMessageAcks.Inc()
-		logEntry.Debugf("Decide message as discard: %v", msg.Message.ID())
+		logEntry.Debugf("Success to decide message as discard: %v", msg.Message.ID())
 		success = true
 	}
 	if success {

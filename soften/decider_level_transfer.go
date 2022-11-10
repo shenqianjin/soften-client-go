@@ -116,11 +116,11 @@ func (d *transferDecider) Decide(ctx context.Context, msg consumerMessage, cheSt
 	}
 	callback := func(messageID pulsar.MessageID, producerMessage *pulsar.ProducerMessage, err error) {
 		if err != nil {
-			logEntry.WithField("msgID", msg.ID()).Errorf("Failed to send message to destTopic: %s, err: %v", rtr.options.Topic, err)
+			logEntry.WithField("msgID", msg.ID()).Errorf("Failed to send message to topic: %s, err: %v", rtr.options.Topic, err)
 			msg.Consumer.Nack(msg)
 			msg.internalExtra.consumerMetrics.ConsumeMessageNacks.Inc()
 		} else {
-			logEntry.WithField("msgID", msg.ID()).Debugf("Succeed to send message to destTopic: %s", rtr.options.Topic)
+			logEntry.WithField("msgID", msg.ID()).Debugf("Succeed to send message to topic: %s", rtr.options.Topic)
 			msg.Ack()
 			msg.internalExtra.consumerMetrics.ConsumeMessageAcks.Inc()
 		}
