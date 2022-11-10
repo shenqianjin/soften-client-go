@@ -6,6 +6,7 @@ import (
 	"runtime"
 	"strings"
 
+	"github.com/shenqianjin/soften-client-go/soften/support/meta"
 	"github.com/sirupsen/logrus"
 )
 
@@ -58,7 +59,7 @@ func (f *TextFormatter) Format(entry *logrus.Entry) ([]byte, error) {
 
 	formattedTime := entry.Time.Format(f.TimestampFormat)
 	reqId := ""
-	if r, ok := entry.Data["reqId"]; ok {
+	if r, ok := entry.Data[meta.KeyReqId]; ok && r != nil {
 		reqId = fmt.Sprintf("%v", r)
 	}
 	level := strings.ToUpper(entry.Level.String())

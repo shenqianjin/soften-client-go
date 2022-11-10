@@ -86,10 +86,11 @@ func FormatDeadTopic(groundTopic string, subscription string) (string, error) {
 // ------ logger util ------
 
 func ParseLogEntry(ctx context.Context, logger log.Logger) log.Entry {
-	reqId := meta.GetMeta(ctx, meta.KeyReqId)
 	var logEntry log.Entry = logger
-	if reqId != "" {
-		logEntry = logEntry.WithField(meta.KeyReqId, reqId)
+	if reqId := meta.GetMeta(ctx, meta.KeyReqId); reqId != nil {
+		if ri, ok := reqId.(string); ok && ri != "" {
+			logEntry = logger.WithField(meta.KeyReqId, reqId)
+		}
 	}
 	return logEntry
 }

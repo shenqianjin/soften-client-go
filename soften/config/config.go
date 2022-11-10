@@ -38,8 +38,7 @@ type ClientConfig struct {
 	// Specify metric cardinality to the tenant, namespace or topic levels, or remove it completely.
 	// Default: pulsar.MetricsCardinalityNamespace --> pulsar.MetricsCardinalityTopic
 	MetricsCardinality pulsar.MetricsCardinality `json:"metrics_cardinality"`
-
-	MetricsPolicy *MetricsPolicy // Optional: metrics policy to custom metrics such as histogram buckets and metrics topic mode
+	MetricsPolicy      *MetricsPolicy            `json:"metrics"` // Optional: metrics policy to custom metrics such as histogram buckets and metrics topic mode
 }
 
 // ------ producer configuration ------
