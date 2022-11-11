@@ -112,7 +112,8 @@ func (d *producerShiftDecider) Decide(ctx context.Context, msg *pulsar.ProducerM
 			<-rtr.readyCh
 		} else {
 			// back to other router or main topic before the checked router is ready
-			logEntry.Warnf("skip to decide because router is still not ready for topic: %s", destTopic)
+			logEntry.Warnf("skip to decide message as %v to topic: %v because router is still not ready",
+				d.options.msgGoto, destTopic)
 			return nil, nil, false
 		}
 	}
@@ -174,7 +175,7 @@ func (d *producerShiftDecider) DecideAsync(ctx context.Context, msg *pulsar.Prod
 			<-rtr.readyCh
 		} else {
 			// back to other router or main topic before the checked router is ready
-			logEntry.Warnf("skip to decide message as %v because router is still not ready for topic: %s",
+			logEntry.Warnf("skip to decide message as %v to topic: %v because router is still not ready",
 				d.options.msgGoto, destTopic)
 			return false
 		}

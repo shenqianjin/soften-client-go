@@ -74,7 +74,7 @@ func (d *producerTransferDecider) Decide(ctx context.Context, msg *pulsar.Produc
 		destTopic = d.options.transfer.Topic
 	}
 	if destTopic == "" {
-		err := errors.New(fmt.Sprintf("Failed to transfer message because there is no topic is specified. message: %v",
+		err := errors.New(fmt.Sprintf("Failed to decide message as transfer because there is no topic is specified. message: %v",
 			formatPayloadLogContent(msg.Payload)))
 		return nil, err, false
 	}
@@ -120,7 +120,7 @@ func (d *producerTransferDecider) Decide(ctx context.Context, msg *pulsar.Produc
 	// wait for send request to finish
 	<-doneCh
 	if err != nil {
-		d.logger.Warnf("Failed to send message to topic: %v. message: %v, err: %v",
+		d.logger.Warnf("Failed to decide message as transfer to topic: %v. message: %v, err: %v",
 			destTopic, formatPayloadLogContent(msg.Payload), err)
 		return mid, err, false
 	}

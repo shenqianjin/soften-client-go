@@ -82,7 +82,7 @@ func (d *transferDecider) Decide(ctx context.Context, msg consumerMessage, cheSt
 		if d.options.transfer.ConnectInSyncEnable {
 			<-rtr.readyCh
 		} else {
-			logEntry.Warnf("skip to transfer message because router is still not ready for topic: %s, msgId: %v",
+			logEntry.Warnf("skip to decide message as transfer to %v because router is still not ready. msgId: %v",
 				destTopic, msg.ID())
 			return false
 		}
