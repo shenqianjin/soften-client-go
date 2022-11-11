@@ -129,11 +129,13 @@ func (d *shiftDecider) Decide(ctx context.Context, msg consumerMessage, cheStatu
 	}
 	callback := func(messageID pulsar.MessageID, producerMessage *pulsar.ProducerMessage, err error) {
 		if err != nil {
-			logEntry.WithField("msgID", msg.ID()).Errorf("Failed to send message to topic: %s, err: %v", rtr.options.Topic, err)
+			logEntry.WithField("msgID", msg.ID()).Errorf("Failed to decide message as %v to topic: %s, err: %v",
+				d.options.msgGoto, rtr.options.Topic, err)
 			msg.Consumer.Nack(msg)
 			msg.internalExtra.consumerMetrics.ConsumeMessageNacks.Inc()
 		} else {
-			logEntry.WithField("msgID", msg.ID()).Infof("Succeed to send message to topic: %s", rtr.options.Topic)
+			logEntry.WithField("msgID", msg.ID()).Infof("Succeed to decide message as %v to topic: %s",
+				d.options.msgGoto, rtr.options.Topic)
 			msg.Ack()
 			msg.internalExtra.consumerMetrics.ConsumeMessageAcks.Inc()
 		}
@@ -151,7 +153,7 @@ func (d *shiftDecider) internalFormatDestTopic(cs checker.CheckStatus, msg consu
 		destLevel = d.options.shift.Level
 	}
 	if destLevel == "" {
-		return "", errors.New(fmt.Sprintf("failed to shift (%v) message "+
+		return "", errors.New(fmt.Sprintf("failed to decide message as %v "+
 			"because there is no level is specified. msgId: %v", d.options.msgGoto, msg.ID()))
 	}
 	if d.options.msgGoto == decider.GotoUpgrade {

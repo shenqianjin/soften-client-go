@@ -82,7 +82,8 @@ func (d *transferDecider) Decide(ctx context.Context, msg consumerMessage, cheSt
 		if d.options.transfer.ConnectInSyncEnable {
 			<-rtr.readyCh
 		} else {
-			logEntry.Warnf("skip to decide because router is still not ready for topic: %s", destTopic)
+			logEntry.Warnf("skip to transfer message because router is still not ready for topic: %s, msgId: %v",
+				destTopic, msg.ID())
 			return false
 		}
 	}
@@ -116,11 +117,12 @@ func (d *transferDecider) Decide(ctx context.Context, msg consumerMessage, cheSt
 	}
 	callback := func(messageID pulsar.MessageID, producerMessage *pulsar.ProducerMessage, err error) {
 		if err != nil {
-			logEntry.WithField("msgID", msg.ID()).Errorf("Failed to send message to topic: %s, err: %v", rtr.options.Topic, err)
+			logEntry.WithField("msgID", msg.ID()).Errorf("Failed to decide message as transfer to topic: %s, err: %v",
+				rtr.options.Topic, err)
 			msg.Consumer.Nack(msg)
 			msg.internalExtra.consumerMetrics.ConsumeMessageNacks.Inc()
 		} else {
-			logEntry.WithField("msgID", msg.ID()).Infof("Succeed to send message to topic: %s", rtr.options.Topic)
+			logEntry.WithField("msgID", msg.ID()).Infof("Succeed to decide message as transfer to topic: %s", rtr.options.Topic)
 			msg.Ack()
 			msg.internalExtra.consumerMetrics.ConsumeMessageAcks.Inc()
 		}

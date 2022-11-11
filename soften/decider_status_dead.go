@@ -82,7 +82,7 @@ func (d *deadDecider) Decide(ctx context.Context, msg consumerMessage, cheStatus
 	}
 	callback := func(messageID pulsar.MessageID, producerMessage *pulsar.ProducerMessage, err error) {
 		if err != nil {
-			logEntry.WithField("msgID", msg.ID()).Errorf("Failed to send message to topic: %s, err: %v", d.router.options.Topic, err)
+			logEntry.WithField("msgID", msg.ID()).Errorf("Failed to decide message as dead to topic: %s, err: %v", d.router.options.Topic, err)
 			msg.Consumer.Nack(msg)
 			msg.internalExtra.consumerMetrics.ConsumeMessageNacks.Inc()
 		} else {
@@ -94,7 +94,7 @@ func (d *deadDecider) Decide(ctx context.Context, msg consumerMessage, cheStatus
 			if !msg.EventTime().IsZero() {
 				logContent = fmt.Sprintf("%s, latency from event: %v", logContent, time.Now().Sub(msg.EventTime()))
 			}
-			logEntry.WithField("msgID", msg.ID()).Warnf("Succeed to send message to topic (dead): %v, message: %v", d.router.options.Topic, logContent)
+			logEntry.WithField("msgID", msg.ID()).Warnf("Succeed to decide message as dead to topic: %v, message: %v", d.router.options.Topic, logContent)
 			msg.Ack()
 			msg.internalExtra.consumerMetrics.ConsumeMessageAcks.Inc()
 		}

@@ -124,7 +124,7 @@ func (d *producerTransferDecider) Decide(ctx context.Context, msg *pulsar.Produc
 			destTopic, formatPayloadLogContent(msg.Payload), err)
 		return mid, err, false
 	}
-	logEntry.Warnf("Success to send message to topic: %v. message: %v", destTopic, formatPayloadLogContent(msg.Payload))
+	logEntry.Warnf("Success to decide message as transfer to topic: %v. message: %v", destTopic, formatPayloadLogContent(msg.Payload))
 	return mid, err, true
 }
 
@@ -145,7 +145,7 @@ func (d *producerTransferDecider) DecideAsync(ctx context.Context, msg *pulsar.P
 		destTopic = d.options.transfer.Topic
 	}
 	if destTopic == "" {
-		err := errors.New(fmt.Sprintf("Failed to transfer message because there is no topic is specified. message: %v",
+		err := errors.New(fmt.Sprintf("Failed to decide message as transfer because there is no topic is specified. message: %v",
 			formatPayloadLogContent(msg.Payload)))
 		callback(nil, msg, err)
 		return false
@@ -172,10 +172,10 @@ func (d *producerTransferDecider) DecideAsync(ctx context.Context, msg *pulsar.P
 	// send
 	callbackNew := func(mid pulsar.MessageID, msg *pulsar.ProducerMessage, err error) {
 		if err != nil {
-			logEntry.WithField("msgID", mid).Errorf("Failed to send message to topic: %s, message: %v, err: %v",
+			logEntry.WithField("msgID", mid).Errorf("Failed to decide message as transfer to topic: %s, message: %v, err: %v",
 				rtr.options.Topic, formatPayloadLogContent(msg.Payload), err)
 		} else {
-			logEntry.WithField("msgID", mid).Infof("Succeed to send message to topic: %s, message: %v",
+			logEntry.WithField("msgID", mid).Infof("Succeed to decide message as transfer to topic: %s, message: %v",
 				rtr.options.Topic, formatPayloadLogContent(msg.Payload))
 		}
 		callback(mid, msg, err)

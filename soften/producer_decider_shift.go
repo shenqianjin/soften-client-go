@@ -134,11 +134,12 @@ func (d *producerShiftDecider) Decide(ctx context.Context, msg *pulsar.ProducerM
 	// wait for send request to finish
 	<-doneCh
 	if err != nil {
-		d.logger.Warnf("Failed to send message to topic: %v. message: %v, err: %v",
-			destTopic, formatPayloadLogContent(msg.Payload), err)
+		d.logger.Warnf("Failed to decide message as %v to topic: %v. message: %v, err: %v",
+			d.options.msgGoto, destTopic, formatPayloadLogContent(msg.Payload), err)
 		return mid, err, false
 	}
-	logEntry.Infof("Success to send message to topic: %v. message: %v", destTopic, formatPayloadLogContent(msg.Payload))
+	logEntry.Infof("Success to decide message as %v to topic: %v. message: %v",
+		d.options.msgGoto, destTopic, formatPayloadLogContent(msg.Payload))
 	return mid, err, true
 }
 
@@ -173,18 +174,19 @@ func (d *producerShiftDecider) DecideAsync(ctx context.Context, msg *pulsar.Prod
 			<-rtr.readyCh
 		} else {
 			// back to other router or main topic before the checked router is ready
-			logEntry.Warnf("skip to decide because router is still not ready for topic: %s", destTopic)
+			logEntry.Warnf("skip to decide message as %v because router is still not ready for topic: %s",
+				d.options.msgGoto, destTopic)
 			return false
 		}
 	}
 	// send
 	callbackNew := func(mid pulsar.MessageID, msg *pulsar.ProducerMessage, err error) {
 		if err != nil {
-			logEntry.WithField("msgID", mid).Errorf("Failed to send message to topic: %s, message: %v, err: %v",
-				rtr.options.Topic, formatPayloadLogContent(msg.Payload), err)
+			logEntry.WithField("msgID", mid).Errorf("Failed to decide message as %v to topic: %s, message: %v, err: %v",
+				d.options.msgGoto, rtr.options.Topic, formatPayloadLogContent(msg.Payload), err)
 		} else {
-			logEntry.WithField("msgID", mid).Infof("Succeed to send message to topic: %s, message: %v",
-				rtr.options.Topic, formatPayloadLogContent(msg.Payload))
+			logEntry.WithField("msgID", mid).Infof("Succeed to decide message as %v to topic: %s, message: %v",
+				d.options.msgGoto, rtr.options.Topic, formatPayloadLogContent(msg.Payload))
 		}
 		callback(mid, msg, err)
 	}
@@ -202,7 +204,7 @@ func (d *producerShiftDecider) internalFormatDestTopic(cs checker.CheckStatus, m
 		destLevel = d.options.shift.Level
 	}
 	if destLevel == "" {
-		return "", errors.New(fmt.Sprintf("failed to shift (%v) message "+
+		return "", errors.New(fmt.Sprintf("failed to decide message as %v"+
 			"because there is no level is specified. msg: %v", d.options.msgGoto, string(msg.Payload)))
 	}
 	switch d.options.msgGoto {

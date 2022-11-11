@@ -136,11 +136,13 @@ func (d *statusDecider) Reentrant(ctx context.Context, msg consumerMessage, prop
 	logEntry := util.ParseLogEntry(ctx, d.logger)
 	callback := func(messageID pulsar.MessageID, producerMessage *pulsar.ProducerMessage, err error) {
 		if err != nil {
-			logEntry.WithField("msgID", msg.ID()).Errorf("Failed to send message to topic: %s, err: %v", d.router.options.Topic, err)
+			logEntry.WithField("msgID", msg.ID()).Errorf("Failed to decide message as %v to topic: %s, err: %v",
+				d.options.msgGoto, d.router.options.Topic, err)
 			msg.Consumer.Nack(msg)
 			msg.internalExtra.consumerMetrics.ConsumeMessageNacks.Inc()
 		} else {
-			logEntry.WithField("msgID", msg.ID()).Infof("Succeed to send message to topic: %s", d.router.options.Topic)
+			logEntry.WithField("msgID", msg.ID()).Infof("Succeed to decide message as %v to topic: %s",
+				d.options.msgGoto, d.router.options.Topic)
 			msg.Ack()
 			msg.internalExtra.consumerMetrics.ConsumeMessageAcks.Inc()
 		}
