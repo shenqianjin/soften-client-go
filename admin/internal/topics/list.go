@@ -45,7 +45,7 @@ func newListCommand(rtArgs *internal.RootArgs, mdlArgs *topicsArgs) *cobra.Comma
 	flags := cmd.Flags()
 	// parse partition
 	flags.BoolVarP(&cmdArgs.partitioned, "partitioned", "P", false, constant.PartitionedUsage)
-	flags.BoolVar(&cmdArgs.all, "all", true, constant.AllUsage)
+	cmd.Flags().BoolVarP(&cmdArgs.all, "all", "a", false, constant.AllUsage)
 
 	return cmd
 }
@@ -65,16 +65,16 @@ func listTopics(rtArgs *internal.RootArgs, mdlArgs *topicsArgs, cmdArgs *listArg
 	}
 	// filter by options
 	if !cmdArgs.all && namespaceTopic.ShortTopic != "" {
-		if mdlArgs.level != "" || mdlArgs.status != "" || mdlArgs.subscription != "" {
-			matchedTopics := make([]string, 0)
-			expectedTopics := util.FormatTopics(namespaceTopic.FullName, mdlArgs.level, mdlArgs.status, mdlArgs.subscription)
-			for _, t := range expectedTopics {
-				if slices.Contains(topics, t) {
-					matchedTopics = append(matchedTopics, t)
-				}
+		//if mdlArgs.level != "" || mdlArgs.status != "" || mdlArgs.subscription != "" {
+		matchedTopics := make([]string, 0)
+		expectedTopics := util.FormatTopics(namespaceTopic.FullName, mdlArgs.level, mdlArgs.status, mdlArgs.subscription)
+		for _, t := range expectedTopics {
+			if slices.Contains(topics, t) {
+				matchedTopics = append(matchedTopics, t)
 			}
-			topics = matchedTopics
 		}
+		topics = matchedTopics
+		//}
 	}
 
 	if len(topics) == 0 {

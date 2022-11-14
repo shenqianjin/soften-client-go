@@ -29,7 +29,7 @@ func newDeleteCommand(rtArgs *internal.RootArgs, mdlArgs *topicsArgs) *cobra.Com
 		Example: "(1) soften-admin topics delete public/default/test01\n" +
 			"(2) soften-admin topics delete test02 -P\n" +
 			"(3) soften-admin topics delete persistent://business/finance/equity -P",
-		Args: cobra.MinimumNArgs(1),
+		Args: cobra.ExactArgs(1),
 		Run: func(cmd *cobra.Command, args []string) {
 			cmdArgs.groundTopic = args[0]
 			deleteTopics(rtArgs, mdlArgs, cmdArgs)
@@ -37,7 +37,7 @@ func newDeleteCommand(rtArgs *internal.RootArgs, mdlArgs *topicsArgs) *cobra.Com
 	}
 	// parse variables
 	cmd.Flags().BoolVarP(&cmdArgs.partitioned, "partitioned", "P", false, constant.PartitionedUsage)
-	cmd.Flags().BoolVar(&cmdArgs.all, "all", true, constant.AllUsage)
+	cmd.Flags().BoolVarP(&cmdArgs.all, "all", "a", false, constant.AllUsage)
 
 	return cmd
 }
@@ -63,9 +63,9 @@ func deleteTopics(rtArgs *internal.RootArgs, mdlArgs *topicsArgs, cmdArgs *delet
 		}
 	} else {
 		// filter by options
-		if mdlArgs.level != "" || mdlArgs.status != "" || mdlArgs.subscription != "" {
-			topics = util.FormatTopics(namespaceTopic.FullName, mdlArgs.level, mdlArgs.status, mdlArgs.subscription)
-		}
+		//if mdlArgs.level != "" || mdlArgs.status != "" || mdlArgs.subscription != "" {
+		topics = util.FormatTopics(namespaceTopic.FullName, mdlArgs.level, mdlArgs.status, mdlArgs.subscription)
+		//}
 	}
 	if err != nil {
 		logrus.Fatalf("delete \"%s\" failed: %v\n", cmdArgs.groundTopic, err)

@@ -37,7 +37,7 @@ func newUpdateCommand(rtArgs *internal.RootArgs, mdlArgs *topicsArgs) *cobra.Com
 	}
 	// parse variables
 	cmd.Flags().UintVarP(&cmdArgs.partitions, "partitions", "p", 0, constant.PartitionsUsage4Update)
-	cmd.Flags().BoolVar(&cmdArgs.all, "all", true, constant.AllUsage)
+	cmd.Flags().BoolVarP(&cmdArgs.all, "all", "a", false, constant.AllUsage)
 
 	return cmd
 }
@@ -67,9 +67,9 @@ func updateTopics(rtArgs *internal.RootArgs, mdlArgs *topicsArgs, cmdArgs *updat
 		}
 	} else {
 		// filter by options
-		if mdlArgs.level != "" || mdlArgs.status != "" || mdlArgs.subscription != "" {
-			topics = util.FormatTopics(namespaceTopic.FullName, mdlArgs.level, mdlArgs.status, mdlArgs.subscription)
-		}
+		//if mdlArgs.level != "" || mdlArgs.status != "" || mdlArgs.subscription != "" {
+		topics = util.FormatTopics(namespaceTopic.FullName, mdlArgs.level, mdlArgs.status, mdlArgs.subscription)
+		//}
 	}
 
 	if len(topics) == 0 {

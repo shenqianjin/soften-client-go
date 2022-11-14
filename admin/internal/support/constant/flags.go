@@ -35,7 +35,8 @@ var (
 		"separate with '\\n' and these lines mean 'or' logic for matching\n" +
 		"see https://github.com/antonmedv/expr/blob/master/docs/Language-Definition.md for grammar"
 
-	AllUsage = "process on all topics including all levels, statuses and subscriptions"
+	AllUsage = "process on all topics including all levels, statuses and subscriptions\n" +
+		"higher priority than level, status, or subscription options"
 
 	PrintProgressIterateIntervalUsage = "iterate interval to print progress"
 	PrintProgressRecallIntervalUsage  = "recall interval to print progress"

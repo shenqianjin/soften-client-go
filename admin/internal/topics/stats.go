@@ -38,7 +38,7 @@ func newStatCommand(rtArgs *internal.RootArgs, mdlArgs *topicsArgs) *cobra.Comma
 	}
 	// parse variables
 	cmd.Flags().BoolVarP(&cmdArgs.partitioned, "partitioned", "P", false, constant.PartitionedUsage)
-	cmd.Flags().BoolVar(&cmdArgs.all, "all", true, constant.AllUsage)
+	cmd.Flags().BoolVarP(&cmdArgs.all, "all", "a", false, constant.AllUsage)
 
 	return cmd
 }
@@ -63,9 +63,9 @@ func statTopics(rtArgs *internal.RootArgs, mdlArgs *topicsArgs, cmdArgs *statArg
 		}
 	} else {
 		// filter by options
-		if mdlArgs.level != "" || mdlArgs.status != "" || mdlArgs.subscription != "" {
-			topics = util.FormatTopics(namespaceTopic.FullName, mdlArgs.level, mdlArgs.status, mdlArgs.subscription)
-		}
+		//if mdlArgs.level != "" || mdlArgs.status != "" || mdlArgs.subscription != "" {
+		topics = util.FormatTopics(namespaceTopic.FullName, mdlArgs.level, mdlArgs.status, mdlArgs.subscription)
+		//}
 	}
 	if err != nil {
 		logrus.Fatalf("stats \"%s\" failed: %v\n", cmdArgs.groundTopic, err)
