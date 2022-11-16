@@ -32,7 +32,7 @@ type ClientConfig struct {
 	TLSTrustCertsFilePath   string                `json:"tls_trust_certs_file_path"`  // Optional: trusted TLS certificate file
 	Authentication          pulsar.Authentication `json:"-"`                          // Optional: custom authentication interface
 
-	LogLevel string     `json:"log_level"` // log level enum: panic; fatal; error; warn/warning; info; debug; trace
+	LogLevel string     `json:"log_level"` // Optional: values are enums same with ClientConfig.LogLevel and have higher priority
 	Logger   log.Logger `json:"-"`
 
 	// Specify metric cardinality to the tenant, namespace or topic levels, or remove it completely.
@@ -156,20 +156,20 @@ type StatusPolicy struct {
 	ReentrantDelay     *uint                    `json:"reentrant_delay"`     // Optional: 重入延迟
 	ReentrantMaxTimes  *uint                    `json:"reentrant_max_times"` // Optional: 重入次数上限
 	Publish            *PublishPolicy           `json:"publish"`             // Optional: 发布策略
-	LogLevel           string                   `json:"log_level"`           // log level enum: panic; fatal; error; warn/warning; info; debug; trace
+	LogLevel           string                   `json:"log_level"`           // Optional: values are enums same with ClientConfig.LogLevel and have higher priority
 }
 
 type DeadPolicy struct {
 	Publish  *PublishPolicy `json:"publish"`   // Optional: 发布策略
-	LogLevel string         `json:"log_level"` // log level enum: panic; fatal; error; warn/warning; info; debug; trace
+	LogLevel string         `json:"log_level"` // Optional: values are enums same with ClientConfig.LogLevel and have higher priority
 }
 
 type DonePolicy struct {
-	LogLevel string `json:"log_level"` // log level enum: panic; fatal; error; warn/warning; info; debug; trace
+	LogLevel string `json:"log_level"` // Optional: values are enums same with ClientConfig.LogLevel and have higher priority
 }
 
 type DiscardPolicy struct {
-	LogLevel string `json:"log_level"` // log level enum: panic; fatal; error; warn/warning; info; debug; trace
+	LogLevel string `json:"log_level"` // Optional: values are enums same with ClientConfig.LogLevel and have higher priority
 }
 
 type TransferPolicy struct {
@@ -178,7 +178,7 @@ type TransferPolicy struct {
 	ConsumeDelay        uint           `json:"consume_delay"`          // Optional: 消费延迟(近似值: 通过1次或者多次重入实现, 不足1次重入延迟时当1次处理), 默认 0
 	CountMode           CountPassMode  `json:"count_pass_mode"`        // Optional: 计数传递模式: 0 传递累计计数; 1 重置计数
 	Publish             *PublishPolicy `json:"publish"`                // Optional: 发布策略
-	LogLevel            string         `json:"log_level"`              // log level enum: panic; fatal; error; warn/warning; info; debug; trace
+	LogLevel            string         `json:"log_level"`              // Optional: values are enums same with ClientConfig.LogLevel and have higher priority
 }
 
 type ShiftPolicy struct {
@@ -187,7 +187,7 @@ type ShiftPolicy struct {
 	ConsumeDelay        uint                `json:"consume_delay"`          // Optional: 消费延迟(近似值: 通过1次或者多次重入实现, 不足1次重入延迟时当1次处理), 默认 0
 	CountMode           CountPassMode       `json:"count_pass_mode"`        // Optional: 计数传递模式: 0 透传累计计数; 1 重置计数
 	Publish             *PublishPolicy      `json:"publish"`                // Optional: 发布策略
-	LogLevel            string              `json:"log_level"`              // log level enum: panic; fatal; error; warn/warning; info; debug; trace
+	LogLevel            string              `json:"log_level"`              // Optional: values are enums same with ClientConfig.LogLevel and have higher priority
 }
 
 type BackoffPolicy struct {
