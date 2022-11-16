@@ -64,7 +64,7 @@ func (d *producerFinalDecider) Decide(ctx context.Context, msg *pulsar.ProducerM
 	// parse log entry
 	logEntry := util.ParseLogEntry(ctx, d.logger)
 	// discard
-	if d.options.logLevel <= logrus.InfoLevel {
+	if d.options.logLevel >= logrus.InfoLevel {
 		logEntry.Infof("Success to decide message as discard. message: %v", formatPayloadLogContent(msg.Payload))
 	}
 	return nil, nil, true
@@ -82,7 +82,7 @@ func (d *producerFinalDecider) DecideAsync(ctx context.Context, msg *pulsar.Prod
 	// parse log entry
 	logEntry := util.ParseLogEntry(ctx, d.logger)
 	// discard
-	if d.options.logLevel <= logrus.InfoLevel {
+	if d.options.logLevel >= logrus.InfoLevel {
 		logEntry.Infof("Success to decide message as discard. message: %v", formatPayloadLogContent(msg.Payload))
 	}
 	callback(nil, msg, nil)

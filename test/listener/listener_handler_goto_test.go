@@ -204,6 +204,7 @@ func testListenHandleGoto(t *testing.T, testCase testListenHandleCase) {
 	shiftLevel, _ := message.LevelOf(testCase.shiftLevel)
 	leveledPolicy := &config.LevelPolicy{
 		DiscardEnable:  config.ToPointer(testCase.handleGoto == decider.GotoDiscard.String()),
+		Discard:        &config.DiscardPolicy{LogLevel: "debug"},
 		DeadEnable:     config.ToPointer(testCase.handleGoto == decider.GotoDead.String()),
 		PendingEnable:  config.ToPointer(testCase.handleGoto == decider.GotoPending.String()),
 		Pending:        testPolicy,

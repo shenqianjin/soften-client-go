@@ -133,7 +133,7 @@ func (d *producerTransferDecider) Decide(ctx context.Context, msg *pulsar.Produc
 			destTopic, formatPayloadLogContent(msg.Payload), err)
 		return mid, err, false
 	}
-	if d.options.logLevel <= logrus.InfoLevel {
+	if d.options.logLevel >= logrus.InfoLevel {
 		logEntry.Infof("Success to decide message as transfer to topic: %v. message: %v", destTopic, formatPayloadLogContent(msg.Payload))
 	}
 	return mid, err, true
@@ -186,7 +186,7 @@ func (d *producerTransferDecider) DecideAsync(ctx context.Context, msg *pulsar.P
 			logEntry.WithField("msgID", mid).Errorf("Failed to decide message as transfer to topic: %s, message: %v, err: %v",
 				rtr.options.Topic, formatPayloadLogContent(msg.Payload), err)
 		} else {
-			if d.options.logLevel <= logrus.InfoLevel {
+			if d.options.logLevel >= logrus.InfoLevel {
 				logEntry.WithField("msgID", mid).Infof("Succeed to decide message as transfer to topic: %s, message: %v",
 					rtr.options.Topic, formatPayloadLogContent(msg.Payload))
 			}

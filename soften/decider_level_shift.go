@@ -143,7 +143,7 @@ func (d *shiftDecider) Decide(ctx context.Context, msg consumerMessage, cheStatu
 			msg.Consumer.Nack(msg)
 			msg.internalExtra.consumerMetrics.ConsumeMessageNacks.Inc()
 		} else {
-			if d.options.logLevel <= logrus.InfoLevel {
+			if d.options.logLevel >= logrus.InfoLevel {
 				logEntry.WithField("msgID", msg.ID()).Infof("Succeed to decide message as %v to topic: %s",
 					d.options.msgGoto, rtr.options.Topic)
 			}

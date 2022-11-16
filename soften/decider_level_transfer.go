@@ -131,7 +131,7 @@ func (d *transferDecider) Decide(ctx context.Context, msg consumerMessage, cheSt
 			msg.Consumer.Nack(msg)
 			msg.internalExtra.consumerMetrics.ConsumeMessageNacks.Inc()
 		} else {
-			if d.options.logLevel <= logrus.InfoLevel {
+			if d.options.logLevel >= logrus.InfoLevel {
 				logEntry.WithField("msgID", msg.ID()).Infof("Succeed to decide message as transfer to topic: %s", rtr.options.Topic)
 			}
 			msg.Ack()

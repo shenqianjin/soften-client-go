@@ -106,7 +106,7 @@ func (d *deadDecider) Decide(ctx context.Context, msg consumerMessage, cheStatus
 			if !msg.EventTime().IsZero() {
 				logContent = fmt.Sprintf("%s, latency from event: %v", logContent, time.Now().Sub(msg.EventTime()))
 			}
-			if d.options.logLevel <= logrus.WarnLevel {
+			if d.options.logLevel >= logrus.WarnLevel {
 				logEntry.WithField("msgID", msg.ID()).Warnf("Succeed to decide message as dead to topic: %v, message: %v", d.router.options.Topic, logContent)
 			}
 			msg.Ack()

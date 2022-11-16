@@ -78,14 +78,14 @@ func (d *finalStatusDecider) Decide(ctx context.Context, msg consumerMessage, ch
 	case decider.GotoDone:
 		msg.Ack()
 		msg.internalExtra.consumerMetrics.ConsumeMessageAcks.Inc()
-		if d.options.logLevel <= logrus.InfoLevel {
+		if d.options.logLevel >= logrus.InfoLevel {
 			logEntry.Infof("Success to decide message as done: %v from topic: %v", msg.Message.ID(), msg.Topic())
 		}
 		success = true
 	case decider.GotoDiscard:
 		msg.Ack()
 		msg.internalExtra.consumerMetrics.ConsumeMessageAcks.Inc()
-		if d.options.logLevel <= logrus.InfoLevel {
+		if d.options.logLevel >= logrus.InfoLevel {
 			logEntry.Infof("Success to decide message as discard: %v from topic: %v", msg.Message.ID(), msg.Topic())
 		}
 		success = true
