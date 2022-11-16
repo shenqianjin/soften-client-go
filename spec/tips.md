@@ -23,18 +23,19 @@ PULSAR_MEM=${PULSAR_MEM:-"-Xms4g -Xmx4g -XX:MaxDirectMemorySize=4g"}
 
 ### 配置建议
 
-| 配置项                                    | 默认值                          | 建议调整  | 备注                  |
-|:---------------------------------------|:-----------------------------|:------|:--------------------|
-| systemTopicEnabled                     | false                        | true  | ?                   |
-| topicLevelPoliciesEnabled              | false                        | true  | 支持topic策略           |
-| managedLedgerDefaultEnsembleSize       | 2                            | 3     | ?                   |
-| managedLedgerDefaultWriteQuorum        | 2                            | 3     | ?                   |
-| managedLedgerDefaultWriteQuorum        | 2                            | 3     | ?                   |
-| brokerDeleteInactiveTopicsEnabled      | true                         | false | TODO: 不要自动清理没有订阅的数据 |
-| brokerDeleteInactiveTopicsMode         | delete_when_no_subscriptions | -     | -                   |
-| allowAutoTopicCreation                 | true                         | false | TODO: 防止Topic泛滥     |
-| allowAutoTopicCreationType             | non-partitioned              | -     | -                   |
-| acknowledgmentAtBatchIndexLevelEnabled | false                        | true  | Go Client暂无意义       |
+| 配置项                                     | 默认值                          | 建议调整  | 备注                          |
+|:----------------------------------------|:-----------------------------|:------|:----------------------------|
+| systemTopicEnabled                      | false                        | true  | topicLevelPoliciesEnabled依赖 |
+| topicLevelPoliciesEnabled               | false                        | true  | 支持topic策略                   |
+| managedLedgerDefaultEnsembleSize        | 2                            | 3     | ?                           |
+| managedLedgerDefaultWriteQuorum         | 2                            | 3     | ?                           |
+| managedLedgerDefaultWriteQuorum         | 2                            | 3     | ?                           |
+| brokerDeleteInactiveTopicsEnabled       | true                         | false | 不要自动清理没有订阅的数据               |
+| brokerDeleteInactiveTopicsMode          | delete_when_no_subscriptions | -     | -                           |
+| allowAutoTopicCreation                  | true                         | false | TODO: 防止Topic泛滥             |
+| allowAutoTopicCreationType              | non-partitioned              | -     | -                           |
+| acknowledgmentAtBatchIndexLevelEnabled  | false                        | true  | TODO: Go Client暂无意义         |
+| splitTopicAndPartitionLabelInPrometheus | fasle                        | true  | metrics指标切割topic和partition  |
 
 建议关闭 allowAutoTopicCreationType
 - 防止 Topic 泛滥

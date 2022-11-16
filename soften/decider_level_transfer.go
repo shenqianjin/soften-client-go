@@ -13,6 +13,7 @@ import (
 	"github.com/shenqianjin/soften-client-go/soften/internal"
 	"github.com/shenqianjin/soften-client-go/soften/message"
 	"github.com/shenqianjin/soften-client-go/soften/support/util"
+	"github.com/sirupsen/logrus"
 )
 
 type transferDecider struct {
@@ -29,6 +30,7 @@ type transferDeciderOptions struct {
 	level        internal.TopicLevel
 	subscription string
 	transfer     *config.TransferPolicy
+	logLevel     logrus.Level
 }
 
 func newTransferDecider(client *client, options *transferDeciderOptions, metricsProvider *internal.MetricsProvider) (*transferDecider, error) {
@@ -43,6 +45,13 @@ func newTransferDecider(client *client, options *transferDeciderOptions, metrics
 	}
 	if options.transfer == nil {
 		return nil, errors.New("missing transfer policy for consumer decider")
+	}
+	if options.transfer.LogLevel != "" {
+		if logLvl, err := logrus.ParseLevel(options.transfer.LogLevel); err != nil {
+			return nil, err
+		} else {
+			options.logLevel = logLvl
+		}
 	}
 
 	routers := make(map[string]*router)
@@ -122,7 +131,9 @@ func (d *transferDecider) Decide(ctx context.Context, msg consumerMessage, cheSt
 			msg.Consumer.Nack(msg)
 			msg.internalExtra.consumerMetrics.ConsumeMessageNacks.Inc()
 		} else {
-			logEntry.WithField("msgID", msg.ID()).Infof("Succeed to decide message as transfer to topic: %s", rtr.options.Topic)
+			if d.options.logLevel <= logrus.InfoLevel {
+				logEntry.WithField("msgID", msg.ID()).Infof("Succeed to decide message as transfer to topic: %s", rtr.options.Topic)
+			}
 			msg.Ack()
 			msg.internalExtra.consumerMetrics.ConsumeMessageAcks.Inc()
 		}

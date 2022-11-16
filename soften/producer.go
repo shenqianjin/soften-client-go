@@ -151,6 +151,7 @@ func (p *producer) formatDecidersOptions(conf *config.ProducerConfig) produceDec
 		groundTopic:    conf.Topic,
 		level:          conf.Level,
 		DiscardEnable:  *conf.DiscardEnable,
+		Discard:        conf.Discard,
 		DeadEnable:     *conf.DeadEnable,
 		Dead:           conf.Dead,
 		UpgradeEnable:  *conf.UpgradeEnable,

@@ -32,6 +32,7 @@ type produceDecidersOptions struct {
 	DeadEnable     bool
 	Dead           *config.ShiftPolicy
 	DiscardEnable  bool
+	Discard        *config.DiscardPolicy
 	TransferEnable bool
 	Transfer       *config.TransferPolicy
 	UpgradeEnable  bool
@@ -48,7 +49,8 @@ func newProduceDeciders(p *producer, options produceDecidersOptions) (produceDec
 	deciders := make(produceDeciders)
 	if options.DiscardEnable {
 		msgGoto := decider.GotoDiscard
-		deciderOpt := producerFinalDeciderOptions{groundTopic: options.groundTopic, level: options.level}
+		deciderOpt := producerFinalDeciderOptions{groundTopic: options.groundTopic,
+			level: options.level, discard: options.Discard}
 		if d, err := newProducerFinalDecider(p, &deciderOpt, p.metricsProvider); err != nil {
 			return nil, err
 		} else {
@@ -122,7 +124,9 @@ type generalConsumeDeciderOptions struct {
 	Topic            string                 // Business Topic
 	Level            internal.TopicLevel    //
 	subscriptionName string                 //
+	Done             *config.DonePolicy     //
 	DiscardEnable    bool                   // Discard 检查开关
+	Discard          *config.DiscardPolicy  //
 	DeadEnable       bool                   // Dead 检查开关
 	Dead             *config.DeadPolicy     //
 	TransferEnable   bool                   // Transfer 重试检查开关
@@ -137,14 +141,16 @@ type generalConsumeDeciderOptions struct {
 
 func newGeneralConsumeDeciders(cli *client, l *consumeListener, options generalConsumeDeciderOptions) (*generalConsumeDeciders, error) {
 	handlers := &generalConsumeDeciders{}
-	doneOptions := finalStatusDeciderOptions{groundTopic: l.groundTopic, subscription: l.subscription, msgGoto: decider.GotoDone}
+	doneOptions := finalStatusDeciderOptions{groundTopic: l.groundTopic, subscription: l.subscription,
+		msgGoto: decider.GotoDone, done: options.Done}
 	doneDecider, err := newFinalStatusDecider(l.logger, doneOptions, l.metricsProvider)
 	if err != nil {
 		return nil, err
 	}
 	handlers.doneDecider = doneDecider
 	if options.DiscardEnable {
-		discardOptions := finalStatusDeciderOptions{groundTopic: l.groundTopic, subscription: l.subscription, msgGoto: decider.GotoDiscard}
+		discardOptions := finalStatusDeciderOptions{groundTopic: l.groundTopic, subscription: l.subscription,
+			msgGoto: decider.GotoDiscard, discard: options.Discard}
 		d, err1 := newFinalStatusDecider(l.logger, discardOptions, l.metricsProvider)
 		if err1 != nil {
 			return nil, err1

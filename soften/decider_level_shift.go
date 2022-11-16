@@ -14,6 +14,7 @@ import (
 	"github.com/shenqianjin/soften-client-go/soften/internal"
 	"github.com/shenqianjin/soften-client-go/soften/message"
 	"github.com/shenqianjin/soften-client-go/soften/support/util"
+	"github.com/sirupsen/logrus"
 )
 
 type shiftDecider struct {
@@ -32,7 +33,8 @@ type shiftDeciderOptions struct {
 	msgStatus    internal.MessageStatus
 	msgGoto      internal.DecideGoto
 
-	shift *config.ShiftPolicy
+	shift    *config.ShiftPolicy
+	logLevel logrus.Level
 }
 
 func newShiftDecider(client *client, options *shiftDeciderOptions, metricsProvider *internal.MetricsProvider) (*shiftDecider, error) {
@@ -58,6 +60,13 @@ func newShiftDecider(client *client, options *shiftDeciderOptions, metricsProvid
 	} else if options.msgGoto == decider.GotoDegrade {
 		if options.shift.Level != "" && options.shift.Level.OrderOf() >= options.level.OrderOf() {
 			return nil, errors.New("the specified level is too higher for degrade decider")
+		}
+	}
+	if options.shift.LogLevel != "" {
+		if logLvl, err := logrus.ParseLevel(options.shift.LogLevel); err != nil {
+			return nil, err
+		} else {
+			options.logLevel = logLvl
 		}
 	}
 
@@ -134,8 +143,10 @@ func (d *shiftDecider) Decide(ctx context.Context, msg consumerMessage, cheStatu
 			msg.Consumer.Nack(msg)
 			msg.internalExtra.consumerMetrics.ConsumeMessageNacks.Inc()
 		} else {
-			logEntry.WithField("msgID", msg.ID()).Infof("Succeed to decide message as %v to topic: %s",
-				d.options.msgGoto, rtr.options.Topic)
+			if d.options.logLevel <= logrus.InfoLevel {
+				logEntry.WithField("msgID", msg.ID()).Infof("Succeed to decide message as %v to topic: %s",
+					d.options.msgGoto, rtr.options.Topic)
+			}
 			msg.Ack()
 			msg.internalExtra.consumerMetrics.ConsumeMessageAcks.Inc()
 		}

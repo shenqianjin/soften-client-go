@@ -14,12 +14,14 @@ import (
 	"github.com/shenqianjin/soften-client-go/soften/internal"
 	"github.com/shenqianjin/soften-client-go/soften/message"
 	"github.com/shenqianjin/soften-client-go/soften/support/util"
+	"github.com/sirupsen/logrus"
 )
 
 type deadDecideOptions struct {
 	groundTopic  string
 	subscription string
 	level        internal.TopicLevel
+	logLevel     logrus.Level
 }
 
 // deadDecider route messages to ${TOPIC}-${subscription}-DLQ 主题, 固定后缀，不允许定制
@@ -36,6 +38,16 @@ func newDeadDecider(client *client, policy *config.DeadPolicy, options deadDecid
 	}
 	if options.subscription == "" {
 		return nil, errors.New("subscription is blank")
+	}
+	if policy == nil {
+		return nil, errors.New("missing policy for dead decider")
+	}
+	if policy.LogLevel != "" {
+		if logLvl, err := logrus.ParseLevel(policy.LogLevel); err != nil {
+			return nil, err
+		} else {
+			options.logLevel = logLvl
+		}
 	}
 	subscriptionSuffix := "-" + options.subscription
 	rtOptions := routerOptions{
@@ -94,7 +106,9 @@ func (d *deadDecider) Decide(ctx context.Context, msg consumerMessage, cheStatus
 			if !msg.EventTime().IsZero() {
 				logContent = fmt.Sprintf("%s, latency from event: %v", logContent, time.Now().Sub(msg.EventTime()))
 			}
-			logEntry.WithField("msgID", msg.ID()).Warnf("Succeed to decide message as dead to topic: %v, message: %v", d.router.options.Topic, logContent)
+			if d.options.logLevel <= logrus.WarnLevel {
+				logEntry.WithField("msgID", msg.ID()).Warnf("Succeed to decide message as dead to topic: %v, message: %v", d.router.options.Topic, logContent)
+			}
 			msg.Ack()
 			msg.internalExtra.consumerMetrics.ConsumeMessageAcks.Inc()
 		}

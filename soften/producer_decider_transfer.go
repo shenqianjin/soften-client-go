@@ -15,6 +15,7 @@ import (
 	"github.com/shenqianjin/soften-client-go/soften/internal"
 	"github.com/shenqianjin/soften-client-go/soften/message"
 	"github.com/shenqianjin/soften-client-go/soften/support/util"
+	"github.com/sirupsen/logrus"
 )
 
 type producerTransferDecider struct {
@@ -31,6 +32,7 @@ type producerTransferDeciderOptions struct {
 	groundTopic string
 	level       internal.TopicLevel
 	transfer    *config.TransferPolicy
+	logLevel    logrus.Level
 }
 
 func newProducerTransferDecider(producer *producer, options *producerTransferDeciderOptions, metricsProvider *internal.MetricsProvider) (*producerTransferDecider, error) {
@@ -45,6 +47,13 @@ func newProducerTransferDecider(producer *producer, options *producerTransferDec
 	}
 	if options.transfer == nil {
 		return nil, errors.New("missing transfer policy for consumer decider")
+	}
+	if options.transfer.LogLevel != "" {
+		if logLvl, err := logrus.ParseLevel(options.transfer.LogLevel); err != nil {
+			return nil, err
+		} else {
+			options.logLevel = logLvl
+		}
 	}
 
 	d := &producerTransferDecider{
@@ -124,7 +133,9 @@ func (d *producerTransferDecider) Decide(ctx context.Context, msg *pulsar.Produc
 			destTopic, formatPayloadLogContent(msg.Payload), err)
 		return mid, err, false
 	}
-	logEntry.Warnf("Success to decide message as transfer to topic: %v. message: %v", destTopic, formatPayloadLogContent(msg.Payload))
+	if d.options.logLevel <= logrus.InfoLevel {
+		logEntry.Infof("Success to decide message as transfer to topic: %v. message: %v", destTopic, formatPayloadLogContent(msg.Payload))
+	}
 	return mid, err, true
 }
 
@@ -175,8 +186,10 @@ func (d *producerTransferDecider) DecideAsync(ctx context.Context, msg *pulsar.P
 			logEntry.WithField("msgID", mid).Errorf("Failed to decide message as transfer to topic: %s, message: %v, err: %v",
 				rtr.options.Topic, formatPayloadLogContent(msg.Payload), err)
 		} else {
-			logEntry.WithField("msgID", mid).Infof("Succeed to decide message as transfer to topic: %s, message: %v",
-				rtr.options.Topic, formatPayloadLogContent(msg.Payload))
+			if d.options.logLevel <= logrus.InfoLevel {
+				logEntry.WithField("msgID", mid).Infof("Succeed to decide message as transfer to topic: %s, message: %v",
+					rtr.options.Topic, formatPayloadLogContent(msg.Payload))
+			}
 		}
 		callback(mid, msg, err)
 	}

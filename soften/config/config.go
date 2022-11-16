@@ -61,6 +61,7 @@ type ProducerConfig struct {
 	BatcherBuilderType      int   `json:"batcher_builder_type"`       // Optional: batcher builcer type: 0 DefaultBatchBuilder; 1 KeyBasedBatchBuilder
 
 	DiscardEnable  *bool           `json:"discard_enable"` // Optional:
+	Discard        *DiscardPolicy  `json:"discard"`        // Optional:
 	DeadEnable     *bool           `json:"dead_enable"`    // Optional:
 	Dead           *ShiftPolicy    `json:"dead"`           // Optional: fix dead to D1 currently
 	TransferEnable *bool           `json:"route_enable"`   // Optional: 自定义路由开关
@@ -123,16 +124,18 @@ type LevelPolicy struct {
 	TransferEnable *bool           `json:"transfer_enable"` // Optional: PreReTransfer 检查开关, 默认false
 	Transfer       *TransferPolicy `json:"transfer"`        // Optional: Handle失败时的动态重路由
 
-	Ready          *ReadyPolicy  `json:"ready"`           // Optional: Ready 主题检查策略
-	BlockingEnable *bool         `json:"blocking_enable"` // Optional: Blocking 检查开关
-	Blocking       *StatusPolicy `json:"blocking"`        // Optional: Blocking 主题检查策略
-	PendingEnable  *bool         `json:"pending_enable"`  // Optional: Pending 检查开关
-	Pending        *StatusPolicy `json:"pending"`         // Optional: Pending 主题检查策略
-	RetryingEnable *bool         `json:"retrying_enable"` // Optional: Retrying 重试检查开关
-	Retrying       *StatusPolicy `json:"retrying"`        // Optional: Retrying 主题检查策略
-	DeadEnable     *bool         `json:"dead_enable"`     // Optional: 死信队列开关, 默认false; 如果所有校验器都没能校验通过, 应用代码需要自行Ack或者Nack
-	Dead           *DeadPolicy   `json:"dead"`            // Optional: Dead 主题检查策略
-	DiscardEnable  *bool         `json:"discard_enable"`  // Optional: 丢弃消息开关, 默认false
+	Ready          *ReadyPolicy   `json:"ready"`           // Optional: Ready 处理策略
+	BlockingEnable *bool          `json:"blocking_enable"` // Optional: Blocking 检查开关
+	Blocking       *StatusPolicy  `json:"blocking"`        // Optional: Blocking 处理策略
+	PendingEnable  *bool          `json:"pending_enable"`  // Optional: Pending 检查开关
+	Pending        *StatusPolicy  `json:"pending"`         // Optional: Pending 处理策略
+	RetryingEnable *bool          `json:"retrying_enable"` // Optional: Retrying 重试检查开关
+	Retrying       *StatusPolicy  `json:"retrying"`        // Optional: Retrying 处理策略
+	DeadEnable     *bool          `json:"dead_enable"`     // Optional: 死信队列开关, 默认false; 如果所有校验器都没能校验通过, 应用代码需要自行Ack或者Nack
+	Dead           *DeadPolicy    `json:"dead"`            // Optional: Dead 处理策略
+	DiscardEnable  *bool          `json:"discard_enable"`  // Optional: 丢弃消息开关, 默认false
+	Discard        *DiscardPolicy `json:"discard"`         // Optional: Discard 处理策略
+	Done           *DonePolicy    `json:"done"`            // Optional: Done 处理策略
 }
 
 type ReadyPolicy struct {
@@ -153,10 +156,20 @@ type StatusPolicy struct {
 	ReentrantDelay     *uint                    `json:"reentrant_delay"`     // Optional: 重入延迟
 	ReentrantMaxTimes  *uint                    `json:"reentrant_max_times"` // Optional: 重入次数上限
 	Publish            *PublishPolicy           `json:"publish"`             // Optional: 发布策略
+	LogLevel           string                   `json:"log_level"`           // log level enum: panic; fatal; error; warn/warning; info; debug; trace
 }
 
 type DeadPolicy struct {
-	Publish *PublishPolicy `json:"publish"` // Optional: 发布策略
+	Publish  *PublishPolicy `json:"publish"`   // Optional: 发布策略
+	LogLevel string         `json:"log_level"` // log level enum: panic; fatal; error; warn/warning; info; debug; trace
+}
+
+type DonePolicy struct {
+	LogLevel string `json:"log_level"` // log level enum: panic; fatal; error; warn/warning; info; debug; trace
+}
+
+type DiscardPolicy struct {
+	LogLevel string `json:"log_level"` // log level enum: panic; fatal; error; warn/warning; info; debug; trace
 }
 
 type TransferPolicy struct {
@@ -165,6 +178,7 @@ type TransferPolicy struct {
 	ConsumeDelay        uint           `json:"consume_delay"`          // Optional: 消费延迟(近似值: 通过1次或者多次重入实现, 不足1次重入延迟时当1次处理), 默认 0
 	CountMode           CountPassMode  `json:"count_pass_mode"`        // Optional: 计数传递模式: 0 传递累计计数; 1 重置计数
 	Publish             *PublishPolicy `json:"publish"`                // Optional: 发布策略
+	LogLevel            string         `json:"log_level"`              // log level enum: panic; fatal; error; warn/warning; info; debug; trace
 }
 
 type ShiftPolicy struct {
@@ -173,6 +187,7 @@ type ShiftPolicy struct {
 	ConsumeDelay        uint                `json:"consume_delay"`          // Optional: 消费延迟(近似值: 通过1次或者多次重入实现, 不足1次重入延迟时当1次处理), 默认 0
 	CountMode           CountPassMode       `json:"count_pass_mode"`        // Optional: 计数传递模式: 0 透传累计计数; 1 重置计数
 	Publish             *PublishPolicy      `json:"publish"`                // Optional: 发布策略
+	LogLevel            string              `json:"log_level"`              // log level enum: panic; fatal; error; warn/warning; info; debug; trace
 }
 
 type BackoffPolicy struct {

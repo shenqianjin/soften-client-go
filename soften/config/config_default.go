@@ -17,6 +17,8 @@ const (
 	defaultConsumeWeightBlocking = uint(1)  // Blocking 队列:  5% 权重
 
 	defaultLeveledConsumeWeightMain = uint(10)
+
+	defaultLogLevelTextInfo = "info"
 )
 
 // ------ default others ------
@@ -56,6 +58,7 @@ var (
 		ReentrantDelay:     ToPointer(uint(60)),          // 每1分钟进行一次重入
 		ReentrantMaxTimes:  ToPointer(uint(0)),           // 最大重入次数不限制
 		Publish:            newDefaultPublishPolicy(),
+		LogLevel:           defaultLogLevelTextInfo,
 	}
 
 	// defaultStatusPolicyPending 默认Pending状态的校验策略。
@@ -67,6 +70,7 @@ var (
 		ReentrantDelay:     ToPointer(uint(60)),         // 每1分钟进行一次重入
 		ReentrantMaxTimes:  ToPointer(uint(0)),          // 最多重入30次
 		Publish:            newDefaultPublishPolicy(),
+		LogLevel:           defaultLogLevelTextInfo,
 	}
 
 	// defaultStatusPolicyBlocking 默认pending状态的校验策略。
@@ -78,37 +82,54 @@ var (
 		ReentrantDelay:     ToPointer(uint(600)),         // 每10min进行一次重入
 		ReentrantMaxTimes:  ToPointer(uint(144)),         // 最多重入144次 (1天=144*10min)
 		Publish:            newDefaultPublishPolicy(),
+		LogLevel:           defaultLogLevelTextInfo,
 	}
 
-	// defaultDeadPolicy default dead to D1
+	// defaultDeadPolicy default dead to DLQ
 	defaultDeadPolicy = &DeadPolicy{
-		Publish: newDefaultPublishPolicy(),
+		Publish:  newDefaultPublishPolicy(),
+		LogLevel: defaultLogLevelTextInfo,
+	}
+
+	// defaultDiscardPolicy
+	defaultDiscardPolicy = &DiscardPolicy{
+		LogLevel: defaultLogLevelTextInfo,
+	}
+
+	// defaultDonePolicy
+	defaultDonePolicy = &DonePolicy{
+		LogLevel: defaultLogLevelTextInfo,
 	}
 
 	// defaultUpgradePolicy
 	defaultUpgradePolicy = &ShiftPolicy{
-		Publish: newDefaultPublishPolicy(),
+		Publish:  newDefaultPublishPolicy(),
+		LogLevel: defaultLogLevelTextInfo,
 	}
 
 	// defaultDegradePolicy
 	defaultDegradePolicy = &ShiftPolicy{
-		Publish: newDefaultPublishPolicy(),
+		Publish:  newDefaultPublishPolicy(),
+		LogLevel: defaultLogLevelTextInfo,
 	}
 
 	// defaultShiftPolicy
 	defaultShiftPolicy = &ShiftPolicy{
-		Publish: newDefaultPublishPolicy(),
+		Publish:  newDefaultPublishPolicy(),
+		LogLevel: defaultLogLevelTextInfo,
 	}
 
 	// defaultDeadPolicy default dead to D1
 	defaultShiftDeadPolicy = &ShiftPolicy{
-		Level:   message.D1,
-		Publish: newDefaultPublishPolicy(),
+		Level:    message.D1,
+		Publish:  newDefaultPublishPolicy(),
+		LogLevel: defaultLogLevelTextInfo,
 	}
 
 	// defaultTransferPolicy
 	defaultTransferPolicy = &TransferPolicy{
-		Publish: newDefaultPublishPolicy(),
+		Publish:  newDefaultPublishPolicy(),
+		LogLevel: defaultLogLevelTextInfo,
 	}
 )
 

@@ -3,6 +3,7 @@ package soften
 import (
 	"context"
 	"errors"
+	"fmt"
 	"time"
 
 	"github.com/apache/pulsar-client-go/pulsar"
@@ -12,6 +13,7 @@ import (
 	"github.com/shenqianjin/soften-client-go/soften/internal"
 	"github.com/shenqianjin/soften-client-go/soften/message"
 	"github.com/shenqianjin/soften-client-go/soften/support/util"
+	"github.com/sirupsen/logrus"
 )
 
 type statusDeciderOptions struct {
@@ -22,6 +24,7 @@ type statusDeciderOptions struct {
 	deaDecider      internalConsumeDecider //
 	level           internal.TopicLevel
 	consumeMaxTimes int
+	logLevel        logrus.Level
 }
 
 // statusDecider routes messages to ${TOPIC}-${subscription}-${status} 主题, 固定后缀，不允许定制
@@ -39,6 +42,19 @@ func newStatusDecider(client *client, policy *config.StatusPolicy, options statu
 	}
 	if options.subscription == "" {
 		return nil, errors.New("subscription is blank")
+	}
+	if options.status == "" {
+		return nil, errors.New("status is blank")
+	}
+	if policy == nil {
+		return nil, errors.New(fmt.Sprintf("missing policy for %v decider", options.status))
+	}
+	if policy.LogLevel != "" {
+		if logLvl, err := logrus.ParseLevel(policy.LogLevel); err != nil {
+			return nil, err
+		} else {
+			options.logLevel = logLvl
+		}
 	}
 	subscriptionSuffix := "-" + options.subscription
 	rtOptions := routerOptions{
@@ -141,8 +157,10 @@ func (d *statusDecider) Reentrant(ctx context.Context, msg consumerMessage, prop
 			msg.Consumer.Nack(msg)
 			msg.internalExtra.consumerMetrics.ConsumeMessageNacks.Inc()
 		} else {
-			logEntry.WithField("msgID", msg.ID()).Infof("Succeed to decide message as %v to topic: %s",
-				d.options.msgGoto, d.router.options.Topic)
+			if d.options.logLevel <= logrus.InfoLevel {
+				logEntry.WithField("msgID", msg.ID()).Infof("Succeed to decide message as %v to topic: %s",
+					d.options.msgGoto, d.router.options.Topic)
+			}
 			msg.Ack()
 			msg.internalExtra.consumerMetrics.ConsumeMessageAcks.Inc()
 		}

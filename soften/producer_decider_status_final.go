@@ -8,14 +8,18 @@ import (
 	"github.com/apache/pulsar-client-go/pulsar"
 	"github.com/apache/pulsar-client-go/pulsar/log"
 	"github.com/shenqianjin/soften-client-go/soften/checker"
+	"github.com/shenqianjin/soften-client-go/soften/config"
 	"github.com/shenqianjin/soften-client-go/soften/decider"
 	"github.com/shenqianjin/soften-client-go/soften/internal"
 	"github.com/shenqianjin/soften-client-go/soften/support/util"
+	"github.com/sirupsen/logrus"
 )
 
 type producerFinalDeciderOptions struct {
 	groundTopic string
 	level       internal.TopicLevel
+	discard     *config.DiscardPolicy
+	logLevel    logrus.Level
 }
 
 type producerFinalDecider struct {
@@ -27,6 +31,16 @@ type producerFinalDecider struct {
 func newProducerFinalDecider(producer *producer, options *producerFinalDeciderOptions, metricsProvider *internal.MetricsProvider) (*producerFinalDecider, error) {
 	if options == nil {
 		return nil, errors.New("missing options for producer final decider")
+	}
+	if options.discard == nil {
+		return nil, errors.New("missing discard policy for final decider")
+	}
+	if options.discard.LogLevel != "" {
+		if logLvl, err := logrus.ParseLevel(options.discard.LogLevel); err != nil {
+			return nil, err
+		} else {
+			options.logLevel = logLvl
+		}
 	}
 
 	d := &producerFinalDecider{
@@ -50,7 +64,9 @@ func (d *producerFinalDecider) Decide(ctx context.Context, msg *pulsar.ProducerM
 	// parse log entry
 	logEntry := util.ParseLogEntry(ctx, d.logger)
 	// discard
-	logEntry.Infof("Success to decide message as discard. message: %v", formatPayloadLogContent(msg.Payload))
+	if d.options.logLevel <= logrus.InfoLevel {
+		logEntry.Infof("Success to decide message as discard. message: %v", formatPayloadLogContent(msg.Payload))
+	}
 	return nil, nil, true
 }
 
@@ -66,7 +82,9 @@ func (d *producerFinalDecider) DecideAsync(ctx context.Context, msg *pulsar.Prod
 	// parse log entry
 	logEntry := util.ParseLogEntry(ctx, d.logger)
 	// discard
-	logEntry.Infof("Success to decide message as discard. message: %v", formatPayloadLogContent(msg.Payload))
+	if d.options.logLevel <= logrus.InfoLevel {
+		logEntry.Infof("Success to decide message as discard. message: %v", formatPayloadLogContent(msg.Payload))
+	}
 	callback(nil, msg, nil)
 	decided = true
 	return

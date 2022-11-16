@@ -27,7 +27,7 @@ func (v *validator) ValidateAndDefaultClientConfig(conf *ClientConfig) error {
 	// default logger
 	if conf.Logger == nil {
 		if conf.LogLevel == "" {
-			conf.LogLevel = "info"
+			conf.LogLevel = defaultLogLevelTextInfo
 		}
 		logger := logrus.New()
 		if logLvl, err := logrus.ParseLevel(conf.LogLevel); err != nil {
@@ -256,6 +256,13 @@ func (v *validator) validateAndDefaultPolicyProps4MainLevel(policy *LevelPolicy,
 	if policy.Ready == nil {
 		policy.Ready = defaultStatusReadyPolicy
 	}
+	// validate and default done policy
+	if policy.Done == nil {
+		policy.Done = defaultDonePolicy
+	}
+	if err := v.validateAndDefaultDonePolicy(policy.Done, defaultDonePolicy); err != nil {
+		return err
+	}
 	// default and valid pending policy
 	if *policy.PendingEnable {
 		if policy.Pending == nil {
@@ -296,6 +303,15 @@ func (v *validator) validateAndDefaultPolicyProps4MainLevel(policy *LevelPolicy,
 			policy.Dead = defaultDeadPolicy
 		}
 		if err := v.validateAndDefaultDeadPolicy(policy.Dead, defaultDeadPolicy); err != nil {
+			return err
+		}
+	}
+	// validate and default discard policy
+	if *policy.DiscardEnable {
+		if policy.Discard == nil {
+			policy.Discard = defaultDiscardPolicy
+		}
+		if err := v.validateAndDefaultDiscardPolicy(policy.Discard, defaultDiscardPolicy); err != nil {
 			return err
 		}
 	}
@@ -372,6 +388,13 @@ func (v *validator) validateAndDefaultPolicyProps4ExtraLevel(policy *LevelPolicy
 	if policy.Ready == nil {
 		policy.Ready = mainPolicy.Ready
 	}
+	// validate and default done policy
+	if policy.Done == nil {
+		policy.Done = defaultDonePolicy
+	}
+	if err := v.validateAndDefaultDonePolicy(policy.Done, defaultDonePolicy); err != nil {
+		return err
+	}
 	// default and valid pending policy
 	if *policy.PendingEnable {
 		if policy.Pending == nil {
@@ -406,11 +429,21 @@ func (v *validator) validateAndDefaultPolicyProps4ExtraLevel(policy *LevelPolicy
 			return err
 		}
 	}
+	// validate and default dead policy
 	if *policy.DeadEnable {
 		if policy.Dead == nil {
 			policy.Dead = mainPolicy.Dead
 		}
 		if err := v.validateAndDefaultDeadPolicy(policy.Dead, mainPolicy.Dead); err != nil {
+			return err
+		}
+	}
+	// validate and default discard policy
+	if *policy.DiscardEnable {
+		if policy.Discard == nil {
+			policy.Discard = defaultDiscardPolicy
+		}
+		if err := v.validateAndDefaultDiscardPolicy(policy.Discard, mainPolicy.Discard); err != nil {
 			return err
 		}
 	}
@@ -469,6 +502,12 @@ func (v *validator) validateAndDefaultShiftPolicy(mainLevel internal.TopicLevel,
 		configuredPolicy.Publish = newDefaultPublishPolicy()
 	}
 	v.validateAndDefaultPublishPolicy(configuredPolicy.Publish, newDefaultPublishPolicy())
+	// validate and default log level
+	if configuredPolicy.LogLevel == "" {
+		configuredPolicy.LogLevel = defaultPolicy.LogLevel
+	} else if _, err := logrus.ParseLevel(configuredPolicy.LogLevel); err != nil {
+		return err
+	}
 
 	return nil
 }
@@ -484,6 +523,12 @@ func (v *validator) validateAndDefaultTransferPolicy(configuredPolicy *TransferP
 		configuredPolicy.Publish = newDefaultPublishPolicy()
 	}
 	v.validateAndDefaultPublishPolicy(configuredPolicy.Publish, newDefaultPublishPolicy())
+	// validate and default log level
+	if configuredPolicy.LogLevel == "" {
+		configuredPolicy.LogLevel = defaultPolicy.LogLevel
+	} else if _, err := logrus.ParseLevel(configuredPolicy.LogLevel); err != nil {
+		return err
+	}
 	return nil
 }
 
@@ -560,6 +605,16 @@ func (v *validator) ValidateAndDefaultProducerConfig(conf *ProducerConfig) error
 			return err
 		}
 	}
+	// validate and default discard policy
+	if *conf.DiscardEnable {
+		if conf.Discard == nil {
+			conf.Discard = defaultDiscardPolicy
+		}
+		if err := v.validateAndDefaultDiscardPolicy(conf.Discard, defaultDiscardPolicy); err != nil {
+			return err
+		}
+	}
+
 	// validate upgrade: default nothing
 	if *conf.UpgradeEnable {
 		if conf.Upgrade == nil {
@@ -634,6 +689,12 @@ func (v *validator) validateAndDefaultStatusPolicy(configuredPolicy *StatusPolic
 		configuredPolicy.Publish = newDefaultPublishPolicy()
 	}
 	v.validateAndDefaultPublishPolicy(configuredPolicy.Publish, newDefaultPublishPolicy())
+	// validate and default log level
+	if configuredPolicy.LogLevel == "" {
+		configuredPolicy.LogLevel = defaultPolicy.LogLevel
+	} else if _, err := logrus.ParseLevel(configuredPolicy.LogLevel); err != nil {
+		return err
+	}
 
 	return nil
 }
@@ -664,6 +725,26 @@ func (v *validator) validateAndDefaultDeadPolicy(configuredPolicy *DeadPolicy, d
 		configuredPolicy.Publish = newDefaultPublishPolicy()
 	}
 	if err := v.validateAndDefaultPublishPolicy(configuredPolicy.Publish, defaultDeadPolicy.Publish); err != nil {
+		return err
+	}
+	return nil
+}
+
+func (v *validator) validateAndDefaultDiscardPolicy(configuredPolicy *DiscardPolicy, defaultPolicy *DiscardPolicy) error {
+	// validate and default log level
+	if configuredPolicy.LogLevel == "" {
+		configuredPolicy.LogLevel = defaultPolicy.LogLevel
+	} else if _, err := logrus.ParseLevel(configuredPolicy.LogLevel); err != nil {
+		return err
+	}
+	return nil
+}
+
+func (v *validator) validateAndDefaultDonePolicy(configuredPolicy *DonePolicy, defaultPolicy *DonePolicy) error {
+	// validate and default log level
+	if configuredPolicy.LogLevel == "" {
+		configuredPolicy.LogLevel = defaultPolicy.LogLevel
+	} else if _, err := logrus.ParseLevel(configuredPolicy.LogLevel); err != nil {
 		return err
 	}
 	return nil
