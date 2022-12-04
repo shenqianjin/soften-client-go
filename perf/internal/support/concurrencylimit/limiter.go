@@ -4,7 +4,7 @@ import (
 	"fmt"
 )
 
-type CountLimiter interface {
+type ConcurrencyLimiter interface {
 	TryAcquire() bool
 	Acquire()
 	Release()
@@ -14,7 +14,7 @@ type concurrencyLimiter struct {
 	ch chan struct{}
 }
 
-func NewCountLimiter(n int) CountLimiter {
+func NewConcurrencyLimiter(n int) ConcurrencyLimiter {
 	if n <= 0 {
 		panic(fmt.Sprintf("concurrency should more than one. current: %d", n))
 	}
