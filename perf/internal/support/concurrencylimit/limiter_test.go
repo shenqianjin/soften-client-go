@@ -1,4 +1,4 @@
-package limiter
+package concurrencylimit
 
 import (
 	"fmt"
@@ -23,7 +23,7 @@ func TestConcurrencyLimit(t *testing.T) {
 		}
 	}()
 
-	limiter := NewConcurrencyLimiter(concurrency)
+	limiter := New(concurrency)
 	for i := 0; i < loop; i++ {
 		go func(i int) {
 			defer group.Done()
@@ -54,7 +54,7 @@ func TestConcurrencyLimitByTryRequire(t *testing.T) {
 		}
 	}()
 
-	limiter := NewConcurrencyLimiter(concurrency)
+	limiter := New(concurrency)
 	for i := 0; i < loop; i++ {
 		go func(i int) {
 			defer group.Done()

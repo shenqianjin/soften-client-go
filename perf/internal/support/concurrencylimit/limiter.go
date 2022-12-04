@@ -1,20 +1,20 @@
-package limiter
+package concurrencylimit
 
 import (
 	"fmt"
 )
 
-type ConcurrencyLimiter interface {
+type Limiter interface {
 	TryAcquire() bool
 	Acquire()
 	Release()
 }
 
-type concurrencyLimiter struct {
+type limiter struct {
 	ch chan struct{}
 }
 
-func NewConcurrencyLimiter(n int) ConcurrencyLimiter {
+func New(n int) Limiter {
 	if n <= 0 {
 		panic(fmt.Sprintf("concurrency should more than one. current: %d", n))
 	}
@@ -22,10 +22,10 @@ func NewConcurrencyLimiter(n int) ConcurrencyLimiter {
 	for i := 0; i < n; i++ {
 		ch <- struct{}{}
 	}
-	return &concurrencyLimiter{ch: ch}
+	return &limiter{ch: ch}
 }
 
-func (l *concurrencyLimiter) TryAcquire() bool {
+func (l *limiter) TryAcquire() bool {
 	select {
 	case <-l.ch:
 		return true
@@ -34,10 +34,10 @@ func (l *concurrencyLimiter) TryAcquire() bool {
 	}
 }
 
-func (l *concurrencyLimiter) Acquire() {
+func (l *limiter) Acquire() {
 	<-l.ch
 }
 
-func (l *concurrencyLimiter) Release() {
+func (l *limiter) Release() {
 	l.ch <- struct{}{}
 }
