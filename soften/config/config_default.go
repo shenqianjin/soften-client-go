@@ -47,6 +47,7 @@ var (
 	// defaultStatusReadyPolicy 默认pending状态的校验策略。
 	defaultStatusReadyPolicy = &ReadyPolicy{
 		ConsumeWeight: ToPointer(defaultConsumeWeightMain),
+		ConsumeLimit:  newDefaultLimitPolicy(),
 	}
 
 	// defaultStatusPolicyRetrying 默认Retrying状态的校验策略。
@@ -59,6 +60,7 @@ var (
 		ReentrantMaxTimes:  ToPointer(uint(0)),           // 最大重入次数不限制
 		Publish:            newDefaultPublishPolicy(),
 		LogLevel:           defaultLogLevelTextInfo,
+		ConsumeLimit:       newDefaultLimitPolicy(),
 	}
 
 	// defaultStatusPolicyPending 默认Pending状态的校验策略。
@@ -71,6 +73,7 @@ var (
 		ReentrantMaxTimes:  ToPointer(uint(0)),          // 最多重入30次
 		Publish:            newDefaultPublishPolicy(),
 		LogLevel:           defaultLogLevelTextInfo,
+		ConsumeLimit:       newDefaultLimitPolicy(),
 	}
 
 	// defaultStatusPolicyBlocking 默认pending状态的校验策略。
@@ -83,6 +86,7 @@ var (
 		ReentrantMaxTimes:  ToPointer(uint(144)),         // 最多重入144次 (1天=144*10min)
 		Publish:            newDefaultPublishPolicy(),
 		LogLevel:           defaultLogLevelTextInfo,
+		ConsumeLimit:       newDefaultLimitPolicy(),
 	}
 
 	// defaultDeadPolicy default dead to DLQ
@@ -150,6 +154,14 @@ func newDefaultPublishPolicy() *PublishPolicy {
 		Backoff: newDefaultBackoffPolicy(),
 	}
 	return publishPolicy
+}
+
+func newDefaultLimitPolicy() *LimitPolicy {
+	policy := &LimitPolicy{
+		MaxOPS:         ToPointer(uint(0)),
+		MaxConcurrency: ToPointer(uint(0)),
+	}
+	return policy
 }
 
 // ------ default consume leveled policies ------

@@ -100,7 +100,20 @@ func newConsumeListener(cli *client, conf config.ConsumerConfig, checkpoints map
 	// initialize status singleLeveledConsumer
 	if len(conf.Levels) == 1 {
 		level := conf.Levels[0]
-		if consumer, err := newSingleLeveledConsumer(topicLogger, cli, level, &conf, l.messageCh, l.levelDeciders[level]); err != nil {
+		options := &singleLeveledConsumerOptions{
+			Topics:                      conf.Topics,
+			SubscriptionName:            conf.SubscriptionName,
+			Type:                        conf.Type,
+			SubscriptionInitialPosition: conf.SubscriptionInitialPosition,
+			NackBackoffDelayPolicy:      conf.NackBackoffDelayPolicy,
+			NackRedeliveryDelay:         conf.NackRedeliveryDelay,
+			RetryEnable:                 conf.RetryEnable,
+			DLQ:                         conf.DLQ,
+			policy:                      conf.LevelPolicy,
+			BalanceStrategy:             conf.StatusBalanceStrategy,
+			MainLevel:                   conf.Levels[0],
+		}
+		if consumer, err := newSingleLeveledConsumer(topicLogger, cli, level, options, l.messageCh, l.levelDeciders[level]); err != nil {
 			return nil, err
 		} else {
 			l.leveledConsumers[level] = consumer
@@ -379,6 +392,9 @@ func (l *consumeListener) internalStartInParallel(ctx context.Context, handler h
 }
 
 func (l *consumeListener) consume(ctx context.Context, handlerFunc handler.PremiumHandleFunc, msg consumerMessage) {
+	if msg.internalExtra.deferFunc != nil {
+		defer msg.internalExtra.deferFunc()
+	}
 	msg.internalExtra.prevCheckBeginTime = time.Now()
 	// prev-check to handle in turn
 	for _, checkType := range l.prevCheckOrders {

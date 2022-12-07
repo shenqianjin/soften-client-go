@@ -81,6 +81,8 @@ type ProducerConfig struct {
 type ConsumerConfig struct {
 	*LevelPolicy
 
+	// ------ consumer configuration (referred to pulsar.ConsumerOptions) ------
+
 	Topics                      []string                           `json:"topics"`                        // Alternative with Topic: 如果有值, Topic 配置将被忽略; 第一个为核心主题
 	Topic                       string                             `json:"topic"`                         // Alternative with Topics: Topics缺失的情况下，该值生效
 	SubscriptionName            string                             `json:"subscription_name"`             // Required:
@@ -92,12 +94,14 @@ type ConsumerConfig struct {
 	RetryEnable                 bool                               `json:"retry_enable"`                  // Optional: Unrecommended, compatible with origin pulsar client
 	DLQ                         *DLQPolicy                         `json:"dlq"`                           // Optional: Unrecommended, compatible with origin pulsar client
 
-	Concurrency      *ConcurrencyPolicy       `json:"concurrency"`        // Optional: 并发控制
-	BalanceStrategy  internal.BalanceStrategy `json:"balance_strategy"`   // Optional: 消费均衡策略
-	EscapeHandler    EscapeHandler            `json:"-"`                  // Optional: 逃逸消息处理器, 优先级高于 EscapeHandleType
-	EscapeHandleType EscapeHandleType         `json:"escape_handle_type"` // Optional: 逃逸消息处理类型: 0 Panic; 1 Ack; 2 Nack
+	// ------ consumer configuration (global and active among subscribed levels) ------
 
-	// ------ consumer configuration (multi-level) ------
+	Concurrency      *ConcurrencyPolicy `json:"concurrency"`        // Optional: 并发控制
+	ConsumerLimit    *LimitPolicy       `json:"consumer_limit"`     // Optional: Consumer 级别限制策略
+	EscapeHandler    EscapeHandler      `json:"-"`                  // Optional: 逃逸消息处理器, 优先级高于 EscapeHandleType
+	EscapeHandleType EscapeHandleType   `json:"escape_handle_type"` // Optional: 逃逸消息处理类型: 0 Panic; 1 Ack; 2 Nack
+
+	// ------ consumer configuration (active for multi-level) ------
 
 	Levels               message.Levels           `json:"levels"`                 // Required: 默认L1, 且消费的Topic Level级别, len(Topics) == 1 or Topic存在的时候才生效
 	LevelBalanceStrategy internal.BalanceStrategy `json:"level_balance_strategy"` // Optional: Topic级别消费策略
@@ -114,6 +118,9 @@ type LevelPolicies map[internal.TopicLevel]*LevelPolicy
 type LevelPolicy struct {
 	ConsumeWeight   uint `json:"consume_weight"`    // Optional: consume weight
 	ConsumeMaxTimes int  `json:"consume_max_times"` // Optional: 最大消费次数
+
+	StatusBalanceStrategy internal.BalanceStrategy `json:"status_balance_strategy"` // Optional: 多状态间的消费均衡策略
+	ConsumeLimit          *LimitPolicy             `json:"consume_limit"`           // Optional: Level 级别限制策略
 
 	UpgradeEnable  *bool           `json:"upgrade_enable"`  // Optional: 升级开关
 	Upgrade        *ShiftPolicy    `json:"upgrade"`         // Optional: 升级策略
@@ -139,7 +146,8 @@ type LevelPolicy struct {
 }
 
 type ReadyPolicy struct {
-	ConsumeWeight *uint `json:"consume_weight"` // Optional: 消费权重
+	ConsumeWeight *uint        `json:"consume_weight"` // Optional: 消费权重
+	ConsumeLimit  *LimitPolicy `json:"consume_limit"`  // Optional: Status 级别限制策略
 }
 
 // StatusPolicy 定义单状态的消费重入策略。
@@ -157,6 +165,7 @@ type StatusPolicy struct {
 	ReentrantMaxTimes  *uint                    `json:"reentrant_max_times"` // Optional: 重入次数上限
 	Publish            *PublishPolicy           `json:"publish"`             // Optional: 发布策略
 	LogLevel           string                   `json:"log_level"`           // Optional: values are enums same with ClientConfig.LogLevel and have higher priority
+	ConsumeLimit       *LimitPolicy             `json:"consume_limit"`       // Optional: Status 级别限制策略
 }
 
 type DeadPolicy struct {
@@ -231,11 +240,9 @@ type ConcurrencyPolicy struct {
 	PanicHandler func(interface{}) `json:"-"` // Optional, handle panics comes from executing message handler
 }
 
-type ConsumeLimit struct {
-	ConsumeMaxTimes  uint
-	PendingMaxTimes  uint
-	RetryingMaxTimes uint
-	BlockingMaxTimes uint
+type LimitPolicy struct {
+	MaxOPS         *uint `json:"max_ops"`         // Optional: maximum handle messages per seconds. default 0: unlimited
+	MaxConcurrency *uint `json:"max_concurrency"` // Optional: maximum handle concurrency limit. default 0: unlimited
 }
 
 // ------ escape handle type ------

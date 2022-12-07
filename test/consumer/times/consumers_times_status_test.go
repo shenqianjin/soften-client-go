@@ -1,4 +1,4 @@
-package limit
+package times
 
 import (
 	"context"
@@ -35,7 +35,7 @@ type testConsumeLimitCase struct {
 }
 
 func TestConsumeLimitL2_Retrying_Success(t *testing.T) {
-	topic := internal.GenerateTestTopic(internal.PrefixTestConsumeLimit)
+	topic := internal.GenerateTestTopic(internal.PrefixTestConsumeTimes)
 	level := message.L2
 
 	testPolicy := &config.StatusPolicy{
@@ -75,7 +75,7 @@ func TestConsumeLimitL2_Retrying_Success(t *testing.T) {
 }
 
 func TestConsumeLimitL2_Retrying(t *testing.T) {
-	topic := internal.GenerateTestTopic(internal.PrefixTestConsumeLimit)
+	topic := internal.GenerateTestTopic(internal.PrefixTestConsumeTimes)
 	level := message.L2
 
 	testPolicy := &config.StatusPolicy{
@@ -114,7 +114,7 @@ func TestConsumeLimitL2_Retrying(t *testing.T) {
 }
 
 func TestConsumeLimitL2_Pending(t *testing.T) {
-	topic := internal.GenerateTestTopic(internal.PrefixTestConsumeLimit)
+	topic := internal.GenerateTestTopic(internal.PrefixTestConsumeTimes)
 	level := message.L2
 
 	testPolicy := &config.StatusPolicy{
@@ -149,7 +149,7 @@ func TestConsumeLimitL2_Pending(t *testing.T) {
 	testConsumeLimitGoto(t, HandleCase)
 }
 func TestConsumeLimitL2_Blocking(t *testing.T) {
-	topic := internal.GenerateTestTopic(internal.PrefixTestConsumeLimit)
+	topic := internal.GenerateTestTopic(internal.PrefixTestConsumeTimes)
 	level := message.L2
 
 	testPolicy := &config.StatusPolicy{

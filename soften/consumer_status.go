@@ -8,28 +8,33 @@ import (
 	"github.com/apache/pulsar-client-go/pulsar/log"
 	"github.com/shenqianjin/soften-client-go/soften/config"
 	"github.com/shenqianjin/soften-client-go/soften/internal"
+	"github.com/shenqianjin/soften-client-go/soften/internal/concurrencylimit"
 	"github.com/shenqianjin/soften-client-go/soften/message"
 	"github.com/shenqianjin/soften-client-go/soften/support/meta"
+	"go.uber.org/ratelimit"
 )
 
 // statusConsumer received messages from a specified status topic.
 // It referred to pulsar.Consumer.
 type statusConsumer struct {
 	pulsar.Consumer
-	logger          log.Logger
-	level           internal.TopicLevel
-	status          internal.MessageStatus
-	policy          *config.StatusPolicy
-	metrics         *internal.ListenerConsumerMetrics
-	statusMessageCh chan consumerMessage // channel used to deliver message to clients
-	decider         *statusDecider
+	logger             log.Logger
+	level              internal.TopicLevel
+	status             internal.MessageStatus
+	policy             *config.StatusPolicy
+	metrics            *internal.ListenerConsumerMetrics
+	rateLimiter        ratelimit.Limiter
+	concurrencyLimiter concurrencylimit.Limiter
+	statusMessageCh    chan consumerMessage // channel used to deliver message to clients
+	decider            *statusDecider
 }
 
 type statusConsumerOptions struct {
-	level   internal.TopicLevel
-	status  internal.MessageStatus
-	policy  *config.StatusPolicy
-	metrics *internal.ListenerConsumerMetrics
+	groundTopic string
+	level       internal.TopicLevel
+	status      internal.MessageStatus
+	policy      *config.StatusPolicy
+	metrics     *internal.ListenerConsumerMetrics
 }
 
 func newStatusConsumer(parentLogger log.Logger, pulsarConsumer pulsar.Consumer, options statusConsumerOptions, decider *statusDecider) *statusConsumer {
@@ -42,6 +47,13 @@ func newStatusConsumer(parentLogger log.Logger, pulsarConsumer pulsar.Consumer, 
 		metrics:         options.metrics,
 		decider:         decider,
 		statusMessageCh: make(chan consumerMessage, 10),
+	}
+	// init limiters
+	if *options.policy.ConsumeLimit.MaxOPS > 0 {
+		sc.rateLimiter = ratelimit.New(int(*options.policy.ConsumeLimit.MaxOPS))
+	}
+	if *options.policy.ConsumeLimit.MaxConcurrency > 0 {
+		sc.concurrencyLimiter = concurrencylimit.New(int(*options.policy.ConsumeLimit.MaxConcurrency))
 	}
 	go sc.start()
 	sc.metrics.ConsumersOpened.Inc()
@@ -84,7 +96,7 @@ func (sc *statusConsumer) start() {
 		// (2) consume time is before / equal now
 		if consumeTime.IsZero() || !consumeTime.After(now) {
 			sc.increaseConsumeTimes(consumerMsg)
-			sc.statusMessageCh <- consumerMsg
+			sc.delivery(consumerMsg)
 			continue
 		}
 
@@ -98,7 +110,7 @@ func (sc *statusConsumer) start() {
 				time.Sleep(consumeTime.Sub(now))
 			}
 			sc.increaseConsumeTimes(consumerMsg)
-			sc.statusMessageCh <- consumerMsg
+			sc.delivery(consumerMsg)
 			continue
 		}
 
@@ -111,7 +123,7 @@ func (sc *statusConsumer) start() {
 		// delivery message to client if consumeTime is before/equal now.
 		if !consumeTime.After(now) {
 			sc.increaseConsumeTimes(consumerMsg)
-			sc.statusMessageCh <- consumerMsg
+			sc.delivery(consumerMsg)
 			continue
 		}
 		// TODO: Nack later if the wait time is less than one reentrant delay
@@ -129,8 +141,22 @@ func (sc *statusConsumer) start() {
 		}
 		// delivery the msg to client as well for other cases, such as decide failed
 		sc.increaseConsumeTimes(consumerMsg)
-		sc.statusMessageCh <- consumerMsg
+		sc.delivery(consumerMsg)
 	}
+}
+
+func (sc *statusConsumer) delivery(msg consumerMessage) {
+	// check rate limit
+	if sc.rateLimiter != nil {
+		sc.rateLimiter.Take()
+	}
+	// check concurrency limit
+	if sc.concurrencyLimiter != nil {
+		sc.concurrencyLimiter.Acquire()
+		msg.internalExtra.deferFunc = func() { sc.concurrencyLimiter.Release() }
+	}
+	// delivery
+	sc.statusMessageCh <- msg
 }
 
 func (sc *statusConsumer) increaseConsumeTimes(msg consumerMessage) {

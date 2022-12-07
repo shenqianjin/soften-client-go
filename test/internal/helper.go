@@ -26,6 +26,7 @@ var (
 	PrefixTestProduce      = "test-produce"
 	PrefixTestProduceBatch = "test-produce-batch"
 	PrefixTestConsume      = "test-consume"
+	PrefixTestConsumeTimes = "test-consume-times"
 	PrefixTestConsumeLimit = "test-consume-limit"
 	PrefixTestConsumeBatch = "test-consume-batch"
 	PrefixTestConsumeCheck = "test-consume-check"

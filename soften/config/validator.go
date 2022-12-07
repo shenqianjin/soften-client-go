@@ -120,10 +120,6 @@ func (v *validator) ValidateAndDefaultConsumerConfig(conf *ConsumerConfig) error
 	if conf.LevelBalanceStrategy == "" {
 		conf.LevelBalanceStrategy = BalanceStrategyRoundRand
 	}
-	// default status balance strategy
-	if conf.BalanceStrategy == "" {
-		conf.BalanceStrategy = BalanceStrategyRoundRand
-	}
 
 	// default topics
 	if len(conf.Topics) == 0 && conf.Topic == "" {
@@ -143,6 +139,10 @@ func (v *validator) ValidateAndDefaultConsumerConfig(conf *ConsumerConfig) error
 		} else {
 			conf.LevelPolicy = &LevelPolicy{}
 		}
+	}
+	// force set leveled consume limit policy as global consumer limit one if it is missing in single level consumer case
+	if conf.ConsumerLimit != nil && conf.ConsumeLimit == nil && len(conf.Levels) == 1 {
+		conf.ConsumeLimit = conf.ConsumerLimit
 	}
 	if err := v.validateAndDefaultPolicyProps4MainLevel(conf.LevelPolicy, conf.Level); err != nil {
 		return err
@@ -203,6 +203,13 @@ func (v *validator) ValidateAndDefaultConsumerConfig(conf *ConsumerConfig) error
 			return err
 		}
 	}
+	// default consumer limit
+	if conf.ConsumerLimit == nil {
+		conf.ConsumerLimit = newDefaultLimitPolicy()
+	} else if err := v.validateAndDefaultLimitPolicy(conf.ConsumerLimit, newDefaultLimitPolicy()); err != nil {
+		return err
+	}
+
 	return nil
 }
 
@@ -252,9 +259,16 @@ func (v *validator) validateAndDefaultPolicyProps4MainLevel(policy *LevelPolicy,
 	if policy.TransferEnable == nil {
 		policy.TransferEnable = new(bool)
 	}
+	// default status balance strategy
+	if policy.StatusBalanceStrategy == "" {
+		policy.StatusBalanceStrategy = BalanceStrategyRoundRand
+	}
 	// default status Policy
 	if policy.Ready == nil {
 		policy.Ready = defaultStatusReadyPolicy
+	}
+	if err := v.validateAndDefaultReadyPolicy(policy.Ready, defaultStatusReadyPolicy); err != nil {
+		return err
 	}
 	// validate and default done policy
 	if policy.Done == nil {
@@ -342,6 +356,12 @@ func (v *validator) validateAndDefaultPolicyProps4MainLevel(policy *LevelPolicy,
 			return err
 		}
 	}
+	// default limit
+	if policy.ConsumeLimit == nil {
+		policy.ConsumeLimit = newDefaultLimitPolicy()
+	} else if err := v.validateAndDefaultLimitPolicy(policy.ConsumeLimit, newDefaultLimitPolicy()); err != nil {
+		return err
+	}
 	return nil
 }
 
@@ -384,15 +404,23 @@ func (v *validator) validateAndDefaultPolicyProps4ExtraLevel(policy *LevelPolicy
 		policy.TransferEnable = new(bool)
 		*policy.TransferEnable = *mainPolicy.TransferEnable
 	}
+
+	// default status balance strategy
+	if policy.StatusBalanceStrategy == "" {
+		policy.StatusBalanceStrategy = mainPolicy.StatusBalanceStrategy
+	}
 	// default status Policy
 	if policy.Ready == nil {
 		policy.Ready = mainPolicy.Ready
 	}
+	if err := v.validateAndDefaultReadyPolicy(policy.Ready, mainPolicy.Ready); err != nil {
+		return err
+	}
 	// validate and default done policy
 	if policy.Done == nil {
-		policy.Done = defaultDonePolicy
+		policy.Done = mainPolicy.Done
 	}
-	if err := v.validateAndDefaultDonePolicy(policy.Done, defaultDonePolicy); err != nil {
+	if err := v.validateAndDefaultDonePolicy(policy.Done, mainPolicy.Done); err != nil {
 		return err
 	}
 	// default and valid pending policy
@@ -441,7 +469,7 @@ func (v *validator) validateAndDefaultPolicyProps4ExtraLevel(policy *LevelPolicy
 	// validate and default discard policy
 	if *policy.DiscardEnable {
 		if policy.Discard == nil {
-			policy.Discard = defaultDiscardPolicy
+			policy.Discard = mainPolicy.Discard
 		}
 		if err := v.validateAndDefaultDiscardPolicy(policy.Discard, mainPolicy.Discard); err != nil {
 			return err
@@ -473,6 +501,12 @@ func (v *validator) validateAndDefaultPolicyProps4ExtraLevel(policy *LevelPolicy
 		if err := v.validateAndDefaultShiftPolicy(message.L1, policy.Shift, mainPolicy.Shift); err != nil {
 			return err
 		}
+	}
+	// default limit
+	if policy.ConsumeLimit == nil {
+		policy.ConsumeLimit = mainPolicy.ConsumeLimit
+	} else if err := v.validateAndDefaultLimitPolicy(policy.ConsumeLimit, mainPolicy.ConsumeLimit); err != nil {
+		return err
 	}
 	return nil
 }
@@ -654,6 +688,24 @@ func (v *validator) ValidateAndDefaultProducerConfig(conf *ProducerConfig) error
 	return nil
 }
 
+func (v *validator) validateAndDefaultReadyPolicy(configuredPolicy *ReadyPolicy, defaultPolicy *ReadyPolicy) error {
+	if configuredPolicy == nil {
+		configuredPolicy = defaultPolicy
+		return nil
+	}
+	if configuredPolicy.ConsumeWeight == nil {
+		configuredPolicy.ConsumeWeight = defaultPolicy.ConsumeWeight
+	}
+	// validate and default limit policy
+	if configuredPolicy.ConsumeLimit == nil {
+		configuredPolicy.ConsumeLimit = newDefaultLimitPolicy()
+	}
+	if err := v.validateAndDefaultLimitPolicy(configuredPolicy.ConsumeLimit, newDefaultLimitPolicy()); err != nil {
+		return err
+	}
+	return nil
+}
+
 func (v *validator) validateAndDefaultStatusPolicy(configuredPolicy *StatusPolicy, defaultPolicy *StatusPolicy) error {
 	if configuredPolicy == nil {
 		configuredPolicy = defaultPolicy
@@ -688,14 +740,22 @@ func (v *validator) validateAndDefaultStatusPolicy(configuredPolicy *StatusPolic
 	if configuredPolicy.Publish == nil {
 		configuredPolicy.Publish = newDefaultPublishPolicy()
 	}
-	v.validateAndDefaultPublishPolicy(configuredPolicy.Publish, newDefaultPublishPolicy())
+	if err := v.validateAndDefaultPublishPolicy(configuredPolicy.Publish, newDefaultPublishPolicy()); err != nil {
+		return err
+	}
 	// validate and default log level
 	if configuredPolicy.LogLevel == "" {
 		configuredPolicy.LogLevel = defaultPolicy.LogLevel
 	} else if _, err := logrus.ParseLevel(configuredPolicy.LogLevel); err != nil {
 		return err
 	}
-
+	// validate and default limit policy
+	if configuredPolicy.ConsumeLimit == nil {
+		configuredPolicy.ConsumeLimit = newDefaultLimitPolicy()
+	}
+	if err := v.validateAndDefaultLimitPolicy(configuredPolicy.ConsumeLimit, newDefaultLimitPolicy()); err != nil {
+		return err
+	}
 	return nil
 }
 
@@ -715,6 +775,20 @@ func (v *validator) validateAndDefaultConcurrencyPolicy(configuredPolicy *Concur
 	}
 	if configuredPolicy.PanicHandler == nil {
 		configuredPolicy.PanicHandler = defaultPolicy.PanicHandler
+	}
+	return nil
+}
+
+func (v *validator) validateAndDefaultLimitPolicy(configuredPolicy *LimitPolicy, defaultPolicy *LimitPolicy) error {
+	if configuredPolicy == nil {
+		configuredPolicy = defaultPolicy
+		return nil
+	}
+	if configuredPolicy.MaxOPS == nil {
+		configuredPolicy.MaxOPS = defaultPolicy.MaxOPS
+	}
+	if configuredPolicy.MaxConcurrency == nil {
+		configuredPolicy.MaxConcurrency = defaultPolicy.MaxConcurrency
 	}
 	return nil
 }

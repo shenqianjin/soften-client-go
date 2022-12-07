@@ -7,6 +7,7 @@ import (
 
 	"github.com/shenqianjin/soften-client-go/perf/internal"
 	"github.com/shenqianjin/soften-client-go/perf/internal/support/choice"
+	"github.com/shenqianjin/soften-client-go/perf/internal/support/concurrencylimit"
 	"github.com/shenqianjin/soften-client-go/perf/internal/support/cost"
 	"github.com/shenqianjin/soften-client-go/perf/internal/support/stats"
 	"github.com/shenqianjin/soften-client-go/perf/internal/support/util"
@@ -27,11 +28,11 @@ type consumeService struct {
 	costPolicy    cost.CostPolicy
 
 	quotaLimits         []uint64
-	quotaLimiters       map[string]concurrencylimiter.ConcurrencyLimiter // 超额度限制时,去blocking对列
+	quotaLimiters       map[string]concurrencylimit.Limiter // 超额度限制时,去blocking对列
 	rateLimits          []uint64
 	rateLimiters        map[string]*rate.Limiter // 超额度限制时,去blocking对列
 	concurrencyLimits   []uint64
-	concurrencyLimiters map[string]concurrencylimiter.ConcurrencyLimiter // 超并发限制时,去pending队列
+	concurrencyLimiters map[string]concurrencylimit.Limiter // 超并发限制时,去pending队列
 
 	gotoWeights      map[string]uint64
 	handleGotoChoice choice.GotoPolicy
@@ -48,9 +49,9 @@ func newConsumer(rtArgs *internal.RootArgs, cmdArgs *ConsumeArgs) *consumeServic
 		concurrencyLimits: util.ParseUint64Array(cmdArgs.ConsumeConcurrencyLimit),
 		gotoWeights:       util.ParseGotoWeightMap(cmdArgs.ConsumeGoto),
 
-		concurrencyLimiters: make(map[string]concurrencylimiter.ConcurrencyLimiter), // 超并发限制时,去pending队列
-		rateLimiters:        make(map[string]*rate.Limiter),                         // 超额度限制时,去blocking对列
-		quotaLimiters:       make(map[string]concurrencylimiter.ConcurrencyLimiter), // 超额度限制时,去blocking对列
+		concurrencyLimiters: make(map[string]concurrencylimit.Limiter), // 超并发限制时,去pending队列
+		rateLimiters:        make(map[string]*rate.Limiter),            // 超额度限制时,去blocking对列
+		quotaLimiters:       make(map[string]concurrencylimit.Limiter), // 超额度限制时,去blocking对列
 	}
 	handleGotoChoice := choice.NewRoundRandWeightGotoPolicy(c.gotoWeights)
 	c.handleGotoChoice = handleGotoChoice
@@ -63,7 +64,7 @@ func newConsumer(rtArgs *internal.RootArgs, cmdArgs *ConsumeArgs) *consumeServic
 	if len(c.concurrencyLimits) > 0 {
 		for index, con := range c.concurrencyLimits {
 			if con > 0 {
-				c.concurrencyLimiters[fmt.Sprintf("Group-%d", index+1)] = concurrencylimiter.NewConcurrencyLimiter(int(con)) // rate.New(int(li), time.Second)
+				c.concurrencyLimiters[fmt.Sprintf("Group-%d", index+1)] = concurrencylimit.New(int(con)) // rate.New(int(li), time.Second)
 			} else {
 				c.concurrencyLimiters[fmt.Sprintf("Group-%d", index+1)] = nil
 			}
@@ -83,7 +84,7 @@ func newConsumer(rtArgs *internal.RootArgs, cmdArgs *ConsumeArgs) *consumeServic
 	if len(c.quotaLimits) > 0 {
 		for index, quota := range c.quotaLimits {
 			if quota > 0 {
-				c.quotaLimiters[fmt.Sprintf("Group-%d", index+1)] = concurrencylimiter.NewConcurrencyLimiter(int(quota)) // rate.New(int(li), time.Second)
+				c.quotaLimiters[fmt.Sprintf("Group-%d", index+1)] = concurrencylimit.New(int(quota)) // rate.New(int(li), time.Second)
 			} else {
 				c.quotaLimiters[fmt.Sprintf("Group-%d", index+1)] = nil
 			}

@@ -5,13 +5,12 @@ import (
 	"reflect"
 	"time"
 
-	"github.com/shenqianjin/soften-client-go/soften/message"
-
 	"github.com/apache/pulsar-client-go/pulsar"
 	"github.com/shenqianjin/soften-client-go/soften/checker"
 	"github.com/shenqianjin/soften-client-go/soften/decider"
 	"github.com/shenqianjin/soften-client-go/soften/internal"
 	"github.com/shenqianjin/soften-client-go/soften/internal/strategy"
+	"github.com/shenqianjin/soften-client-go/soften/message"
 )
 
 // ------ Route message ------
@@ -75,6 +74,8 @@ type internalExtraMessage struct {
 	consumerMetrics    *internal.ListenerConsumerMetrics
 	deciderMetrics     *internal.ListenerDeciderMetrics
 	messagesEndMetrics *internal.ListenerMessagesMetrics
+
+	deferFunc func()
 }
 
 // ------ message receiver help ------

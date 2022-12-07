@@ -6,14 +6,18 @@ import (
 	"github.com/apache/pulsar-client-go/pulsar/log"
 	"github.com/shenqianjin/soften-client-go/soften/config"
 	"github.com/shenqianjin/soften-client-go/soften/internal"
+	"github.com/shenqianjin/soften-client-go/soften/internal/concurrencylimit"
+	"go.uber.org/ratelimit"
 )
 
 type multiLeveledConsumer struct {
-	logger           log.Logger
-	messageCh        chan consumerMessage                        // channel used to deliver message to application
-	leveledStrategy  internal.BalanceStrategy                    // 消费策略
-	leveledPolicies  map[internal.TopicLevel]*config.LevelPolicy // 级别消费策略
-	leveledConsumers map[internal.TopicLevel]*singleLeveledConsumer
+	logger             log.Logger
+	rateLimiter        ratelimit.Limiter
+	concurrencyLimiter concurrencylimit.Limiter
+	messageCh          chan consumerMessage                        // channel used to deliver message to application
+	leveledStrategy    internal.BalanceStrategy                    // 消费策略
+	leveledPolicies    map[internal.TopicLevel]*config.LevelPolicy // 级别消费策略
+	leveledConsumers   map[internal.TopicLevel]*singleLeveledConsumer
 }
 
 func newMultiLeveledConsumer(parentLogger log.Logger, client *client, conf *config.ConsumerConfig, messageCh chan consumerMessage, levelHandlers map[internal.TopicLevel]*leveledConsumeDeciders) (*multiLeveledConsumer, error) {
@@ -23,13 +27,34 @@ func newMultiLeveledConsumer(parentLogger log.Logger, client *client, conf *conf
 		leveledPolicies: conf.LevelPolicies,
 		messageCh:       messageCh,
 	}
+
+	options := &singleLeveledConsumerOptions{
+		Topics:                      conf.Topics,
+		SubscriptionName:            conf.SubscriptionName,
+		Type:                        conf.Type,
+		SubscriptionInitialPosition: conf.SubscriptionInitialPosition,
+		NackBackoffDelayPolicy:      conf.NackBackoffDelayPolicy,
+		NackRedeliveryDelay:         conf.NackRedeliveryDelay,
+		RetryEnable:                 conf.RetryEnable,
+		DLQ:                         conf.DLQ,
+		BalanceStrategy:             conf.StatusBalanceStrategy,
+		MainLevel:                   conf.Levels[0],
+		policy:                      conf.LevelPolicy,
+	}
 	mlc.leveledConsumers = make(map[internal.TopicLevel]*singleLeveledConsumer, len(conf.Levels))
 	for _, level := range conf.Levels {
-		levelConsumer, err := newSingleLeveledConsumer(mlc.logger, client, level, conf, make(chan consumerMessage, 10), levelHandlers[level])
+		options.policy = conf.LevelPolicies[level]
+		levelConsumer, err := newSingleLeveledConsumer(mlc.logger, client, level, options, make(chan consumerMessage, 10), levelHandlers[level])
 		if err != nil {
 			return nil, fmt.Errorf("failed to new multi-status comsumer -> %v", err)
 		}
 		mlc.leveledConsumers[level] = levelConsumer
+	}
+	if *conf.ConsumerLimit.MaxOPS > 0 {
+		mlc.rateLimiter = ratelimit.New(int(*conf.ConsumerLimit.MaxOPS))
+	}
+	if *conf.ConsumerLimit.MaxConcurrency > 0 {
+		mlc.concurrencyLimiter = concurrencylimit.New(int(*conf.ConsumerLimit.MaxConcurrency))
 	}
 	// start to listen message from all status singleLeveledConsumer
 	go mlc.retrieveLeveledMessages()
@@ -48,17 +73,27 @@ func (c *multiLeveledConsumer) retrieveLeveledMessages() {
 		panic(fmt.Errorf("failed to start retrieve: %v", err))
 	}
 	for {
+		// retrieve message from multiple levels
 		msg, ok := messageChSelector.receiveOneByWeight(chs, balanceStrategy, &[]int{})
 		if !ok {
 			c.logger.Warnf("status chan closed")
 			break
 		}
 		// 获取到消息
-		if msg.Message != nil && msg.Consumer != nil {
-			//fmt.Printf("received message  msgId: %v -- content: '%s'\n", msg.ID(), string(msg.Payload()))
-			c.messageCh <- msg
-		} else {
-			panic(fmt.Sprintf("consumed an invalid message: %v", msg))
+		// check rate limit
+		if c.rateLimiter != nil {
+			c.rateLimiter.Take()
 		}
+		// check concurrency limit
+		if c.concurrencyLimiter != nil {
+			c.concurrencyLimiter.Acquire()
+			if originalDeferFunc := msg.internalExtra.deferFunc; originalDeferFunc != nil {
+				msg.internalExtra.deferFunc = func() { originalDeferFunc(); c.concurrencyLimiter.Release() }
+			} else {
+				msg.internalExtra.deferFunc = func() { c.concurrencyLimiter.Release() }
+			}
+		}
+		// delivery
+		c.messageCh <- msg
 	}
 }
