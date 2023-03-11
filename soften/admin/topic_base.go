@@ -12,6 +12,14 @@ type baseTopicManger struct {
 	url        string
 }
 
+func newBaseTopicManger(url string) *baseTopicManger {
+	httpClient := &http.Client{}
+	return &baseTopicManger{
+		url:        url,
+		httpclient: httpClient,
+	}
+}
+
 // ------ base implementation ------
 
 func (m *baseTopicManger) StatsInternal(topic string) (stats TopicStatsInternal, err error) {
@@ -28,9 +36,29 @@ func (m *baseTopicManger) StatsInternal(topic string) (stats TopicStatsInternal,
 	return stats, err
 }
 
-func (m *baseTopicManger) Unload(topic string) error {
+func (m *baseTopicManger) Unload(topic string) (err error) {
+	parsedTopic, err := internal.ParseTopicName(topic)
+	if err != nil {
+		return
+	}
+
 	pathPattern := "%s/admin/v2/%s/unload"
-	req, err := http.NewRequest(http.MethodPut, fmt.Sprintf(pathPattern, m.url, topic), http.NoBody)
+	req, err := http.NewRequest(http.MethodPut, fmt.Sprintf(pathPattern, m.url, parsedTopic.GetTopicRestPath()), http.NoBody)
+	if err != nil {
+		return err
+	}
+	err = callWithRet(m.httpclient, req, nil)
+	return err
+}
+
+func (m *baseTopicManger) SetMessageTTL(topic string, ttl uint64) (err error) {
+	parsedTopic, err := internal.ParseTopicName(topic)
+	if err != nil {
+		return
+	}
+
+	pathPattern := "%s/admin/v2/%s/messageTTL?messageTTL=%d"
+	req, err := http.NewRequest(http.MethodPost, fmt.Sprintf(pathPattern, m.url, parsedTopic.GetTopicRestPath(), ttl), http.NoBody)
 	if err != nil {
 		return err
 	}

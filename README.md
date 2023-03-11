@@ -1,9 +1,10 @@
 ## Soften Go Client Library
 
-Soften is a state-oriented, flexibility-tunable and equality-nursed messaging client for coordinating workloads 
+Soften is a state-oriented, flexibility-tunable and equality-nursed messaging client for coordinating workloads
 of async business messages, especially a same business shared by hundreds of billions of users.
 
 ### Goal
+
 - Isolate messages by statuses
 - Flexibly tune concurrency, weights, retries, delays, etc.
 - Nurse equality for different users
@@ -12,17 +13,24 @@ of async business messages, especially a same business shared by hundreds of bil
 - Adaptively adjust rate or concurrency, weights, delays, etc (TBD)
 
 ### Requirements
+
 - Go 1.18+
 
 ### Usage
+
 #### Installation
+
 Download the library of Go client to local environment:
+
 ```go
 go get -u "github.com/shenqianjin/soften-client-go"
 ```
+
 #### Create Client
+
 In order to interact with Pulsar, you'll first need a Client object. You can create a client object using the NewClient
 function, passing in a ClientConfig object. Here's an example:
+
 ```go
 client, err := soften.NewClient(config.ClientConfig{URL: "pulsar://localhost:6650"})
 if err != nil {
@@ -30,9 +38,12 @@ if err != nil {
 }
 defer client.Close()
 ```
+
 #### Create Producer - Regular Mode
+
 Pulsar producers publish messages to Pulsar topics. You can configure Go producers using a ProducerConfig object.
 Here's an example:
+
 ```go
 // create producer
 producer, err := client.CreateProducer(pulsar.ProducerOptions{
@@ -54,13 +65,17 @@ for i := 0; i < 10; i++ {
     }
 }
 ```
+
 #### Create Producer - Advanced Mode
-Soften provides checkpoints as optional choices before you send messages to your messaging middleware. 
+
+Soften provides checkpoints as optional choices before you send messages to your messaging middleware.
 Learn more about send checkpoints in [manual].
 
 Here is an example of send checkpoints to satisfy the following requirements:
+
 - schedule VIP users' messages to a high level topic
 - send Disable users' messages to dead letter topic
+
 ```go
 producer, err := client.CreateProducer(config.ProducerConfig{
     Topic:             "topic-1",
@@ -79,9 +94,12 @@ producer, err := client.CreateProducer(config.ProducerConfig{
     return checker.CheckStatusRejected
 }))
 ```
+
 #### Create Listener - Regular Mode
+
 Pulsar consumers subscribe to one or more Pulsar topics and listen for incoming messages produced on that topic/those topics.
 You can configure Go consumers using a ConsumerConfig object. Here's a basic example:
+
 ```go
 // create listen
 listener, err := cli.CreateListener(config.ConsumerConfig{
@@ -104,17 +122,20 @@ if err != nil {
 
 time.Sleep(2 * time.Second)
 ```
+
 #### Create Listener - Advanced Mode
+
 Soften also provides checkpoints as optional choices before/after you consume messages in your listeners.
 you can also specify goto status directly as the return of your handle function which you input into your
 listener as well. Learn more about consume checkpoints in [manual] and goto status actions in [manual].
 
-
 Here is an example of mixed consume checkpoints and goto actions to satisfy the following requirements:
+
 - previous handle checkpoint: schedule Junior users' messages to a low level topic - B1
 - post handle checkpoint: send these messages which is handled with "Bad Request" error to dead letter topic
 - goto decision: backoff these messages which is handled with "Internal Server Error" error to retrying topic,
   they will be re-consumed in a few seconds (depended on your RetryingPolicy configuration)
+
 ```go
 listener, err := client.CreateListener(config.ConsumerConfig{
     Topic:                       "topic-1",
@@ -157,5 +178,6 @@ err = listener.StartPremium(context.Background(), messageHandle)
 ```
 
 ### Contributing
+
 Contributions are welcomed and greatly appreciated. See CONTRIBUTING.md for details on submitting patches
 and the contribution workflow.

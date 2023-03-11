@@ -94,7 +94,7 @@ type ConsumerConfig struct {
 	RetryEnable                 bool                               `json:"retry_enable"`                  // Optional: Unrecommended, compatible with origin pulsar client
 	DLQ                         *DLQPolicy                         `json:"dlq"`                           // Optional: Unrecommended, compatible with origin pulsar client
 
-	// ------ consumer configuration (global and active among subscribed levels) ------
+	// ------ consumer configuration (active for global) ------
 
 	Concurrency      *ConcurrencyPolicy `json:"concurrency"`        // Optional: 并发控制
 	ConsumerLimit    *LimitPolicy       `json:"consumer_limit"`     // Optional: Consumer 级别限制策略

@@ -5,9 +5,12 @@ package admin
 type BaseTopicAdmin interface {
 	Unload(topic string) error
 	StatsInternal(topic string) (stats TopicStatsInternal, err error)
+	SetMessageTTL(topic string, ttl uint64) error
 }
 
 type NonPartitionedTopicManager interface {
+	BaseTopicAdmin
+	
 	Create(topic string) error
 	Delete(topic string) error
 	List(namespace string) (topics []string, err error)
@@ -15,6 +18,8 @@ type NonPartitionedTopicManager interface {
 }
 
 type PartitionedTopicManger interface {
+	BaseTopicAdmin
+
 	Create(topic string, partitions uint) error
 	CreateMissedPartitions(topic string) error
 	Delete(topic string) error
@@ -25,8 +30,7 @@ type PartitionedTopicManger interface {
 }
 
 type RobustTopicManager interface {
-	Unload(topic string) error
-	StatsInternal(topic string) (stats TopicStatsInternal, err error)
+	BaseTopicAdmin
 
 	// Create non-partitioned or partitioned topic, partitions == 0 means non-partitioned
 	Create(topic string, partitions uint) error
@@ -55,4 +59,12 @@ type TenantManager interface {
 
 type ClusterManager interface {
 	List() ([]string, error)
+}
+
+// ------ subscription api ------
+
+type SubscriptionManager interface {
+	List(topic string) ([]string, error)
+	Subscribe(topic, subs string) error
+	Unsubscribe(topic, subs string) error
 }

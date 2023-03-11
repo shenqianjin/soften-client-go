@@ -76,9 +76,9 @@ func ParseNamespaceTopic(namespaceOrTopic string) (*NamespaceTopic, error) {
 
 func FormatTopics(groundTopic string, levelStr, statusStr string, subscription string) []string {
 	topics := make([]string, 0)
-	levels := formatLevels(levelStr)
-	statuses := formatStatuses(statusStr)
-	subs := formatSubs(subscription)
+	levels := parseLevels(levelStr)
+	statuses := ParseStatuses(statusStr)
+	subs := ParseSubs(subscription)
 	// validate subs and statuses
 
 	topics, err := util.FormatTopics(groundTopic, levels, statuses, subs...)
@@ -86,36 +86,6 @@ func FormatTopics(groundTopic string, levelStr, statusStr string, subscription s
 		logrus.Fatal(err)
 	}
 	return topics
-}
-
-func IsL1Topic(topic string) bool {
-	if topic == "" {
-		logrus.Fatalf("invalid topic name")
-	}
-	for _, l := range message.LevelValues() {
-		if l == message.L1 {
-			continue
-		}
-		if strings.HasSuffix(topic, l.TopicSuffix()) {
-			return false
-		}
-	}
-	return true
-}
-
-func IsReadyTopic(topic string) bool {
-	if topic == "" {
-		logrus.Fatal("invalid topic name")
-	}
-	for _, s := range message.StatusValues() {
-		if s == message.StatusReady {
-			continue
-		}
-		if strings.HasSuffix(topic, s.TopicSuffix()) {
-			return false
-		}
-	}
-	return true
 }
 
 func IsPartitionedSubTopic(topic string) bool {
@@ -128,7 +98,7 @@ func IsPartitionedSubTopic(topic string) bool {
 	return false
 }
 
-func formatLevels(levelStr string) (levels message.Levels) {
+func parseLevels(levelStr string) (levels message.Levels) {
 	if levelStr == "" {
 		levels = message.Levels{message.L1}
 	} else {
@@ -145,7 +115,7 @@ func formatLevels(levelStr string) (levels message.Levels) {
 	return levels
 }
 
-func formatStatuses(statusStr string) (statuses message.Statuses) {
+func ParseStatuses(statusStr string) (statuses message.Statuses) {
 	if statusStr == "" {
 		statuses = message.Statuses{message.StatusReady}
 	} else {
@@ -162,7 +132,7 @@ func formatStatuses(statusStr string) (statuses message.Statuses) {
 	return
 }
 
-func formatSubs(subStr string) (subs []string) {
+func ParseSubs(subStr string) (subs []string) {
 	if subStr == "" {
 		subs = []string{}
 	} else {
@@ -175,7 +145,7 @@ func formatSubs(subStr string) (subs []string) {
 	return
 }
 
-func formatTopic(topic string) string {
+func parseTopic(topic string) string {
 	if parsedTopic, err := util.ParseTopicName(topic); err != nil {
 		logrus.Fatal(err)
 		return "" // only for compile error

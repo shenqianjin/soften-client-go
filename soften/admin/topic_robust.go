@@ -1,6 +1,8 @@
 package admin
 
-import "strings"
+import (
+	"strings"
+)
 
 type Option interface {
 }
@@ -10,23 +12,18 @@ const (
 )
 
 type robustTopicManger struct {
+	*baseTopicManger
 	nonPartitionedManger    *nonPartitionedTopicManager
 	partitionedTopicManager *partitionedTopicManager
 }
 
 func NewRobustTopicManager(url string) RobustTopicManager {
+	baseManager := newBaseTopicManger(url)
 	return &robustTopicManger{
-		nonPartitionedManger:    NewNonPartitionedTopicManager(url),
-		partitionedTopicManager: NewPartitionedTopicManager(url),
+		baseTopicManger:         baseManager,
+		nonPartitionedManger:    newNonPartitionedTopicManagerWithBaseManger(baseManager),
+		partitionedTopicManager: newPartitionedTopicManagerWithBaseManager(baseManager),
 	}
-}
-
-func (m *robustTopicManger) Unload(topic string) error {
-	return m.nonPartitionedManger.Unload(topic)
-}
-
-func (m *robustTopicManger) StatsInternal(topic string) (stats TopicStatsInternal, err error) {
-	return m.nonPartitionedManger.StatsInternal(topic)
 }
 
 func (m *robustTopicManger) Create(topic string, partitions uint) error {

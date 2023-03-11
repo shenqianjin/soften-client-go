@@ -17,14 +17,14 @@ type partitionedTopicManager struct {
 // ------ partitioned implementation ------
 
 func NewPartitionedTopicManager(url string) *partitionedTopicManager {
-	httpClient := &http.Client{}
-	manager := &partitionedTopicManager{
-		baseTopicManger: &baseTopicManger{
-			url:        url,
-			httpclient: httpClient,
-		},
+	baseManger := newBaseTopicManger(url)
+	return newPartitionedTopicManagerWithBaseManager(baseManger)
+}
+
+func newPartitionedTopicManagerWithBaseManager(baseManger *baseTopicManger) *partitionedTopicManager {
+	return &partitionedTopicManager{
+		baseTopicManger: baseManger,
 	}
-	return manager
 }
 
 func (m *partitionedTopicManager) Create(topic string, partitions uint) error {

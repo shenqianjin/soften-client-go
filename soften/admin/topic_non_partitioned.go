@@ -15,14 +15,14 @@ type nonPartitionedTopicManager struct {
 }
 
 func NewNonPartitionedTopicManager(url string) *nonPartitionedTopicManager {
-	httpClient := &http.Client{}
-	manager := &nonPartitionedTopicManager{
-		baseTopicManger: &baseTopicManger{
-			url:        url,
-			httpclient: httpClient,
-		},
+	baseManger := newBaseTopicManger(url)
+	return newNonPartitionedTopicManagerWithBaseManger(baseManger)
+}
+
+func newNonPartitionedTopicManagerWithBaseManger(baseManger *baseTopicManger) *nonPartitionedTopicManager {
+	return &nonPartitionedTopicManager{
+		baseTopicManger: baseManger,
 	}
-	return manager
 }
 
 // ------ non-partitioned topic implementation ------

@@ -28,6 +28,10 @@ var (
 	SubscriptionUsage = "subscription name on the ground topic\n" +
 		"separate with ',' if more than one"
 
+	DeadTTLUsage = "Message TTL for topic in second, allowed range from 0 to Integer.MAX_VALUE\n" +
+		"0 means stores all unacknowledged messages forever\n" +
+		"and default is six month"
+
 	SingleSubscriptionUsage = "subscription name for subscribing your topic\n"
 
 	ConditionsUsage = "conditions to execute\n" +
