@@ -22,15 +22,16 @@ var (
 	DefaultPulsarUrl     = "pulsar://localhost:6650"
 	DefaultPulsarHttpUrl = "http://localhost:8080"
 
-	DefaultTopic           = "my-topic"
-	PrefixTestProduce      = "test-produce"
-	PrefixTestProduceBatch = "test-produce-batch"
-	PrefixTestConsume      = "test-consume"
-	PrefixTestConsumeTimes = "test-consume-times"
-	PrefixTestConsumeLimit = "test-consume-limit"
-	PrefixTestConsumeBatch = "test-consume-batch"
-	PrefixTestConsumeCheck = "test-consume-check"
-	PrefixTestListen       = "test-listen"
+	DefaultTopic               = "my-topic"
+	PrefixTestProduce          = "test-produce"
+	PrefixTestProduceBatch     = "test-produce-batch"
+	PrefixTestConsume          = "test-consume"
+	PrefixTestConsumeTimes     = "test-consume-times"
+	PrefixTestConsumeLimit     = "test-consume-limit"
+	PrefixTestConsumeBatch     = "test-consume-batch"
+	PrefixTestConsumeCheck     = "test-consume-check"
+	PrefixTestConsumeIntercept = "test-consume-intercept"
+	PrefixTestListen           = "test-listen"
 
 	Size64 = 64
 	Size1K = 1024

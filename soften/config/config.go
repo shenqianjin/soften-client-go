@@ -5,6 +5,7 @@ import (
 
 	"github.com/apache/pulsar-client-go/pulsar"
 	"github.com/apache/pulsar-client-go/pulsar/log"
+	"github.com/shenqianjin/soften-client-go/soften/interceptor"
 	"github.com/shenqianjin/soften-client-go/soften/internal"
 	"github.com/shenqianjin/soften-client-go/soften/message"
 )
@@ -119,8 +120,9 @@ type LevelPolicy struct {
 	ConsumeWeight   uint `json:"consume_weight"`    // Optional: consume weight
 	ConsumeMaxTimes int  `json:"consume_max_times"` // Optional: 最大消费次数
 
-	StatusBalanceStrategy internal.BalanceStrategy `json:"status_balance_strategy"` // Optional: 多状态间的消费均衡策略
-	ConsumeLimit          *LimitPolicy             `json:"consume_limit"`           // Optional: Level 级别限制策略
+	StatusBalanceStrategy internal.BalanceStrategy        `json:"status_balance_strategy"` // Optional: 多状态间的消费均衡策略
+	ConsumeLimit          *LimitPolicy                    `json:"consume_limit"`           // Optional: Level 级别限制策略
+	ConsumeInterceptors   interceptor.ConsumeInterceptors `json:"-"`                       // Optional:
 
 	UpgradeEnable  *bool           `json:"upgrade_enable"`  // Optional: 升级开关
 	Upgrade        *ShiftPolicy    `json:"upgrade"`         // Optional: 升级策略

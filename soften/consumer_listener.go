@@ -13,6 +13,7 @@ import (
 	"github.com/shenqianjin/soften-client-go/soften/config"
 	"github.com/shenqianjin/soften-client-go/soften/decider"
 	"github.com/shenqianjin/soften-client-go/soften/handler"
+	"github.com/shenqianjin/soften-client-go/soften/interceptor"
 	"github.com/shenqianjin/soften-client-go/soften/internal"
 	"github.com/shenqianjin/soften-client-go/soften/message"
 	"github.com/shenqianjin/soften-client-go/soften/support/meta"
@@ -32,23 +33,24 @@ type Listener interface {
 
 // consumeListener listens to consume all messages of one or more than one status/levels consumers.
 type consumeListener struct {
-	client            *client
-	logger            log.Logger
-	metricsProvider   *internal.MetricsProvider
-	groundTopic       string
-	subscription      string
-	messageCh         chan consumerMessage // channel used to deliver message to application
-	enables           *internal.ConsumeEnables
-	concurrency       *config.ConcurrencyPolicy
-	escapeHandler     config.EscapeHandler
-	generalDeciders   *generalConsumeDeciders
-	levelDeciders     map[internal.TopicLevel]*leveledConsumeDeciders
-	checkers          map[checker.CheckType]*consumeCheckpointChain
-	prevCheckOrders   []checker.CheckType
-	postCheckOrders   []checker.CheckType
-	startListenerOnce sync.Once
-	closeListenerOnce sync.Once
-	leveledConsumers  map[internal.TopicLevel]*singleLeveledConsumer
+	client                 *client
+	logger                 log.Logger
+	metricsProvider        *internal.MetricsProvider
+	groundTopic            string
+	subscription           string
+	messageCh              chan consumerMessage // channel used to deliver message to application
+	enables                *internal.ConsumeEnables
+	concurrency            *config.ConcurrencyPolicy
+	escapeHandler          config.EscapeHandler
+	generalDeciders        *generalConsumeDeciders
+	levelDeciders          map[internal.TopicLevel]*leveledConsumeDeciders
+	checkers               map[checker.CheckType]*consumeCheckpointChain
+	prevCheckOrders        []checker.CheckType
+	postCheckOrders        []checker.CheckType
+	leveledInterceptorsMap map[internal.TopicLevel]interceptor.ConsumeInterceptors
+	startListenerOnce      sync.Once
+	closeListenerOnce      sync.Once
+	leveledConsumers       map[internal.TopicLevel]*singleLeveledConsumer
 }
 
 func newConsumeListener(cli *client, conf config.ConsumerConfig, checkpoints map[checker.CheckType][]*checker.ConsumeCheckpoint) (*consumeListener, error) {
@@ -77,6 +79,11 @@ func newConsumeListener(cli *client, conf config.ConsumerConfig, checkpoints map
 	l.checkers = l.collectCheckers(l.enables, checkpoints)
 	// collect check orders
 	l.prevCheckOrders, l.postCheckOrders = l.collectCheckOrders()
+	// collect interceptors
+	l.leveledInterceptorsMap = make(map[internal.TopicLevel]interceptor.ConsumeInterceptors, len(conf.Levels))
+	for _, level := range conf.Levels {
+		l.leveledInterceptorsMap[level] = conf.LevelPolicies[level].ConsumeInterceptors
+	}
 	// initialize general deciders
 	generalHdOptions := l.formatGeneralDecidersOptions(conf.Topics[0], l.enables, &conf)
 	if deciders, err := newGeneralConsumeDeciders(cli, l, generalHdOptions); err != nil {

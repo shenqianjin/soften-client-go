@@ -11,6 +11,8 @@ import (
 	"github.com/shenqianjin/soften-client-go/soften/checker"
 	"github.com/shenqianjin/soften-client-go/soften/config"
 	"github.com/shenqianjin/soften-client-go/soften/decider"
+	"github.com/shenqianjin/soften-client-go/soften/handler"
+	"github.com/shenqianjin/soften-client-go/soften/interceptor"
 	"github.com/shenqianjin/soften-client-go/soften/internal"
 	"github.com/shenqianjin/soften-client-go/soften/message"
 	"github.com/shenqianjin/soften-client-go/soften/support/util"
@@ -22,6 +24,8 @@ type deadDecideOptions struct {
 	subscription string
 	level        internal.TopicLevel
 	logLevel     logrus.Level
+
+	leveledInterceptorsMap map[internal.TopicLevel]interceptor.ConsumeInterceptors
 }
 
 // deadDecider route messages to ${TOPIC}-${subscription}-DLQ 主题, 固定后缀，不允许定制
@@ -116,6 +120,10 @@ func (d *deadDecider) Decide(ctx context.Context, msg consumerMessage, cheStatus
 	d.router.Chan() <- &RouteMessage{
 		producerMsg: &producerMsg,
 		callback:    callback,
+	}
+	// execute on decide interceptors
+	if len(d.options.leveledInterceptorsMap[msg.Level()]) > 0 {
+		d.options.leveledInterceptorsMap[msg.Level()].OnDecide(ctx, msg, handler.StatusDead)
 	}
 	return true
 }

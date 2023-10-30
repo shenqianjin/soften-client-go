@@ -159,7 +159,8 @@ func newGeneralConsumeDeciders(cli *client, l *consumeListener, options generalC
 	}
 	if options.DeadEnable {
 		// dead 队列默认统一到L1级别
-		deadOptions := deadDecideOptions{groundTopic: l.groundTopic, level: message.L1, subscription: l.subscription}
+		deadOptions := deadDecideOptions{groundTopic: l.groundTopic, level: message.L1, subscription: l.subscription,
+			leveledInterceptorsMap: l.leveledInterceptorsMap}
 		d, err1 := newDeadDecider(cli, options.Dead, deadOptions, l.metricsProvider)
 		if err1 != nil {
 			return nil, err1

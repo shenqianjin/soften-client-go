@@ -6,6 +6,7 @@ import (
 
 	"github.com/apache/pulsar-client-go/pulsar"
 	"github.com/apache/pulsar-client-go/pulsar/log"
+	"github.com/shenqianjin/soften-client-go/soften/interceptor"
 	"github.com/shenqianjin/soften-client-go/soften/internal"
 	"github.com/shenqianjin/soften-client-go/soften/internal/backoff"
 	"github.com/shenqianjin/soften-client-go/soften/message"
@@ -362,6 +363,10 @@ func (v *validator) validateAndDefaultPolicyProps4MainLevel(policy *LevelPolicy,
 	} else if err := v.validateAndDefaultLimitPolicy(policy.ConsumeLimit, newDefaultLimitPolicy()); err != nil {
 		return err
 	}
+	// default consume interceptors
+	if policy.ConsumeInterceptors == nil {
+		policy.ConsumeInterceptors = make(interceptor.ConsumeInterceptors, 0)
+	}
 	return nil
 }
 
@@ -507,6 +512,10 @@ func (v *validator) validateAndDefaultPolicyProps4ExtraLevel(policy *LevelPolicy
 		policy.ConsumeLimit = mainPolicy.ConsumeLimit
 	} else if err := v.validateAndDefaultLimitPolicy(policy.ConsumeLimit, mainPolicy.ConsumeLimit); err != nil {
 		return err
+	}
+	// default interceptors
+	if policy.ConsumeInterceptors == nil {
+		policy.ConsumeInterceptors = mainPolicy.ConsumeInterceptors
 	}
 	return nil
 }
