@@ -3,7 +3,7 @@ package interceptor
 import (
 	"context"
 
-	"github.com/shenqianjin/soften-client-go/soften/handler"
+	"github.com/shenqianjin/soften-client-go/soften/decider"
 	"github.com/shenqianjin/soften-client-go/soften/message"
 )
 
@@ -11,13 +11,13 @@ import (
 type ConsumeInterceptor interface {
 
 	// OnDecide This is called when consumer sends the acknowledgment to the broker.
-	OnDecide(ctx context.Context, message message.Message, handleStatus handler.HandleStatus)
+	OnDecide(ctx context.Context, message message.Message, decision decider.Decision)
 }
 
 type ConsumeInterceptors []ConsumeInterceptor
 
-func (x ConsumeInterceptors) OnDecide(ctx context.Context, message message.Message, handleStatus handler.HandleStatus) {
+func (x ConsumeInterceptors) OnDecide(ctx context.Context, message message.Message, decision decider.Decision) {
 	for i := range x {
-		x[i].OnDecide(ctx, message, handleStatus)
+		x[i].OnDecide(ctx, message, decision)
 	}
 }

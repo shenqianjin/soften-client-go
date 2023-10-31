@@ -22,6 +22,7 @@ type PrevSendCheckFunc func(ctx context.Context, msg *message.ProducerMessage) C
 type CheckStatus interface {
 	IsPassed() bool
 	GetHandledDefer() func()
+	GetErr() error
 
 	// GetGotoExtra extra data for specified goto status, includes Transfer, transfer currently.
 	GetGotoExtra() decider.GotoExtra

@@ -270,16 +270,12 @@ func testListenHandleLnGoto(t *testing.T, testCase testListenHandleLnCase) {
 	ctx, cancel := context.WithCancel(context.Background())
 	err = listener.StartPremium(ctx, func(ctx context.Context, msg message.Message) handler.HandleStatus {
 		fmt.Printf("consumed message size: %v, headers: %v\n", len(msg.Payload()), msg.Properties())
-		if handleGoto, err := decider.GotoOf(testCase.handleGoto); err == nil {
-			if handleGoto == decider.GotoTransfer {
-				return handler.StatusTransfer.WithTopic(testCase.transferToTopic)
-			}
-			if status, err := handler.StatusOf(testCase.handleGoto); err == nil {
-				return status
-			}
+		handleStatus, err1 := handler.StatusOf(testCase.handleGoto)
+		assert.Nil(t, err1)
+		if handleStatus.GetGoto() == handler.StatusTransfer.GetGoto() {
+			return handler.StatusTransfer.WithTopic(testCase.transferToTopic)
 		}
-		return handler.StatusAuto
-
+		return handleStatus
 	})
 	if err != nil {
 		log.Fatal(err)

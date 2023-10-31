@@ -12,7 +12,6 @@ import (
 	"github.com/shenqianjin/soften-client-go/perf/internal/support/stats"
 	"github.com/shenqianjin/soften-client-go/perf/internal/support/util"
 	"github.com/shenqianjin/soften-client-go/soften/checker"
-	"github.com/shenqianjin/soften-client-go/soften/decider"
 	"github.com/shenqianjin/soften-client-go/soften/handler"
 	"github.com/shenqianjin/soften-client-go/soften/message"
 	"golang.org/x/exp/slices"
@@ -96,35 +95,35 @@ func newConsumer(rtArgs *internal.RootArgs, cmdArgs *ConsumeArgs) *consumeServic
 
 func (svc *consumeService) collectEnables() enables {
 	e := enables{ReadyEnable: true}
-	if svc.gotoWeights[decider.GotoDiscard.String()] > 0 {
+	if svc.gotoWeights[handler.StatusDiscard.GetGoto().String()] > 0 {
 		e.DiscardEnable = true
 	}
-	if svc.gotoWeights[decider.GotoDead.String()] > 0 {
+	if svc.gotoWeights[handler.StatusDead.GetGoto().String()] > 0 {
 		e.DeadEnable = true
 	}
-	if svc.gotoWeights[decider.GotoPending.String()] > 0 ||
+	if svc.gotoWeights[handler.StatusPending.GetGoto().String()] > 0 ||
 		slices.IndexFunc(svc.rateLimits, func(e uint64) bool { return e > 0 }) >= 0 ||
 		slices.IndexFunc(svc.concurrencyLimits, func(e uint64) bool { return e > 0 }) >= 0 {
 		e.PendingEnable = true
 	}
 
-	if svc.gotoWeights[decider.GotoBlocking.String()] > 0 ||
+	if svc.gotoWeights[handler.StatusBlocking.GetGoto().String()] > 0 ||
 		slices.IndexFunc(svc.quotaLimits, func(e uint64) bool { return e > 0 }) >= 0 {
 		e.BlockingEnable = true
 	}
-	if svc.gotoWeights[decider.GotoRetrying.String()] > 0 {
+	if svc.gotoWeights[handler.StatusRetrying.GetGoto().String()] > 0 {
 		e.RetryingEnable = true
 	}
-	if svc.gotoWeights[decider.GotoUpgrade.String()] > 0 {
+	if svc.gotoWeights[handler.StatusUpgrade.GetGoto().String()] > 0 {
 		e.UpgradeEnable = true
 	}
-	if svc.gotoWeights[decider.GotoDegrade.String()] > 0 {
+	if svc.gotoWeights[handler.StatusDegrade.GetGoto().String()] > 0 {
 		e.DegradeEnable = true
 	}
-	if svc.gotoWeights[decider.GotoShift.String()] > 0 {
+	if svc.gotoWeights[handler.StatusShift.GetGoto().String()] > 0 {
 		e.ShiftEnable = true
 	}
-	if svc.gotoWeights[decider.GotoTransfer.String()] > 0 {
+	if svc.gotoWeights[handler.StatusTransfer.GetGoto().String()] > 0 {
 		e.TransferEnable = true
 	}
 	return e
@@ -195,15 +194,15 @@ func (svc *consumeService) internalHandle(ctx context.Context, msg message.Messa
 	var result handler.HandleStatus
 	n := svc.handleGotoChoice.Next()
 	switch n {
-	case string(decider.GotoRetrying):
+	case handler.StatusRetrying.GetGoto().String():
 		result = handler.StatusRetrying
-	case string(decider.GotoPending):
+	case handler.StatusPending.GetGoto().String():
 		result = handler.StatusPending
-	case string(decider.GotoBlocking):
+	case handler.StatusBlocking.GetGoto().String():
 		result = handler.StatusBlocking
-	case string(decider.GotoDead):
+	case handler.StatusDead.GetGoto().String():
 		result = handler.StatusDead
-	case string(decider.GotoDiscard):
+	case handler.StatusDiscard.GetGoto().String():
 		result = handler.StatusDiscard
 	default:
 		result = handler.StatusDone

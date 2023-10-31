@@ -212,22 +212,21 @@ func testListenDecide(t *testing.T, testCase testListenDecideCase) {
 	ctx, cancel := context.WithCancel(context.Background())
 	err = listener.StartPremium(ctx, func(ctx context.Context, msg message.Message) handler.HandleStatus {
 		fmt.Printf("consumed message size: %v, headers: %v\n", len(msg.Payload()), msg.Properties())
-		if handleGoto, err1 := decider.GotoOf(testCase.handleGoto); err1 == nil {
-			if handleGoto == decider.GotoTransfer {
-				return handler.StatusTransfer.WithTopic(testCase.transferToTopic).WithConsumeTime(testCase.consumeTime)
-			} else if handleGoto == decider.GotoUpgrade {
-				return handler.StatusUpgrade.WithConsumeTime(testCase.consumeTime)
-			} else if handleGoto == decider.GotoDegrade {
-				return handler.StatusDegrade.WithConsumeTime(testCase.consumeTime)
-			} else if handleGoto == decider.GotoRetrying {
-				return handler.StatusRetrying.WithConsumeTime(testCase.consumeTime)
-			} else if handleGoto == decider.GotoPending {
-				return handler.StatusPending.WithConsumeTime(testCase.consumeTime)
-			} else if handleGoto == decider.GotoBlocking {
-				return handler.StatusBlocking.WithConsumeTime(testCase.consumeTime)
-			}
+		handleStatus, err1 := handler.StatusOf(testCase.handleGoto)
+		assert.Nil(t, err1)
+		if handleStatus.GetGoto() == handler.StatusTransfer.GetGoto() {
+			return handler.StatusTransfer.WithTopic(testCase.transferToTopic).WithConsumeTime(testCase.consumeTime)
+		} else if handleStatus.GetGoto() == handler.StatusUpgrade.GetGoto() {
+			return handler.StatusUpgrade.WithConsumeTime(testCase.consumeTime)
+		} else if handleStatus.GetGoto() == handler.StatusDegrade.GetGoto() {
+			return handler.StatusDegrade.WithConsumeTime(testCase.consumeTime)
+		} else if handleStatus.GetGoto() == handler.StatusRetrying.GetGoto() {
+			return handler.StatusRetrying.WithConsumeTime(testCase.consumeTime)
+		} else if handleStatus.GetGoto() == handler.StatusPending.GetGoto() {
+			return handler.StatusPending.WithConsumeTime(testCase.consumeTime)
+		} else /*if handleStatus.GetGoto() == handler.StatusBlocking.GetGoto()*/ {
+			return handler.StatusBlocking.WithConsumeTime(testCase.consumeTime)
 		}
-		return handler.StatusAuto
 	})
 	if err != nil {
 		log.Fatal(err)

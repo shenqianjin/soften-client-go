@@ -8,6 +8,7 @@ type checkStatus struct {
 	passed       bool
 	handledDefer func()
 	gotoExtra    decider.GotoExtra
+	err          error
 }
 
 func (s *checkStatus) WithPassed(passed bool) *checkStatus {
@@ -15,6 +16,7 @@ func (s *checkStatus) WithPassed(passed bool) *checkStatus {
 		passed:       passed,
 		handledDefer: s.handledDefer,
 		gotoExtra:    s.gotoExtra,
+		err:          s.err,
 	}
 	return r
 }
@@ -24,6 +26,7 @@ func (s *checkStatus) WithHandledDefer(handledDefer func()) *checkStatus {
 		passed:       s.passed,
 		handledDefer: handledDefer,
 		gotoExtra:    s.gotoExtra,
+		err:          s.err,
 	}
 	return r
 }
@@ -33,6 +36,17 @@ func (s *checkStatus) WithGotoExtra(gotoExtra decider.GotoExtra) *checkStatus {
 		passed:       s.passed,
 		handledDefer: s.handledDefer,
 		gotoExtra:    gotoExtra,
+		err:          s.err,
+	}
+	return r
+}
+
+func (s *checkStatus) WithErr(err error) *checkStatus {
+	r := &checkStatus{
+		passed:       s.passed,
+		handledDefer: s.handledDefer,
+		gotoExtra:    s.gotoExtra,
+		err:          err,
 	}
 	return r
 }
@@ -47,6 +61,10 @@ func (s *checkStatus) GetHandledDefer() func() {
 
 func (s *checkStatus) GetGotoExtra() decider.GotoExtra {
 	return s.gotoExtra
+}
+
+func (s *checkStatus) GetErr() error {
+	return s.err
 }
 
 // ------ check status enums ------

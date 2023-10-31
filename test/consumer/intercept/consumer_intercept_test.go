@@ -157,22 +157,13 @@ func testListenIntercept(t *testing.T, testCase testListenInterceptCase) {
 	ctx, cancel := context.WithCancel(context.Background())
 	err = listener.StartPremium(ctx, func(ctx context.Context, msg message.Message) handler.HandleStatus {
 		fmt.Printf("consumed message size: %v, headers: %v\n", len(msg.Payload()), msg.Properties())
-		if handleGoto, err1 := decider.GotoOf(testCase.handleGoto); err1 == nil {
-			if handleGoto == decider.GotoTransfer {
-				return handler.StatusTransfer.WithTopic(testCase.transferToTopic)
-			} else if handleGoto == decider.GotoUpgrade {
-				return handler.StatusUpgrade
-			} else if handleGoto == decider.GotoDegrade {
-				return handler.StatusDegrade
-			} else if handleGoto == decider.GotoRetrying {
-				return handler.StatusRetrying
-			} else if handleGoto == decider.GotoPending {
-				return handler.StatusPending
-			} else if handleGoto == decider.GotoBlocking {
-				return handler.StatusBlocking
-			}
+		handleStatus, err1 := handler.StatusOf(testCase.handleGoto)
+		assert.Nil(t, err1)
+		if handleStatus.GetGoto() == handler.StatusTransfer.GetGoto() {
+			return handler.StatusTransfer.WithTopic(testCase.transferToTopic)
+		} else {
+			return handleStatus
 		}
-		return handler.StatusAuto
 	})
 	if err != nil {
 		log.Fatal(err)
