@@ -11,7 +11,6 @@ import (
 	"github.com/apache/pulsar-client-go/pulsar"
 	"github.com/shenqianjin/soften-client-go/soften/admin"
 	"github.com/shenqianjin/soften-client-go/soften/config"
-	"github.com/shenqianjin/soften-client-go/soften/decider"
 	"github.com/shenqianjin/soften-client-go/soften/handler"
 	"github.com/shenqianjin/soften-client-go/soften/message"
 	"github.com/shenqianjin/soften-client-go/soften/support/util"
@@ -41,7 +40,7 @@ func TestListenHandleLn_Done(t *testing.T) {
 	HandleCase := testListenHandleLnCase{
 		groundTopic: groundTopic,
 		level:       level.String(),
-		handleGoto:  decider.GotoDone.String(),
+		handleGoto:  handler.StatusDone.GetGoto().String(),
 	}
 	testListenHandleLnGoto(t, HandleCase)
 }
@@ -52,7 +51,7 @@ func TestListenHandleLn_Discard(t *testing.T) {
 	HandleCase := testListenHandleLnCase{
 		groundTopic: groundTopic,
 		level:       level.String(),
-		handleGoto:  decider.GotoDiscard.String(),
+		handleGoto:  handler.StatusDiscard.GetGoto().String(),
 	}
 	testListenHandleLnGoto(t, HandleCase)
 }
@@ -65,7 +64,7 @@ func TestListenHandleLn_Dead(t *testing.T) {
 		groundTopic:     topic,
 		level:           level.String(),
 		consumeToStatus: status.String(),
-		handleGoto:      decider.GotoDead.String(),
+		handleGoto:      handler.StatusDead.GetGoto().String(),
 	}
 	testListenHandleLnGoto(t, HandleCase)
 }
@@ -78,7 +77,7 @@ func TestListenHandleLn_Pending(t *testing.T) {
 		groundTopic:                 groundTopic,
 		level:                       level.String(),
 		consumeToStatus:             status.String(),
-		handleGoto:                  decider.GotoPending.String(),
+		handleGoto:                  handler.StatusPending.GetGoto().String(),
 		expectedTransferredOutCount: 1, // transfer the msg to pending queue, and then reconsume it
 	}
 	testListenHandleLnGoto(t, HandleCase)
@@ -92,7 +91,7 @@ func TestListenHandleLn_Blocking(t *testing.T) {
 		groundTopic:                 groundTopic,
 		level:                       level.String(),
 		consumeToStatus:             status.String(),
-		handleGoto:                  decider.GotoBlocking.String(),
+		handleGoto:                  handler.StatusBlocking.GetGoto().String(),
 		expectedTransferredOutCount: 1,
 	}
 	testListenHandleLnGoto(t, HandleCase)
@@ -106,7 +105,7 @@ func TestListenHandleLn_Retrying(t *testing.T) {
 		groundTopic:                 groundTopic,
 		level:                       level.String(),
 		consumeToStatus:             status.String(),
-		handleGoto:                  decider.GotoRetrying.String(),
+		handleGoto:                  handler.StatusRetrying.GetGoto().String(),
 		expectedTransferredOutCount: 1,
 	}
 	testListenHandleLnGoto(t, HandleCase)
@@ -122,7 +121,7 @@ func TestListenHandleLn_Upgrade(t *testing.T) {
 		consumeToLevel: upgradeLevel.String(),
 		upgradeLevel:   upgradeLevel.String(),
 		shiftLevel:     upgradeLevel.String(),
-		handleGoto:     decider.GotoUpgrade.String(),
+		handleGoto:     handler.StatusUpgrade.GetGoto().String(),
 	}
 	testListenHandleLnGoto(t, HandleCase)
 }
@@ -137,7 +136,7 @@ func TestListenHandleLn_Degrade(t *testing.T) {
 		consumeToLevel: degradeLevel.String(),
 		degradeLevel:   degradeLevel.String(),
 		shiftLevel:     degradeLevel.String(),
-		handleGoto:     decider.GotoDegrade.String(),
+		handleGoto:     handler.StatusDegrade.GetGoto().String(),
 	}
 	testListenHandleLnGoto(t, HandleCase)
 }
@@ -151,7 +150,7 @@ func TestListenHandleLn_Shift(t *testing.T) {
 		level:          level.String(),
 		consumeToLevel: shiftLevel.String(),
 		shiftLevel:     shiftLevel.String(),
-		handleGoto:     decider.GotoShift.String(),
+		handleGoto:     handler.StatusShift.GetGoto().String(),
 	}
 	testListenHandleLnGoto(t, HandleCase)
 }
@@ -164,7 +163,7 @@ func TestListenHandleLn_Transfer(t *testing.T) {
 		groundTopic:     groundTopic,
 		level:           level.String(),
 		transferToTopic: transferToTopic,
-		handleGoto:      decider.GotoTransfer.String(),
+		handleGoto:      handler.StatusTransfer.GetGoto().String(),
 	}
 	testListenHandleLnGoto(t, HandleCase)
 }
@@ -184,9 +183,9 @@ func testListenHandleLnGoto(t *testing.T, testCase testListenHandleLnCase) {
 	pTopics, err := util.FormatTopics(testCase.groundTopic, internal.FormatLevels(testCase.level), message.Statuses{message.StatusReady}, "")
 	assert.Nil(t, err)
 	cTopics := make([]string, 0)
-	if testCase.handleGoto == decider.GotoTransfer.String() {
+	if testCase.handleGoto == handler.StatusTransfer.GetGoto().String() {
 		cTopics = append(cTopics, testCase.transferToTopic)
-	} else if testCase.handleGoto == decider.GotoDiscard.String() {
+	} else if testCase.handleGoto == handler.StatusDiscard.GetGoto().String() {
 		// do nothing
 	} else if testCase.consumeToLevel != "" {
 		fTopics, err := util.FormatTopics(testCase.groundTopic, internal.FormatLevels(testCase.consumeToLevel), message.Statuses{message.StatusReady}, "")
@@ -237,22 +236,22 @@ func testListenHandleLnGoto(t *testing.T, testCase testListenHandleLnCase) {
 	// create listener
 	shiftLevel, _ := message.LevelOf(testCase.shiftLevel)
 	leveledPolicy := &config.LevelPolicy{
-		DiscardEnable:  config.ToPointer(testCase.handleGoto == decider.GotoDiscard.String()),
-		DeadEnable:     config.ToPointer(testCase.handleGoto == decider.GotoDead.String()),
-		PendingEnable:  config.ToPointer(testCase.handleGoto == decider.GotoPending.String()),
+		DiscardEnable:  config.ToPointer(testCase.handleGoto == handler.StatusDiscard.GetGoto().String()),
+		DeadEnable:     config.ToPointer(testCase.handleGoto == handler.StatusDead.GetGoto().String()),
+		PendingEnable:  config.ToPointer(testCase.handleGoto == handler.StatusPending.GetGoto().String()),
 		Pending:        testPolicy,
-		BlockingEnable: config.ToPointer(testCase.handleGoto == decider.GotoBlocking.String()),
+		BlockingEnable: config.ToPointer(testCase.handleGoto == handler.StatusBlocking.GetGoto().String()),
 		Blocking:       testPolicy,
-		RetryingEnable: config.ToPointer(testCase.handleGoto == decider.GotoRetrying.String()),
+		RetryingEnable: config.ToPointer(testCase.handleGoto == handler.StatusRetrying.GetGoto().String()),
 		Retrying:       testPolicy,
-		UpgradeEnable:  config.ToPointer(testCase.handleGoto == decider.GotoUpgrade.String()),
+		UpgradeEnable:  config.ToPointer(testCase.handleGoto == handler.StatusUpgrade.GetGoto().String()),
 		Upgrade:        &config.ShiftPolicy{Level: shiftLevel, ConnectInSyncEnable: true},
-		DegradeEnable:  config.ToPointer(testCase.handleGoto == decider.GotoDegrade.String()),
+		DegradeEnable:  config.ToPointer(testCase.handleGoto == handler.StatusDegrade.GetGoto().String()),
 		Degrade:        &config.ShiftPolicy{Level: shiftLevel, ConnectInSyncEnable: true},
-		ShiftEnable:    config.ToPointer(testCase.handleGoto == decider.GotoShift.String()),
+		ShiftEnable:    config.ToPointer(testCase.handleGoto == handler.StatusShift.GetGoto().String()),
 		Shift:          &config.ShiftPolicy{Level: shiftLevel, ConnectInSyncEnable: true},
-		TransferEnable: config.ToPointer(testCase.handleGoto == decider.GotoTransfer.String()),
-		Transfer:       &config.TransferPolicy{ConnectInSyncEnable: testCase.handleGoto == decider.GotoTransfer.String()},
+		TransferEnable: config.ToPointer(testCase.handleGoto == handler.StatusTransfer.GetGoto().String()),
+		Transfer:       &config.TransferPolicy{ConnectInSyncEnable: testCase.handleGoto == handler.StatusTransfer.GetGoto().String()},
 	}
 	listener, err := client.CreateListener(config.ConsumerConfig{
 		Topic: groundTopic,
@@ -295,9 +294,9 @@ func testListenHandleLnGoto(t *testing.T, testCase testListenHandleLnCase) {
 		assert.Nil(t, err)
 		assert.Equal(t, 1, stats.MsgInCounter)
 		assert.Equal(t, testCase.expectedTransferredOutCount, stats.MsgOutCounter)
-		if testCase.handleGoto == decider.GotoPending.String() ||
-			testCase.handleGoto == decider.GotoBlocking.String() ||
-			testCase.handleGoto == decider.GotoRetrying.String() {
+		if testCase.handleGoto == handler.StatusPending.GetGoto().String() ||
+			testCase.handleGoto == handler.StatusBlocking.GetGoto().String() ||
+			testCase.handleGoto == handler.StatusRetrying.GetGoto().String() {
 			for _, v := range stats.Subscriptions {
 				assert.Equal(t, 1, v.MsgBacklog)
 				break

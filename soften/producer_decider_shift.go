@@ -12,7 +12,6 @@ import (
 	"github.com/apache/pulsar-client-go/pulsar/log"
 	"github.com/shenqianjin/soften-client-go/soften/checker"
 	"github.com/shenqianjin/soften-client-go/soften/config"
-	"github.com/shenqianjin/soften-client-go/soften/decider"
 	"github.com/shenqianjin/soften-client-go/soften/internal"
 	"github.com/shenqianjin/soften-client-go/soften/message"
 	"github.com/shenqianjin/soften-client-go/soften/support/util"
@@ -58,19 +57,19 @@ func newProducerShiftDecider(producer *producer, options *producerShiftDeciderOp
 		}
 	}
 	switch options.msgGoto {
-	case decider.GotoUpgrade:
+	case internal.GotoUpgrade:
 		if options.shift.Level != "" && options.shift.Level.OrderOf() <= options.level.OrderOf() {
 			return nil, errors.New("the specified level is too lower for upgrade decider")
 		}
-	case decider.GotoDegrade:
+	case internal.GotoDegrade:
 		if options.shift.Level != "" && options.shift.Level.OrderOf() >= options.level.OrderOf() {
 			return nil, errors.New("the specified level is too higher for degrade decider")
 		}
-	case decider.GotoDead:
+	case internal.GotoDead:
 		if options.shift.Level != "" && !strings.HasPrefix(options.shift.Level.String(), "D") {
 			return nil, errors.New(fmt.Sprintf("the specified level is invalid for dead decider: %v", options.shift.Level))
 		}
-	case decider.GotoShift:
+	case internal.GotoShift:
 	default:
 		return nil, errors.New(fmt.Sprintf("invalid goto for shift decider: %v", options.msgGoto))
 	}
@@ -222,17 +221,17 @@ func (d *producerShiftDecider) internalFormatDestTopic(cs checker.CheckStatus, m
 			"because there is no level is specified. msg: %v", d.options.msgGoto, string(msg.Payload)))
 	}
 	switch d.options.msgGoto {
-	case decider.GotoUpgrade:
+	case internal.GotoUpgrade:
 		if destLevel.OrderOf() <= d.options.level.OrderOf() {
 			return "", errors.New(fmt.Sprintf("failed to upgrade message "+
 				"because the specified level is too lower. msg: %v", string(msg.Payload)))
 		}
-	case decider.GotoDegrade:
+	case internal.GotoDegrade:
 		if destLevel.OrderOf() >= d.options.level.OrderOf() {
 			return "", errors.New(fmt.Sprintf("failed to degrade message "+
 				"because the specified level is too higher. msg: %v", string(msg.Payload)))
 		}
-	case decider.GotoDead:
+	case internal.GotoDead:
 		if !strings.HasPrefix(destLevel.String(), "D") {
 			return "", errors.New(fmt.Sprintf("failed to shift message "+
 				"because the specified level is invalid for dead decider. msg: %v", string(msg.Payload)))

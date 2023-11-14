@@ -3,7 +3,7 @@ package choice
 import (
 	"math/rand"
 
-	"github.com/shenqianjin/soften-client-go/soften/decider"
+	"github.com/shenqianjin/soften-client-go/soften/handler"
 )
 
 type GotoPolicy interface {
@@ -17,7 +17,7 @@ type roundRandWeightGotoPolicy struct {
 	indexesMap map[int]interface{} // index到owner的下标映射
 }
 
-func NewRoundRandWeightGotoPolicy(weightMap map[string]uint64) *roundRandWeightGotoPolicy {
+func NewRoundRandWeightGotoPolicy(weightMap map[string]uint64) GotoPolicy {
 	total := uint(0)
 	count := 0
 	indexesMap := make(map[int]interface{})
@@ -55,5 +55,5 @@ func (p *roundRandWeightGotoPolicy) Next() interface{} {
 	if len(p.indexesMap) > 1 {
 		return <-p.choiceCh
 	}
-	return decider.GotoDone
+	return handler.StatusDone.GetGoto()
 }

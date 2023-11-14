@@ -34,10 +34,10 @@ func newFinalStatusDecider(parentLog log.Logger, options finalStatusDeciderOptio
 	if options.msgGoto == "" {
 		return nil, errors.New("final message status cannot be empty")
 	}
-	if options.msgGoto != decider.GotoDone && options.msgGoto != decider.GotoDiscard {
+	if options.msgGoto != internal.GotoDone && options.msgGoto != internal.GotoDiscard {
 		return nil, errors.New(fmt.Sprintf("%s is not a final message goto action", options.msgGoto))
 	}
-	if options.msgGoto == decider.GotoDiscard {
+	if options.msgGoto == internal.GotoDiscard {
 		if options.discard == nil {
 			return nil, errors.New("missing discard policy for final decider")
 		}
@@ -48,7 +48,7 @@ func newFinalStatusDecider(parentLog log.Logger, options finalStatusDeciderOptio
 				options.logLevel = logLvl
 			}
 		}
-	} else if options.msgGoto == decider.GotoDone {
+	} else if options.msgGoto == internal.GotoDone {
 		if options.done == nil {
 			return nil, errors.New("missing done policy for final decider")
 		}
@@ -74,14 +74,14 @@ func (d *finalStatusDecider) Decide(ctx context.Context, msg consumerMessage, de
 	// parse log entry
 	logEntry := util.ParseLogEntry(ctx, d.logger)
 	switch d.options.msgGoto {
-	case decider.GotoDone:
+	case internal.GotoDone:
 		msg.Ack()
 		msg.internalExtra.consumerMetrics.ConsumeMessageAcks.Inc()
 		if d.options.logLevel >= logrus.InfoLevel {
 			logEntry.Infof("Success to decide message as done: %v from topic: %v", msg.Message.ID(), msg.Topic())
 		}
 		success = true
-	case decider.GotoDiscard:
+	case internal.GotoDiscard:
 		msg.Ack()
 		msg.internalExtra.consumerMetrics.ConsumeMessageAcks.Inc()
 		if d.options.logLevel >= logrus.InfoLevel {

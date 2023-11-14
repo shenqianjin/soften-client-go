@@ -11,7 +11,6 @@ import (
 	"github.com/apache/pulsar-client-go/pulsar"
 	"github.com/shenqianjin/soften-client-go/soften/admin"
 	"github.com/shenqianjin/soften-client-go/soften/config"
-	"github.com/shenqianjin/soften-client-go/soften/decider"
 	"github.com/shenqianjin/soften-client-go/soften/handler"
 	"github.com/shenqianjin/soften-client-go/soften/message"
 	"github.com/shenqianjin/soften-client-go/soften/support/util"
@@ -132,7 +131,7 @@ func TestConsumeLimitL2_Pending(t *testing.T) {
 		level:                        level.String(),
 		consumeToDeadFinal:           true,
 		consumeToStatus:              message.StatusPending.String(),
-		consumeHandleGoto:            decider.GotoPending.String(),
+		consumeHandleGoto:            handler.StatusPending.GetGoto().String(),
 		consumeStatusPolicy:          testPolicy,
 		expectedStatusReentrantTimes: expectedStatusReentrantTimes,
 		expectedDeadMsgCount:         1,
@@ -167,7 +166,7 @@ func TestConsumeLimitL2_Blocking(t *testing.T) {
 		level:                        level.String(),
 		consumeToDeadFinal:           true,
 		consumeToStatus:              message.StatusBlocking.String(),
-		consumeHandleGoto:            decider.GotoBlocking.String(),
+		consumeHandleGoto:            handler.StatusBlocking.GetGoto().String(),
 		consumeStatusPolicy:          testPolicy,
 		expectedStatusReentrantTimes: expectedStatusReentrantTimes,
 		expectedDeadMsgCount:         1,
@@ -238,13 +237,13 @@ func testConsumeLimitGoto(t *testing.T, handleCase testConsumeLimitCase) {
 
 	// create listener
 	leveledPolicy := &config.LevelPolicy{
-		DiscardEnable:  config.ToPointer(handleCase.consumeHandleGoto == decider.GotoDiscard.String()),
+		DiscardEnable:  config.ToPointer(handleCase.consumeHandleGoto == handler.StatusDiscard.GetGoto().String()),
 		DeadEnable:     config.ToPointer(handleCase.consumeToDeadFinal),
-		PendingEnable:  config.ToPointer(handleCase.consumeHandleGoto == decider.GotoPending.String()),
+		PendingEnable:  config.ToPointer(handleCase.consumeHandleGoto == handler.StatusPending.GetGoto().String()),
 		Pending:        handleCase.consumeStatusPolicy,
-		BlockingEnable: config.ToPointer(handleCase.consumeHandleGoto == decider.GotoBlocking.String()),
+		BlockingEnable: config.ToPointer(handleCase.consumeHandleGoto == handler.StatusBlocking.GetGoto().String()),
 		Blocking:       handleCase.consumeStatusPolicy,
-		RetryingEnable: config.ToPointer(handleCase.consumeHandleGoto == decider.GotoRetrying.String()),
+		RetryingEnable: config.ToPointer(handleCase.consumeHandleGoto == handler.StatusRetrying.GetGoto().String()),
 		Retrying:       handleCase.consumeStatusPolicy,
 	}
 	listener, err := client.CreateListener(config.ConsumerConfig{
@@ -282,9 +281,9 @@ func testConsumeLimitGoto(t *testing.T, handleCase testConsumeLimitCase) {
 		assert.Nil(t, err)
 		assert.Equal(t, handleCase.expectedStatusReentrantTimes, stats.MsgInCounter)
 		assert.Equal(t, stats.MsgInCounter, stats.MsgOutCounter)
-		if handleCase.consumeHandleGoto == decider.GotoPending.String() ||
-			handleCase.consumeHandleGoto == decider.GotoBlocking.String() ||
-			handleCase.consumeHandleGoto == decider.GotoRetrying.String() {
+		if handleCase.consumeHandleGoto == handler.StatusPending.GetGoto().String() ||
+			handleCase.consumeHandleGoto == handler.StatusBlocking.GetGoto().String() ||
+			handleCase.consumeHandleGoto == handler.StatusRetrying.GetGoto().String() {
 			for _, v := range stats.Subscriptions {
 				assert.Equal(t, 0, v.MsgBacklog)
 				break

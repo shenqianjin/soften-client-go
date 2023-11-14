@@ -7,7 +7,6 @@ import (
 
 	"github.com/apache/pulsar-client-go/pulsar"
 	"github.com/shenqianjin/soften-client-go/soften/checker"
-	"github.com/shenqianjin/soften-client-go/soften/decider"
 	"github.com/shenqianjin/soften-client-go/soften/internal"
 	"github.com/shenqianjin/soften-client-go/soften/internal/strategy"
 	"github.com/shenqianjin/soften-client-go/soften/message"
@@ -127,32 +126,32 @@ func (mcs *messageChSelectorImpl) receiveOneByWeight(chs []<-chan consumerMessag
 // ------ helper ------
 
 var checkTypeGotoMap = map[checker.CheckType]internal.DecideGoto{
-	checker.CheckTypePrevDiscard:  decider.GotoDiscard,
-	checker.CheckTypePrevDead:     decider.GotoDead,
-	checker.CheckTypePrevUpgrade:  decider.GotoUpgrade,
-	checker.CheckTypePrevDegrade:  decider.GotoDegrade,
-	checker.CheckTypePrevShift:    decider.GotoShift,
-	checker.CheckTypePrevBlocking: decider.GotoBlocking,
-	checker.CheckTypePrevPending:  decider.GotoPending,
-	checker.CheckTypePrevRetrying: decider.GotoRetrying,
-	checker.CheckTypePrevTransfer: decider.GotoTransfer,
+	checker.CheckTypePrevDiscard:  internal.GotoDiscard,
+	checker.CheckTypePrevDead:     internal.GotoDead,
+	checker.CheckTypePrevUpgrade:  internal.GotoUpgrade,
+	checker.CheckTypePrevDegrade:  internal.GotoDegrade,
+	checker.CheckTypePrevShift:    internal.GotoShift,
+	checker.CheckTypePrevBlocking: internal.GotoBlocking,
+	checker.CheckTypePrevPending:  internal.GotoPending,
+	checker.CheckTypePrevRetrying: internal.GotoRetrying,
+	checker.CheckTypePrevTransfer: internal.GotoTransfer,
 
-	checker.CheckTypePostDiscard:  decider.GotoDiscard,
-	checker.CheckTypePostDead:     decider.GotoDead,
-	checker.CheckTypePostUpgrade:  decider.GotoUpgrade,
-	checker.CheckTypePostDegrade:  decider.GotoDegrade,
-	checker.CheckTypePostShift:    decider.GotoShift,
-	checker.CheckTypePostBlocking: decider.GotoBlocking,
-	checker.CheckTypePostPending:  decider.GotoPending,
-	checker.CheckTypePostRetrying: decider.GotoRetrying,
-	checker.CheckTypePostTransfer: decider.GotoTransfer,
+	checker.CheckTypePostDiscard:  internal.GotoDiscard,
+	checker.CheckTypePostDead:     internal.GotoDead,
+	checker.CheckTypePostUpgrade:  internal.GotoUpgrade,
+	checker.CheckTypePostDegrade:  internal.GotoDegrade,
+	checker.CheckTypePostShift:    internal.GotoShift,
+	checker.CheckTypePostBlocking: internal.GotoBlocking,
+	checker.CheckTypePostPending:  internal.GotoPending,
+	checker.CheckTypePostRetrying: internal.GotoRetrying,
+	checker.CheckTypePostTransfer: internal.GotoTransfer,
 
-	checker.ProduceCheckTypeDiscard:  decider.GotoDiscard,
-	checker.ProduceCheckTypeDead:     decider.GotoDead,
-	checker.ProduceCheckTypeUpgrade:  decider.GotoUpgrade,
-	checker.ProduceCheckTypeDegrade:  decider.GotoDegrade,
-	checker.ProduceCheckTypeShift:    decider.GotoShift,
-	checker.ProduceCheckTypeTransfer: decider.GotoTransfer,
+	checker.ProduceCheckTypeDiscard:  internal.GotoDiscard,
+	checker.ProduceCheckTypeDead:     internal.GotoDead,
+	checker.ProduceCheckTypeUpgrade:  internal.GotoUpgrade,
+	checker.ProduceCheckTypeDegrade:  internal.GotoDegrade,
+	checker.ProduceCheckTypeShift:    internal.GotoShift,
+	checker.ProduceCheckTypeTransfer: internal.GotoTransfer,
 }
 
 // ------ log payload formatter ------

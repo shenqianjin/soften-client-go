@@ -11,7 +11,6 @@ import (
 	"github.com/apache/pulsar-client-go/pulsar/log"
 	"github.com/shenqianjin/soften-client-go/soften/checker"
 	"github.com/shenqianjin/soften-client-go/soften/config"
-	"github.com/shenqianjin/soften-client-go/soften/decider"
 	"github.com/shenqianjin/soften-client-go/soften/internal"
 	"github.com/shenqianjin/soften-client-go/soften/message"
 	"github.com/shenqianjin/soften-client-go/soften/support/util"
@@ -224,7 +223,7 @@ func (d *producerTransferDecider) internalSafeGetRouter(topic string) (*router, 
 	} else {
 		rtr = newRtr
 		d.routers[topic] = newRtr
-		metric := d.metricsProvider.GetProducerDeciderMetrics(d.options.groundTopic, topic, decider.GotoTransfer.String())
+		metric := d.metricsProvider.GetProducerDeciderMetrics(d.options.groundTopic, topic, internal.GotoTransfer.String())
 		metric.DecidersOpened.Inc()
 		d.routerMetrics[topic] = metric
 		return rtr, nil

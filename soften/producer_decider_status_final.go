@@ -9,7 +9,6 @@ import (
 	"github.com/apache/pulsar-client-go/pulsar/log"
 	"github.com/shenqianjin/soften-client-go/soften/checker"
 	"github.com/shenqianjin/soften-client-go/soften/config"
-	"github.com/shenqianjin/soften-client-go/soften/decider"
 	"github.com/shenqianjin/soften-client-go/soften/internal"
 	"github.com/shenqianjin/soften-client-go/soften/support/util"
 	"github.com/sirupsen/logrus"
@@ -44,12 +43,12 @@ func newProducerFinalDecider(producer *producer, options *producerFinalDeciderOp
 	}
 
 	d := &producerFinalDecider{
-		logger:          producer.logger.SubLogger(log.Fields{"goto": decider.GotoDiscard}),
+		logger:          producer.logger.SubLogger(log.Fields{"goto": internal.GotoDiscard}),
 		options:         options,
 		metricsProvider: metricsProvider,
 	}
 	topic := d.options.groundTopic + d.options.level.TopicSuffix()
-	d.metricsProvider.GetProducerDeciderMetrics(d.options.groundTopic, topic, decider.GotoDiscard.String()).DecidersOpened.Inc()
+	d.metricsProvider.GetProducerDeciderMetrics(d.options.groundTopic, topic, internal.GotoDiscard.String()).DecidersOpened.Inc()
 	return d, nil
 }
 
@@ -92,5 +91,5 @@ func (d *producerFinalDecider) DecideAsync(ctx context.Context, msg *pulsar.Prod
 
 func (d *producerFinalDecider) close() {
 	topic := d.options.groundTopic + d.options.level.TopicSuffix()
-	d.metricsProvider.GetProducerDeciderMetrics(d.options.groundTopic, topic, decider.GotoDead.String()).DecidersOpened.Desc()
+	d.metricsProvider.GetProducerDeciderMetrics(d.options.groundTopic, topic, internal.GotoDead.String()).DecidersOpened.Desc()
 }

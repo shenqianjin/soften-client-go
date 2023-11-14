@@ -62,12 +62,12 @@ func newDeadDecider(client *client, policy *config.DeadPolicy, options deadDecid
 		return nil, err
 	}
 	d := &deadDecider{router: rt, logger: client.logger, options: options, metricsProvider: metricsProvider}
-	d.metricsProvider.GetListenerDecidersMetrics(d.options.groundTopic, d.options.subscription, decider.GotoDead).DecidersOpened.Inc()
+	d.metricsProvider.GetListenerDecidersMetrics(d.options.groundTopic, d.options.subscription, internal.GotoDead).DecidersOpened.Inc()
 	return d, nil
 }
 
 func (d *deadDecider) Decide(ctx context.Context, msg consumerMessage, decision decider.Decision) bool {
-	if decision.GetGoto() != decider.GotoDead {
+	if decision.GetGoto() != internal.GotoDead {
 		return false
 	}
 	// parse log entry
@@ -130,5 +130,5 @@ func (d *deadDecider) close() {
 	if d.router != nil {
 		d.router.close()
 	}
-	d.metricsProvider.GetListenerDecidersMetrics(d.options.groundTopic, d.options.subscription, decider.GotoDead).DecidersOpened.Dec()
+	d.metricsProvider.GetListenerDecidersMetrics(d.options.groundTopic, d.options.subscription, internal.GotoDead).DecidersOpened.Dec()
 }

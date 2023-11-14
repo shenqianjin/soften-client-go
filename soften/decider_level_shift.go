@@ -46,17 +46,17 @@ func newShiftDecider(client *client, options *shiftDeciderOptions, metricsProvid
 	if options.level == "" {
 		return nil, errors.New("level is blank")
 	}
-	if options.msgGoto != decider.GotoUpgrade && options.msgGoto != decider.GotoDegrade && options.msgGoto != decider.GotoShift {
+	if options.msgGoto != internal.GotoUpgrade && options.msgGoto != internal.GotoDegrade && options.msgGoto != internal.GotoShift {
 		return nil, errors.New(fmt.Sprintf("invalid goto decision for consumer shift decider: %v", options.msgGoto))
 	}
 	if options.shift == nil {
 		return nil, errors.New(fmt.Sprintf("missing shift policy for %v decider", options.msgGoto))
 	}
-	if options.msgGoto == decider.GotoUpgrade {
+	if options.msgGoto == internal.GotoUpgrade {
 		if options.shift.Level != "" && options.shift.Level.OrderOf() <= options.level.OrderOf() {
 			return nil, errors.New("the specified level is too lower for upgrade decider")
 		}
-	} else if options.msgGoto == decider.GotoDegrade {
+	} else if options.msgGoto == internal.GotoDegrade {
 		if options.shift.Level != "" && options.shift.Level.OrderOf() >= options.level.OrderOf() {
 			return nil, errors.New("the specified level is too higher for degrade decider")
 		}
@@ -166,17 +166,17 @@ func (d *shiftDecider) internalFormatDestTopic(cs decider.Decision, msg consumer
 		return "", errors.New(fmt.Sprintf("failed to decide message as %v "+
 			"because there is no level is specified. msgId: %v", d.options.msgGoto, msg.ID()))
 	}
-	if d.options.msgGoto == decider.GotoUpgrade {
+	if d.options.msgGoto == internal.GotoUpgrade {
 		if destLevel.OrderOf() <= d.options.level.OrderOf() {
 			return "", errors.New(fmt.Sprintf("failed to upgrade message "+
 				"because the specified level is too lower. msgId: %v", msg.ID()))
 		}
-	} else if d.options.msgGoto == decider.GotoDegrade {
+	} else if d.options.msgGoto == internal.GotoDegrade {
 		if destLevel.OrderOf() >= d.options.level.OrderOf() {
 			return "", errors.New(fmt.Sprintf("failed to degrade message "+
 				"because the specified level is too higher. msgId: %v", msg.ID()))
 		}
-	} else if d.options.msgGoto == decider.GotoShift {
+	} else if d.options.msgGoto == internal.GotoShift {
 		if destLevel == d.options.level {
 			return "", errors.New(fmt.Sprintf("failed to shift message "+
 				"because the specified level is equal to the consume level. msgId: %v", msg.ID()))

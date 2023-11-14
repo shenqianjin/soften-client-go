@@ -61,12 +61,12 @@ func newTransferDecider(client *client, options *transferDeciderOptions, metrics
 		options:         options,
 		metricsProvider: metricsProvider,
 	}
-	d.metricsProvider.GetListenerDecidersMetrics(d.options.groundTopic, d.options.subscription, decider.GotoTransfer).DecidersOpened.Inc()
+	d.metricsProvider.GetListenerDecidersMetrics(d.options.groundTopic, d.options.subscription, internal.GotoTransfer).DecidersOpened.Inc()
 	return d, nil
 }
 
 func (d *transferDecider) Decide(ctx context.Context, msg consumerMessage, decision decider.Decision) bool {
-	if decision.GetGoto() != decider.GotoTransfer {
+	if decision.GetGoto() != internal.GotoTransfer {
 		return false
 	}
 	// parse log entry
@@ -175,5 +175,5 @@ func (d *transferDecider) close() {
 	for _, r := range d.routers {
 		r.close()
 	}
-	d.metricsProvider.GetListenerDecidersMetrics(d.options.groundTopic, d.options.subscription, decider.GotoTransfer).DecidersOpened.Dec()
+	d.metricsProvider.GetListenerDecidersMetrics(d.options.groundTopic, d.options.subscription, internal.GotoTransfer).DecidersOpened.Dec()
 }

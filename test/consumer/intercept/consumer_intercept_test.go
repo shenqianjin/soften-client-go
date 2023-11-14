@@ -50,12 +50,12 @@ func TestConsumeIntercept_OnDecideToDead(t *testing.T) {
 	HandleCase := testListenInterceptCase{
 		groundTopic:     topic,
 		requireLevels:   []string{message.L1.String()},
-		requireStatuses: []string{message.StatusReady.String(), handleStatus.String(), decider.GotoDead.String()},
+		requireStatuses: []string{message.StatusReady.String(), handleStatus.String(), message.StatusDead.String()},
 		produceLevel:    message.L1.String(),
 		produceStatus:   message.StatusReady.String(),
 		consumeLevels:   []string{message.L1.String()},
 		consumeStatuses: []string{message.StatusReady.String(), handleStatus.String()},
-		requireGotos:    []string{decider.GotoRetrying.String(), decider.GotoDead.String()},
+		requireGotos:    []string{message.StatusRetrying.String(), message.StatusDead.String()},
 		handleGoto:      handleStatus.String(),
 
 		consumeMaxTimes:        3,
@@ -116,7 +116,7 @@ func testListenIntercept(t *testing.T, testCase testListenInterceptCase) {
 	var interceptorCount uint32
 	consumeInterceptors := interceptor.ConsumeInterceptors{
 		interceptor.NewDecideInterceptor(func(ctx context.Context, msg message.Message, decision decider.Decision) {
-			if decision.GetGoto() == decider.GotoDead {
+			if decision.GetGoto() == handler.StatusDead.GetGoto() {
 				testCase.interceptFunc(ctx, msg)
 				atomic.AddUint32(&interceptorCount, 1)
 			}
@@ -126,19 +126,19 @@ func testListenIntercept(t *testing.T, testCase testListenInterceptCase) {
 	upgradeLevel, _ := message.LevelOf(testCase.upgradeLevel)
 	degradeLevel, _ := message.LevelOf(testCase.degradeLevel)
 	leveledPolicy := &config.LevelPolicy{
-		DiscardEnable:       config.ToPointer(slices.Contains(testCase.requireGotos, decider.GotoDiscard.String())),
-		DeadEnable:          config.ToPointer(slices.Contains(testCase.requireGotos, decider.GotoDead.String())),
-		PendingEnable:       config.ToPointer(slices.Contains(testCase.requireGotos, decider.GotoPending.String())),
+		DiscardEnable:       config.ToPointer(slices.Contains(testCase.requireGotos, handler.StatusDiscard.GetGoto().String())),
+		DeadEnable:          config.ToPointer(slices.Contains(testCase.requireGotos, handler.StatusDead.GetGoto().String())),
+		PendingEnable:       config.ToPointer(slices.Contains(testCase.requireGotos, handler.StatusPending.GetGoto().String())),
 		Pending:             testPolicy,
-		BlockingEnable:      config.ToPointer(slices.Contains(testCase.requireGotos, decider.GotoBlocking.String())),
+		BlockingEnable:      config.ToPointer(slices.Contains(testCase.requireGotos, handler.StatusBlocking.GetGoto().String())),
 		Blocking:            testPolicy,
-		RetryingEnable:      config.ToPointer(slices.Contains(testCase.requireGotos, decider.GotoRetrying.String())),
+		RetryingEnable:      config.ToPointer(slices.Contains(testCase.requireGotos, handler.StatusRetrying.GetGoto().String())),
 		Retrying:            testPolicy,
-		UpgradeEnable:       config.ToPointer(slices.Contains(testCase.requireGotos, decider.GotoUpgrade.String())),
+		UpgradeEnable:       config.ToPointer(slices.Contains(testCase.requireGotos, handler.StatusUpgrade.GetGoto().String())),
 		Upgrade:             &config.ShiftPolicy{Level: upgradeLevel, ConnectInSyncEnable: true},
-		DegradeEnable:       config.ToPointer(slices.Contains(testCase.requireGotos, decider.GotoDegrade.String())),
+		DegradeEnable:       config.ToPointer(slices.Contains(testCase.requireGotos, handler.StatusDegrade.GetGoto().String())),
 		Degrade:             &config.ShiftPolicy{Level: degradeLevel, ConnectInSyncEnable: true},
-		TransferEnable:      config.ToPointer(slices.Contains(testCase.requireGotos, decider.GotoTransfer.String())),
+		TransferEnable:      config.ToPointer(slices.Contains(testCase.requireGotos, handler.StatusTransfer.GetGoto().String())),
 		Transfer:            &config.TransferPolicy{ConnectInSyncEnable: true},
 		ConsumeInterceptors: consumeInterceptors,
 	}

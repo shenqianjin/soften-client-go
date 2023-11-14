@@ -11,7 +11,6 @@ import (
 	"github.com/panjf2000/ants/v2"
 	"github.com/shenqianjin/soften-client-go/soften/checker"
 	"github.com/shenqianjin/soften-client-go/soften/config"
-	"github.com/shenqianjin/soften-client-go/soften/decider"
 	"github.com/shenqianjin/soften-client-go/soften/handler"
 	"github.com/shenqianjin/soften-client-go/soften/interceptor"
 	"github.com/shenqianjin/soften-client-go/soften/internal"
@@ -581,41 +580,41 @@ func (l *consumeListener) internalDecide4Goto(ctx context.Context, msgGoto inter
 func (l *consumeListener) getDeciderByGotoAction(msgGoto internal.DecideGoto, msg consumerMessage) internalConsumeDecider {
 	lvl := msg.Level()
 	switch msgGoto {
-	case decider.GotoDone:
+	case internal.GotoDone:
 		return l.generalDeciders.doneDecider
-	case decider.GotoPending:
+	case internal.GotoPending:
 		if l.enables.PendingEnable {
 			return l.levelDeciders[lvl].pendingDecider
 		}
-	case decider.GotoBlocking:
+	case internal.GotoBlocking:
 		if l.enables.BlockingEnable {
 			return l.levelDeciders[lvl].blockingDecider
 		}
-	case decider.GotoRetrying:
+	case internal.GotoRetrying:
 		if l.enables.RetryingEnable {
 			return l.levelDeciders[lvl].retryingDecider
 		}
-	case decider.GotoDead:
+	case internal.GotoDead:
 		if l.enables.DeadEnable {
 			return l.generalDeciders.deadDecider
 		}
-	case decider.GotoDiscard:
+	case internal.GotoDiscard:
 		if l.enables.DiscardEnable {
 			return l.generalDeciders.discardDecider
 		}
-	case decider.GotoUpgrade:
+	case internal.GotoUpgrade:
 		if l.enables.UpgradeEnable {
 			return l.generalDeciders.upgradeDecider
 		}
-	case decider.GotoDegrade:
+	case internal.GotoDegrade:
 		if l.enables.DegradeEnable {
 			return l.generalDeciders.degradeDecider
 		}
-	case decider.GotoShift:
+	case internal.GotoShift:
 		if l.enables.ShiftEnable {
 			return l.generalDeciders.shiftDecider
 		}
-	case decider.GotoTransfer:
+	case internal.GotoTransfer:
 		if l.enables.TransferEnable {
 			return l.generalDeciders.transferDecider
 		}

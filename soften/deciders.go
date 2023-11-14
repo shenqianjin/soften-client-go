@@ -48,7 +48,7 @@ type produceDeciders map[internal.DecideGoto]internalProduceDecider
 func newProduceDeciders(p *producer, options produceDecidersOptions) (produceDeciders, error) {
 	deciders := make(produceDeciders)
 	if options.DiscardEnable {
-		msgGoto := decider.GotoDiscard
+		msgGoto := internal.GotoDiscard
 		deciderOpt := producerFinalDeciderOptions{groundTopic: options.groundTopic,
 			level: options.level, discard: options.Discard}
 		if d, err := newProducerFinalDecider(p, &deciderOpt, p.metricsProvider); err != nil {
@@ -58,7 +58,7 @@ func newProduceDeciders(p *producer, options produceDecidersOptions) (produceDec
 		}
 	}
 	if options.DeadEnable {
-		msgGoto := decider.GotoDead
+		msgGoto := internal.GotoDead
 		deciderOpt := producerShiftDeciderOptions{groundTopic: options.groundTopic, level: options.level,
 			msgGoto: msgGoto, shift: options.Dead}
 		if d, err := newProducerShiftDecider(p, &deciderOpt, p.metricsProvider); err != nil {
@@ -72,11 +72,11 @@ func newProduceDeciders(p *producer, options produceDecidersOptions) (produceDec
 		if d, err := newProducerTransferDecider(p, &deciderOpt, p.metricsProvider); err != nil {
 			return nil, err
 		} else {
-			deciders[decider.GotoTransfer] = d
+			deciders[internal.GotoTransfer] = d
 		}
 	}
 	if options.UpgradeEnable {
-		msgGoto := decider.GotoUpgrade
+		msgGoto := internal.GotoUpgrade
 		deciderOpt := producerShiftDeciderOptions{groundTopic: options.groundTopic, level: options.level,
 			msgGoto: msgGoto, shift: options.Upgrade}
 		if d, err := newProducerShiftDecider(p, &deciderOpt, p.metricsProvider); err != nil {
@@ -86,7 +86,7 @@ func newProduceDeciders(p *producer, options produceDecidersOptions) (produceDec
 		}
 	}
 	if options.DegradeEnable {
-		msgGoto := decider.GotoDegrade
+		msgGoto := internal.GotoDegrade
 		deciderOpt := producerShiftDeciderOptions{groundTopic: options.groundTopic, level: options.level,
 			msgGoto: msgGoto, shift: options.Degrade}
 		if s, err := newProducerShiftDecider(p, &deciderOpt, p.metricsProvider); err != nil {
@@ -96,7 +96,7 @@ func newProduceDeciders(p *producer, options produceDecidersOptions) (produceDec
 		}
 	}
 	if options.ShiftEnable {
-		msgGoto := decider.GotoShift
+		msgGoto := internal.GotoShift
 		deciderOpt := producerShiftDeciderOptions{groundTopic: options.groundTopic, level: options.level,
 			msgGoto: msgGoto, shift: options.Shift}
 		if s, err := newProducerShiftDecider(p, &deciderOpt, p.metricsProvider); err != nil {
@@ -142,7 +142,7 @@ type generalConsumeDeciderOptions struct {
 func newGeneralConsumeDeciders(cli *client, l *consumeListener, options generalConsumeDeciderOptions) (*generalConsumeDeciders, error) {
 	handlers := &generalConsumeDeciders{}
 	doneOptions := finalStatusDeciderOptions{groundTopic: l.groundTopic, subscription: l.subscription,
-		msgGoto: decider.GotoDone, done: options.Done}
+		msgGoto: internal.GotoDone, done: options.Done}
 	doneDecider, err := newFinalStatusDecider(l.logger, doneOptions, l.metricsProvider)
 	if err != nil {
 		return nil, err
@@ -150,7 +150,7 @@ func newGeneralConsumeDeciders(cli *client, l *consumeListener, options generalC
 	handlers.doneDecider = doneDecider
 	if options.DiscardEnable {
 		discardOptions := finalStatusDeciderOptions{groundTopic: l.groundTopic, subscription: l.subscription,
-			msgGoto: decider.GotoDiscard, discard: options.Discard}
+			msgGoto: internal.GotoDiscard, discard: options.Discard}
 		d, err1 := newFinalStatusDecider(l.logger, discardOptions, l.metricsProvider)
 		if err1 != nil {
 			return nil, err1
@@ -177,7 +177,7 @@ func newGeneralConsumeDeciders(cli *client, l *consumeListener, options generalC
 		}
 	}
 	if options.UpgradeEnable {
-		msgGoto := decider.GotoUpgrade
+		msgGoto := internal.GotoUpgrade
 		deciderOpt := shiftDeciderOptions{groundTopic: l.groundTopic, level: options.Level, subscription: l.subscription,
 			msgGoto: msgGoto, shift: options.Upgrade}
 		if d, err := newShiftDecider(cli, &deciderOpt, l.metricsProvider); err != nil {
@@ -187,7 +187,7 @@ func newGeneralConsumeDeciders(cli *client, l *consumeListener, options generalC
 		}
 	}
 	if options.DegradeEnable {
-		msgGoto := decider.GotoDegrade
+		msgGoto := internal.GotoDegrade
 		deciderOpt := shiftDeciderOptions{groundTopic: l.groundTopic, level: options.Level, subscription: l.subscription,
 			msgGoto: msgGoto, shift: options.Degrade}
 		if d, err := newShiftDecider(cli, &deciderOpt, l.metricsProvider); err != nil {
@@ -197,7 +197,7 @@ func newGeneralConsumeDeciders(cli *client, l *consumeListener, options generalC
 		}
 	}
 	if options.ShiftEnable {
-		msgGoto := decider.GotoShift
+		msgGoto := internal.GotoShift
 		deciderOpt := shiftDeciderOptions{groundTopic: l.groundTopic, level: options.Level, subscription: l.subscription,
 			msgGoto: msgGoto, shift: options.Shift}
 		if d, err := newShiftDecider(cli, &deciderOpt, l.metricsProvider); err != nil {
@@ -257,7 +257,7 @@ func newLeveledConsumeDeciders(cli *client, l *consumeListener, options leveledC
 	if options.PendingEnable {
 		hdOptions := statusDeciderOptions{groundTopic: l.groundTopic, subscription: l.subscription,
 			level: options.Level, consumeMaxTimes: options.ConsumeMaxTimes,
-			status: message.StatusPending, msgGoto: decider.GotoPending,
+			status: message.StatusPending, msgGoto: internal.GotoPending,
 			deaDecider: deadHandler}
 		d, err := newStatusDecider(cli, options.Pending, hdOptions, l.metricsProvider)
 		if err != nil {
@@ -268,7 +268,7 @@ func newLeveledConsumeDeciders(cli *client, l *consumeListener, options leveledC
 	if options.BlockingEnable {
 		hdOptions := statusDeciderOptions{groundTopic: l.groundTopic, subscription: l.subscription,
 			level: options.Level, consumeMaxTimes: options.ConsumeMaxTimes,
-			status: message.StatusBlocking, msgGoto: decider.GotoBlocking,
+			status: message.StatusBlocking, msgGoto: internal.GotoBlocking,
 			deaDecider: deadHandler}
 		hd, err := newStatusDecider(cli, options.Blocking, hdOptions, l.metricsProvider)
 		if err != nil {
@@ -279,7 +279,7 @@ func newLeveledConsumeDeciders(cli *client, l *consumeListener, options leveledC
 	if options.RetryingEnable {
 		hdOptions := statusDeciderOptions{groundTopic: l.groundTopic, subscription: l.subscription,
 			level: options.Level, consumeMaxTimes: options.ConsumeMaxTimes,
-			status: message.StatusRetrying, msgGoto: decider.GotoRetrying,
+			status: message.StatusRetrying, msgGoto: internal.GotoRetrying,
 			deaDecider: deadHandler}
 		d, err := newStatusDecider(cli, options.Retrying, hdOptions, l.metricsProvider)
 		if err != nil {

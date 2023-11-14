@@ -13,16 +13,16 @@ import (
 // ------ handle goto enums ------
 
 var (
-	StatusBlocking = newPersistentHandleStatus(decider.GotoBlocking)
-	StatusPending  = newPersistentHandleStatus(decider.GotoPending)
-	StatusRetrying = newPersistentHandleStatus(decider.GotoRetrying)
-	StatusDead     = newPersistentHandleStatus(decider.GotoDead)
-	StatusDone     = newHandleStatus(decider.GotoDone)
-	StatusDiscard  = newHandleStatus(decider.GotoDiscard)
-	StatusUpgrade  = newLeveledHandleStatus(decider.GotoUpgrade)
-	StatusDegrade  = newLeveledHandleStatus(decider.GotoDegrade)
-	StatusShift    = newLeveledHandleStatus(decider.GotoShift)
-	StatusTransfer = newTransferHandleStatus(decider.GotoTransfer)
+	StatusBlocking = newPersistentHandleStatus(internal.GotoBlocking)
+	StatusPending  = newPersistentHandleStatus(internal.GotoPending)
+	StatusRetrying = newPersistentHandleStatus(internal.GotoRetrying)
+	StatusDead     = newPersistentHandleStatus(internal.GotoDead)
+	StatusDone     = newHandleStatus(internal.GotoDone)
+	StatusDiscard  = newHandleStatus(internal.GotoDiscard)
+	StatusUpgrade  = newLeveledHandleStatus(internal.GotoUpgrade)
+	StatusDegrade  = newLeveledHandleStatus(internal.GotoDegrade)
+	StatusShift    = newLeveledHandleStatus(internal.GotoShift)
+	StatusTransfer = newTransferHandleStatus(internal.GotoTransfer)
 
 	StatusAuto = handleStatus{} // handle message failure
 )

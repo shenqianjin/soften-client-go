@@ -175,7 +175,7 @@ func (d *statusDecider) Reentrant(ctx context.Context, msg consumerMessage, prop
 
 func (d *statusDecider) tryDeadInternal(ctx context.Context, msg consumerMessage) bool {
 	if d.options.deaDecider != nil {
-		return d.options.deaDecider.Decide(ctx, msg, newDecisionByCheckStatus(decider.GotoDead, checker.CheckStatusPassed))
+		return d.options.deaDecider.Decide(ctx, msg, newDecisionByCheckStatus(internal.GotoDead, checker.CheckStatusPassed))
 	}
 	return false
 }
