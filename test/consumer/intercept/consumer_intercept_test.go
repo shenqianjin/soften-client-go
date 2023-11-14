@@ -115,10 +115,12 @@ func testListenIntercept(t *testing.T, testCase testListenInterceptCase) {
 	}
 	var interceptorCount uint32
 	consumeInterceptors := interceptor.ConsumeInterceptors{
-		interceptor.NewDecideInterceptorBuilder().OnDecideToDead(func(ctx context.Context, msg message.Message) {
-			testCase.interceptFunc(ctx, msg)
-			atomic.AddUint32(&interceptorCount, 1)
-		}).Build(),
+		interceptor.NewDecideInterceptor(func(ctx context.Context, msg message.Message, decision decider.Decision) {
+			if decision.GetGoto() == decider.GotoDead {
+				testCase.interceptFunc(ctx, msg)
+				atomic.AddUint32(&interceptorCount, 1)
+			}
+		}),
 	}
 	// create listener
 	upgradeLevel, _ := message.LevelOf(testCase.upgradeLevel)

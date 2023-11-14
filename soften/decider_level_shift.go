@@ -8,7 +8,6 @@ import (
 
 	"github.com/apache/pulsar-client-go/pulsar"
 	"github.com/apache/pulsar-client-go/pulsar/log"
-	"github.com/shenqianjin/soften-client-go/soften/checker"
 	"github.com/shenqianjin/soften-client-go/soften/config"
 	"github.com/shenqianjin/soften-client-go/soften/decider"
 	"github.com/shenqianjin/soften-client-go/soften/internal"
@@ -82,14 +81,14 @@ func newShiftDecider(client *client, options *shiftDeciderOptions, metricsProvid
 	return d, nil
 }
 
-func (d *shiftDecider) Decide(ctx context.Context, msg consumerMessage, cheStatus checker.CheckStatus) bool {
-	if !cheStatus.IsPassed() {
+func (d *shiftDecider) Decide(ctx context.Context, msg consumerMessage, decision decider.Decision) bool {
+	if decision.GetGoto() != d.options.msgGoto {
 		return false
 	}
 	// parse log entry
 	logEntry := util.ParseLogEntry(ctx, d.logger)
 	// format topic
-	topic, err := d.internalFormatDestTopic(cheStatus, msg)
+	topic, err := d.internalFormatDestTopic(decision, msg)
 	if err != nil {
 		logEntry.Error(err)
 		return false
@@ -127,7 +126,7 @@ func (d *shiftDecider) Decide(ctx context.Context, msg consumerMessage, cheStatu
 	message.Helper.InjectPreviousLevel(msg.Message, props)
 	message.Helper.InjectPreviousStatus(msg.Message, props)
 	// consume time info
-	message.Helper.InjectConsumeTime(props, cheStatus.GetGotoExtra().ConsumeTime)
+	message.Helper.InjectConsumeTime(props, decision.GetGotoExtra().ConsumeTime)
 
 	producerMsg := pulsar.ProducerMessage{
 		Payload:     msg.Payload(),
@@ -158,7 +157,7 @@ func (d *shiftDecider) Decide(ctx context.Context, msg consumerMessage, cheStatu
 	return true
 }
 
-func (d *shiftDecider) internalFormatDestTopic(cs checker.CheckStatus, msg consumerMessage) (string, error) {
+func (d *shiftDecider) internalFormatDestTopic(cs decider.Decision, msg consumerMessage) (string, error) {
 	destLevel := cs.GetGotoExtra().Level
 	if destLevel == "" {
 		destLevel = d.options.shift.Level

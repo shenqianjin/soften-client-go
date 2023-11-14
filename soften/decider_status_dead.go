@@ -8,10 +8,8 @@ import (
 
 	"github.com/apache/pulsar-client-go/pulsar"
 	"github.com/apache/pulsar-client-go/pulsar/log"
-	"github.com/shenqianjin/soften-client-go/soften/checker"
 	"github.com/shenqianjin/soften-client-go/soften/config"
 	"github.com/shenqianjin/soften-client-go/soften/decider"
-	"github.com/shenqianjin/soften-client-go/soften/handler"
 	"github.com/shenqianjin/soften-client-go/soften/interceptor"
 	"github.com/shenqianjin/soften-client-go/soften/internal"
 	"github.com/shenqianjin/soften-client-go/soften/message"
@@ -68,8 +66,8 @@ func newDeadDecider(client *client, policy *config.DeadPolicy, options deadDecid
 	return d, nil
 }
 
-func (d *deadDecider) Decide(ctx context.Context, msg consumerMessage, cheStatus checker.CheckStatus) bool {
-	if !cheStatus.IsPassed() {
+func (d *deadDecider) Decide(ctx context.Context, msg consumerMessage, decision decider.Decision) bool {
+	if decision.GetGoto() != decider.GotoDead {
 		return false
 	}
 	// parse log entry
@@ -123,7 +121,7 @@ func (d *deadDecider) Decide(ctx context.Context, msg consumerMessage, cheStatus
 	}
 	// execute on decide interceptors
 	if len(d.options.leveledInterceptorsMap[msg.Level()]) > 0 {
-		d.options.leveledInterceptorsMap[msg.Level()].OnDecide(ctx, msg, handler.StatusDead)
+		d.options.leveledInterceptorsMap[msg.Level()].OnDecide(ctx, msg, decision)
 	}
 	return true
 }

@@ -4,39 +4,23 @@ import (
 	"context"
 
 	"github.com/shenqianjin/soften-client-go/soften/decider"
-	"github.com/shenqianjin/soften-client-go/soften/internal"
 	"github.com/shenqianjin/soften-client-go/soften/message"
 )
 
-type decideInterceptFuncMap map[internal.DecideGoto]func(ctx context.Context, msg message.Message)
+type onDecideInterceptFunc func(ctx context.Context, msg message.Message, decision decider.Decision)
 
 type decideInterceptor struct {
-	interceptFuncMap decideInterceptFuncMap
+	interceptFunc onDecideInterceptFunc
+}
+
+func NewDecideInterceptor(interceptFunc onDecideInterceptFunc) decideInterceptor {
+	return decideInterceptor{
+		interceptFunc: interceptFunc,
+	}
 }
 
 func (i decideInterceptor) OnDecide(ctx context.Context, msg message.Message, decision decider.Decision) {
-	if interceptFunc, ok := i.interceptFuncMap[decision.GetGoto()]; ok {
-		interceptFunc(ctx, msg)
-	}
+	i.interceptFunc(ctx, msg, decision)
 }
 
-type decideInterceptorBuilder struct {
-	interceptFuncMap decideInterceptFuncMap
-}
-
-func NewDecideInterceptorBuilder() *decideInterceptorBuilder {
-	return &decideInterceptorBuilder{
-		interceptFuncMap: make(decideInterceptFuncMap, 0),
-	}
-}
-
-func (b *decideInterceptorBuilder) OnDecideToDead(f func(ctx context.Context, msg message.Message)) *decideInterceptorBuilder {
-	b.interceptFuncMap[decider.GotoDead] = f
-	return b
-}
-
-func (b *decideInterceptorBuilder) Build() *decideInterceptor {
-	return &decideInterceptor{
-		interceptFuncMap: b.interceptFuncMap,
-	}
-}
+// ------ add default implementation for other intercept functions ------

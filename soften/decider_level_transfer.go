@@ -7,7 +7,6 @@ import (
 
 	"github.com/apache/pulsar-client-go/pulsar"
 	"github.com/apache/pulsar-client-go/pulsar/log"
-	"github.com/shenqianjin/soften-client-go/soften/checker"
 	"github.com/shenqianjin/soften-client-go/soften/config"
 	"github.com/shenqianjin/soften-client-go/soften/decider"
 	"github.com/shenqianjin/soften-client-go/soften/internal"
@@ -66,14 +65,14 @@ func newTransferDecider(client *client, options *transferDeciderOptions, metrics
 	return d, nil
 }
 
-func (d *transferDecider) Decide(ctx context.Context, msg consumerMessage, cheStatus checker.CheckStatus) bool {
-	if !cheStatus.IsPassed() {
+func (d *transferDecider) Decide(ctx context.Context, msg consumerMessage, decision decider.Decision) bool {
+	if decision.GetGoto() != decider.GotoTransfer {
 		return false
 	}
 	// parse log entry
 	logEntry := util.ParseLogEntry(ctx, d.logger)
 	// format destTopic
-	destTopic := cheStatus.GetGotoExtra().Topic
+	destTopic := decision.GetGotoExtra().Topic
 	if destTopic == "" {
 		destTopic = d.options.transfer.Topic
 	}
@@ -115,7 +114,7 @@ func (d *transferDecider) Decide(ctx context.Context, msg consumerMessage, cheSt
 	message.Helper.InjectPreviousLevel(msg.Message, props)
 	message.Helper.InjectPreviousStatus(msg.Message, props)
 	// consume time info
-	message.Helper.InjectConsumeTime(props, cheStatus.GetGotoExtra().ConsumeTime)
+	message.Helper.InjectConsumeTime(props, decision.GetGotoExtra().ConsumeTime)
 
 	producerMsg := pulsar.ProducerMessage{
 		Payload:     msg.Payload(),

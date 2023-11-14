@@ -10,6 +10,7 @@ import (
 	"github.com/apache/pulsar-client-go/pulsar/log"
 	"github.com/shenqianjin/soften-client-go/soften/checker"
 	"github.com/shenqianjin/soften-client-go/soften/config"
+	"github.com/shenqianjin/soften-client-go/soften/decider"
 	"github.com/shenqianjin/soften-client-go/soften/internal"
 	"github.com/shenqianjin/soften-client-go/soften/message"
 	"github.com/shenqianjin/soften-client-go/soften/support/util"
@@ -71,8 +72,8 @@ func newStatusDecider(client *client, policy *config.StatusPolicy, options statu
 	return d, nil
 }
 
-func (d *statusDecider) Decide(ctx context.Context, msg consumerMessage, cheStatus checker.CheckStatus) bool {
-	if !cheStatus.IsPassed() {
+func (d *statusDecider) Decide(ctx context.Context, msg consumerMessage, decision decider.Decision) bool {
+	if decision.GetGoto() != d.options.msgGoto {
 		return false
 	}
 	statusMessageCounter := message.Parser.GetStatusMessageCounter(d.options.status, msg.Message)
@@ -174,7 +175,7 @@ func (d *statusDecider) Reentrant(ctx context.Context, msg consumerMessage, prop
 
 func (d *statusDecider) tryDeadInternal(ctx context.Context, msg consumerMessage) bool {
 	if d.options.deaDecider != nil {
-		return d.options.deaDecider.Decide(ctx, msg, checker.CheckStatusPassed)
+		return d.options.deaDecider.Decide(ctx, msg, newDecisionByCheckStatus(decider.GotoDead, checker.CheckStatusPassed))
 	}
 	return false
 }

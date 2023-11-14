@@ -7,7 +7,6 @@ import (
 	"time"
 
 	"github.com/apache/pulsar-client-go/pulsar/log"
-	"github.com/shenqianjin/soften-client-go/soften/checker"
 	"github.com/shenqianjin/soften-client-go/soften/config"
 	"github.com/shenqianjin/soften-client-go/soften/decider"
 	"github.com/shenqianjin/soften-client-go/soften/internal"
@@ -68,8 +67,8 @@ func newFinalStatusDecider(parentLog log.Logger, options finalStatusDeciderOptio
 
 }
 
-func (d *finalStatusDecider) Decide(ctx context.Context, msg consumerMessage, cheStatus checker.CheckStatus) (success bool) {
-	if !cheStatus.IsPassed() {
+func (d *finalStatusDecider) Decide(ctx context.Context, msg consumerMessage, decision decider.Decision) (success bool) {
+	if decision.GetGoto() != d.options.msgGoto {
 		return false
 	}
 	// parse log entry

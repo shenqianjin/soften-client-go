@@ -33,24 +33,25 @@ type Listener interface {
 
 // consumeListener listens to consume all messages of one or more than one status/levels consumers.
 type consumeListener struct {
-	client                 *client
-	logger                 log.Logger
-	metricsProvider        *internal.MetricsProvider
-	groundTopic            string
-	subscription           string
-	messageCh              chan consumerMessage // channel used to deliver message to application
-	enables                *internal.ConsumeEnables
-	concurrency            *config.ConcurrencyPolicy
-	escapeHandler          config.EscapeHandler
-	generalDeciders        *generalConsumeDeciders
-	levelDeciders          map[internal.TopicLevel]*leveledConsumeDeciders
-	checkers               map[checker.CheckType]*consumeCheckpointChain
-	prevCheckOrders        []checker.CheckType
-	postCheckOrders        []checker.CheckType
+	client            *client
+	logger            log.Logger
+	metricsProvider   *internal.MetricsProvider
+	groundTopic       string
+	subscription      string
+	messageCh         chan consumerMessage // channel used to deliver message to application
+	enables           *internal.ConsumeEnables
+	concurrency       *config.ConcurrencyPolicy
+	escapeHandler     config.EscapeHandler
+	generalDeciders   *generalConsumeDeciders
+	levelDeciders     map[internal.TopicLevel]*leveledConsumeDeciders
+	checkers          map[checker.CheckType]*consumeCheckpointChain
+	prevCheckOrders   []checker.CheckType
+	postCheckOrders   []checker.CheckType
+	startListenerOnce sync.Once
+	closeListenerOnce sync.Once
+	leveledConsumers  map[internal.TopicLevel]*singleLeveledConsumer
+
 	leveledInterceptorsMap map[internal.TopicLevel]interceptor.ConsumeInterceptors
-	startListenerOnce      sync.Once
-	closeListenerOnce      sync.Once
-	leveledConsumers       map[internal.TopicLevel]*singleLeveledConsumer
 }
 
 func newConsumeListener(cli *client, conf config.ConsumerConfig, checkpoints map[checker.CheckType][]*checker.ConsumeCheckpoint) (*consumeListener, error) {
@@ -438,7 +439,7 @@ func (l *consumeListener) consume(ctx context.Context, handlerFunc handler.Premi
 
 	// post-check to Transfer - for obvious goto action
 	if bizHandleStatus.GetGoto() != "" {
-		gotoCheckStatus := checker.CheckStatusPassed.WithGotoExtra(bizHandleStatus.GetGotoExtra())
+		gotoCheckStatus := checker.CheckStatusPassed.WithGotoExtra(bizHandleStatus.GetGotoExtra()).WithErr(bizHandleStatus.GetErr())
 		if decided := l.internalDecide4Goto(ctx, bizHandleStatus.GetGoto(), msg, gotoCheckStatus); decided {
 			// return if handle succeeded
 			return
@@ -557,7 +558,7 @@ func (l *consumeListener) internalDecide4Goto(ctx context.Context, msgGoto inter
 	}
 	// do decider
 	start := time.Now()
-	decided := d.Decide(ctx, msg, checkStatus)
+	decided := d.Decide(ctx, msg, newDecisionByCheckStatus(msgGoto, checkStatus))
 	now := time.Now()
 	msg.internalExtra.deciderMetrics.DecideLatency.Observe(now.Sub(start).Seconds())
 	if !msg.internalExtra.receivedTime.IsZero() {

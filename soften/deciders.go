@@ -20,7 +20,7 @@ type internalProduceDecider interface {
 }
 
 type internalConsumeDecider interface {
-	Decide(ctx context.Context, msg consumerMessage, checkStatus checker.CheckStatus) (success bool)
+	Decide(ctx context.Context, msg consumerMessage, decision decider.Decision) (success bool)
 	close()
 }
 
@@ -306,4 +306,32 @@ func (hds leveledConsumeDeciders) Close() {
 	if hds.degradeDecider != nil {
 		hds.degradeDecider.close()
 	}
+}
+
+// ------ decision internal implementation ------
+
+type decision struct {
+	decideGoto      internal.DecideGoto
+	decideGotoExtra decider.GotoExtra
+	bizErr          error
+}
+
+func newDecisionByCheckStatus(decideGoto internal.DecideGoto, checkStatus checker.CheckStatus) *decision {
+	return &decision{
+		decideGoto:      decideGoto,
+		decideGotoExtra: checkStatus.GetGotoExtra(),
+		bizErr:          checkStatus.GetErr(),
+	}
+}
+
+func (d *decision) GetGoto() internal.DecideGoto {
+	return d.decideGoto
+}
+
+func (d *decision) GetGotoExtra() decider.GotoExtra {
+	return d.decideGotoExtra
+}
+
+func (d *decision) GetErr() error {
+	return d.bizErr
 }

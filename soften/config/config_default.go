@@ -2,10 +2,11 @@ package config
 
 import (
 	"fmt"
+	"strings"
+
 	"github.com/shenqianjin/soften-client-go/soften/internal"
 	"github.com/shenqianjin/soften-client-go/soften/internal/backoff"
 	"github.com/shenqianjin/soften-client-go/soften/message"
-	"strings"
 )
 
 // ------ default weights ------
