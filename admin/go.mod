@@ -8,7 +8,7 @@ require (
 	github.com/shenqianjin/soften-client-go v0.0.0
 	github.com/sirupsen/logrus v1.6.0
 	github.com/spf13/cobra v1.2.1
-	golang.org/x/exp v0.0.0-20231006140011-7918f672742d
+	golang.org/x/exp v0.0.0-20230626212559-97b1e661b5df
 )
 
 require (

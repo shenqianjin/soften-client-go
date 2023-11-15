@@ -8,11 +8,13 @@ SOURCE_PACKAGE="github.com/shenqianjin/soften-client-go"
 
 # target env
 if [ -z "$TARGET_DIR" ]; then
-    TARGET_DIR="$HOME/qbox/kodo/libs/soften-client-go"
+    # TARGET_DIR="$HOME/qbox/kodo/libs/soften-client-go"
+    TARGET_DIR="$HOME/qbox/kodo-libs/soften-client-go"
 fi
 if [ -z "$TARGET_PACKAGE" ]; then
     # default privatize package
-    TARGET_PACKAGE="github.com/qiniu/soften-client-go"
+    # TARGET_PACKAGE="github.com/qiniu/soften-client-go"
+    TARGET_PACKAGE="github.com/qbox/kodo-libs/soften-client-go"
 fi
 
 privatize_dirs="soften go.* README.md docs resources"

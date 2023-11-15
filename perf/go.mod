@@ -11,7 +11,7 @@ require (
 	github.com/spf13/pflag v1.0.5
 	github.com/stretchr/testify v1.8.0
 	go.uber.org/ratelimit v0.2.0
-	golang.org/x/exp v0.0.0-20231006140011-7918f672742d
+	golang.org/x/exp v0.0.0-20230626212559-97b1e661b5df
 	golang.org/x/time v0.0.0-20220722155302-e5dcc9cfc0b9
 )
 

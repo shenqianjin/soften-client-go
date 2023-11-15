@@ -11,7 +11,7 @@ require (
 	github.com/sirupsen/logrus v1.6.0
 	github.com/stretchr/testify v1.8.0
 	go.uber.org/ratelimit v0.2.0
-	golang.org/x/exp v0.0.0-20231006140011-7918f672742d
+	golang.org/x/exp v0.0.0-20230626212559-97b1e661b5df
 )
 
 require (
