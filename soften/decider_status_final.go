@@ -9,6 +9,7 @@ import (
 	"github.com/apache/pulsar-client-go/pulsar/log"
 	"github.com/shenqianjin/soften-client-go/soften/config"
 	"github.com/shenqianjin/soften-client-go/soften/decider"
+	"github.com/shenqianjin/soften-client-go/soften/interceptor"
 	"github.com/shenqianjin/soften-client-go/soften/internal"
 	"github.com/shenqianjin/soften-client-go/soften/support/util"
 	"github.com/sirupsen/logrus"
@@ -28,6 +29,8 @@ type finalStatusDeciderOptions struct {
 	discard  *config.DiscardPolicy
 	done     *config.DonePolicy
 	logLevel logrus.Level
+
+	leveledInterceptorsMap map[internal.TopicLevel]interceptor.ConsumeInterceptors
 }
 
 func newFinalStatusDecider(parentLog log.Logger, options finalStatusDeciderOptions, metricsProvider *internal.MetricsProvider) (*finalStatusDecider, error) {
@@ -70,6 +73,10 @@ func newFinalStatusDecider(parentLog log.Logger, options finalStatusDeciderOptio
 func (d *finalStatusDecider) Decide(ctx context.Context, msg consumerMessage, decision decider.Decision) (success bool) {
 	if decision.GetGoto() != d.options.msgGoto {
 		return false
+	}
+	// execute on decide interceptors
+	if len(d.options.leveledInterceptorsMap[msg.Level()]) > 0 {
+		d.options.leveledInterceptorsMap[msg.Level()].OnDecide(ctx, msg, decision)
 	}
 	// parse log entry
 	logEntry := util.ParseLogEntry(ctx, d.logger)

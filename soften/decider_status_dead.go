@@ -115,13 +115,13 @@ func (d *deadDecider) Decide(ctx context.Context, msg consumerMessage, decision 
 			msg.internalExtra.consumerMetrics.ConsumeMessageAcks.Inc()
 		}
 	}
-	d.router.Chan() <- &RouteMessage{
-		producerMsg: &producerMsg,
-		callback:    callback,
-	}
 	// execute on decide interceptors
 	if len(d.options.leveledInterceptorsMap[msg.Level()]) > 0 {
 		d.options.leveledInterceptorsMap[msg.Level()].OnDecide(ctx, msg, decision)
+	}
+	d.router.Chan() <- &RouteMessage{
+		producerMsg: &producerMsg,
+		callback:    callback,
 	}
 	return true
 }

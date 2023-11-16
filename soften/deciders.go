@@ -142,7 +142,7 @@ type generalConsumeDeciderOptions struct {
 func newGeneralConsumeDeciders(cli *client, l *consumeListener, options generalConsumeDeciderOptions) (*generalConsumeDeciders, error) {
 	handlers := &generalConsumeDeciders{}
 	doneOptions := finalStatusDeciderOptions{groundTopic: l.groundTopic, subscription: l.subscription,
-		msgGoto: internal.GotoDone, done: options.Done}
+		msgGoto: internal.GotoDone, done: options.Done, leveledInterceptorsMap: l.leveledInterceptorsMap}
 	doneDecider, err := newFinalStatusDecider(l.logger, doneOptions, l.metricsProvider)
 	if err != nil {
 		return nil, err
@@ -150,7 +150,7 @@ func newGeneralConsumeDeciders(cli *client, l *consumeListener, options generalC
 	handlers.doneDecider = doneDecider
 	if options.DiscardEnable {
 		discardOptions := finalStatusDeciderOptions{groundTopic: l.groundTopic, subscription: l.subscription,
-			msgGoto: internal.GotoDiscard, discard: options.Discard}
+			msgGoto: internal.GotoDiscard, discard: options.Discard, leveledInterceptorsMap: l.leveledInterceptorsMap}
 		d, err1 := newFinalStatusDecider(l.logger, discardOptions, l.metricsProvider)
 		if err1 != nil {
 			return nil, err1
