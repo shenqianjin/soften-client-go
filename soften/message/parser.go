@@ -51,6 +51,14 @@ func (p *messageParser) GetPreviousStatus(msg pulsar.Message) internal.MessageSt
 	return ""
 }
 
+func (p *messageParser) GetPreviousErrorMessage(msg pulsar.Message) string {
+	properties := msg.Properties()
+	if errorMessage, ok := properties[XPropertyPreviousErrorMessage]; ok {
+		return errorMessage
+	}
+	return ""
+}
+
 func (p *messageParser) GetMessageCounter(msg pulsar.Message) internal.MessageCounter {
 	properties := msg.Properties()
 	if timesStr, ok := properties[XPropertyMessageCounter]; ok {

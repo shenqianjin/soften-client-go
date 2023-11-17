@@ -59,6 +59,18 @@ func (h *messageHelper) InjectPreviousStatus(msg pulsar.Message, props map[strin
 	}
 }
 
+func (h *messageHelper) InjectPreviousErrorMessage(props map[string]string, err error) {
+	if err != nil {
+		errMsg := err.Error()
+		if len(errMsg) > 128 {
+			errMsg = errMsg[:128]
+		}
+		if len(errMsg) > 0 {
+			props[XPropertyPreviousErrorMessage] = errMsg
+		}
+	}
+}
+
 func (h *messageHelper) InjectPreviousLevel(msg pulsar.Message, props map[string]string) {
 	previousLevel := Parser.GetPreviousLevel(msg)
 	currentLevel := Parser.GetCurrentLevel(msg)

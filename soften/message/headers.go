@@ -11,6 +11,7 @@ const (
 
 	XPropertyPreviousMessageLevel  = "X-Previous-Level"  // 前一次消息级别
 	XPropertyPreviousMessageStatus = "X-Previous-Status" // 前一次消息状态
+	XPropertyPreviousErrorMessage  = "X-Previous-Error"  // 前一次消息消费报错
 
 	XPropertyConsumeTime   = "X-Consume-Time"   // 消费时间
 	XPropertyReentrantTime = "X-Reentrant-Time" // 重入时间

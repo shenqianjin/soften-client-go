@@ -27,15 +27,16 @@ type testListenInterceptCase struct {
 	requireStatuses []string // require statuses for topic creation
 	produceLevel    string   // produce level: default L1
 	produceStatus   string   // produce status: default Ready
-	consumeLevels   []string
-	consumeStatuses []string
+	consumeLevels   []string // consume level
+	consumeStatuses []string // consume status
 	requireGotos    []string // require gotos for consume enable
 
-	handleGoto           string
+	handleStatus         handler.HandleStatus
 	handleGotoFinalTopic string
 	consumeMaxTimes      uint
 
-	interceptFunc          func(ctx context.Context, message message.Message)
+	interceptGoto          string
+	interceptFunc          func(ctx context.Context, message message.Message, decision decider.Decision)
 	expectedInterceptCount uint32
 
 	// extra for upgrade/degrade/transfer
@@ -45,23 +46,75 @@ type testListenInterceptCase struct {
 }
 
 func TestConsumeIntercept_OnDecideToDead(t *testing.T) {
-	handleStatus := message.StatusRetrying
+	handleStatus := handler.StatusRetrying.WithErr(fmt.Errorf("internal server error"))
 	topic := internal.GenerateTestTopic(internal.PrefixTestConsumeIntercept)
 	HandleCase := testListenInterceptCase{
 		groundTopic:     topic,
 		requireLevels:   []string{message.L1.String()},
-		requireStatuses: []string{message.StatusReady.String(), handleStatus.String(), message.StatusDead.String()},
+		requireStatuses: []string{message.StatusReady.String(), message.StatusRetrying.String(), message.StatusDead.String()},
 		produceLevel:    message.L1.String(),
 		produceStatus:   message.StatusReady.String(),
 		consumeLevels:   []string{message.L1.String()},
-		consumeStatuses: []string{message.StatusReady.String(), handleStatus.String()},
+		consumeStatuses: []string{message.StatusReady.String(), message.StatusRetrying.String()},
 		requireGotos:    []string{message.StatusRetrying.String(), message.StatusDead.String()},
-		handleGoto:      handleStatus.String(),
+		handleStatus:    handleStatus.WithErr(fmt.Errorf("test error")),
 
 		consumeMaxTimes:        3,
 		expectedInterceptCount: 1,
-		interceptFunc: func(ctx context.Context, msg message.Message) {
-			fmt.Printf("intercepted on decide to dead. msgID: %v, headers: %v\n", msg.ID(), msg.Properties())
+		interceptGoto:          message.StatusDead.String(),
+		interceptFunc: func(ctx context.Context, msg message.Message, decision decider.Decision) {
+			fmt.Printf("intercepted on decide to dead. msgID: %v, headers: %v, goto: %v, err: %v\n",
+				msg.ID(), msg.Properties(), decision.GetGoto(), decision.GetErr())
+		},
+	}
+	testListenIntercept(t, HandleCase)
+}
+
+func TestConsumeIntercept_OnDecideToDiscard(t *testing.T) {
+	handleStatus := handler.StatusDiscard
+	topic := internal.GenerateTestTopic(internal.PrefixTestConsumeIntercept)
+	HandleCase := testListenInterceptCase{
+		groundTopic:     topic,
+		requireLevels:   []string{message.L1.String()},
+		requireStatuses: []string{message.StatusReady.String()},
+		produceLevel:    message.L1.String(),
+		produceStatus:   message.StatusReady.String(),
+		consumeLevels:   []string{message.L1.String()},
+		consumeStatuses: []string{message.StatusReady.String()},
+		requireGotos:    []string{message.StatusDiscard.String()},
+		handleStatus:    handleStatus.WithErr(fmt.Errorf("test goto discard error")),
+
+		consumeMaxTimes:        3,
+		expectedInterceptCount: 1,
+		interceptGoto:          message.StatusDiscard.String(),
+		interceptFunc: func(ctx context.Context, msg message.Message, decision decider.Decision) {
+			fmt.Printf("intercepted on decide to dead. msgID: %v, headers: %v, goto: %v, err: %v\n",
+				msg.ID(), msg.Properties(), decision.GetGoto(), decision.GetErr())
+		},
+	}
+	testListenIntercept(t, HandleCase)
+}
+
+func TestConsumeIntercept_OnDecideToDone(t *testing.T) {
+	handleStatus := handler.StatusDone
+	topic := internal.GenerateTestTopic(internal.PrefixTestConsumeIntercept)
+	HandleCase := testListenInterceptCase{
+		groundTopic:     topic,
+		requireLevels:   []string{message.L1.String()},
+		requireStatuses: []string{message.StatusReady.String()},
+		produceLevel:    message.L1.String(),
+		produceStatus:   message.StatusReady.String(),
+		consumeLevels:   []string{message.L1.String()},
+		consumeStatuses: []string{message.StatusReady.String()},
+		requireGotos:    []string{message.StatusDone.String()},
+		handleStatus:    handleStatus,
+
+		consumeMaxTimes:        3,
+		expectedInterceptCount: 1,
+		interceptGoto:          message.StatusDone.String(),
+		interceptFunc: func(ctx context.Context, msg message.Message, decision decider.Decision) {
+			fmt.Printf("intercepted on decide to dead. msgID: %v, headers: %v, goto: %v, err: %v\n",
+				msg.ID(), msg.Properties(), decision.GetGoto(), decision.GetErr())
 		},
 	}
 	testListenIntercept(t, HandleCase)
@@ -114,11 +167,13 @@ func testListenIntercept(t *testing.T, testCase testListenInterceptCase) {
 		ConsumeMaxTimes: config.ToPointer(testCase.consumeMaxTimes),
 	}
 	var interceptorCount uint32
+	var interceptorError error
 	consumeInterceptors := interceptor.ConsumeInterceptors{
 		interceptor.NewDecideInterceptor(func(ctx context.Context, msg message.Message, decision decider.Decision) {
-			if decision.GetGoto() == handler.StatusDead.GetGoto() {
-				testCase.interceptFunc(ctx, msg)
+			if decision.GetGoto().String() == testCase.interceptGoto {
+				testCase.interceptFunc(ctx, msg, decision)
 				atomic.AddUint32(&interceptorCount, 1)
+				interceptorError = decision.GetErr()
 			}
 		}),
 	}
@@ -159,8 +214,7 @@ func testListenIntercept(t *testing.T, testCase testListenInterceptCase) {
 	ctx, cancel := context.WithCancel(context.Background())
 	err = listener.StartPremium(ctx, func(ctx context.Context, msg message.Message) handler.HandleStatus {
 		fmt.Printf("consumed message size: %v, headers: %v\n", len(msg.Payload()), msg.Properties())
-		handleStatus, err1 := handler.StatusOf(testCase.handleGoto)
-		assert.Nil(t, err1)
+		handleStatus := testCase.handleStatus
 		if handleStatus.GetGoto() == handler.StatusTransfer.GetGoto() {
 			return handler.StatusTransfer.WithTopic(testCase.transferToTopic)
 		} else {
@@ -193,5 +247,6 @@ func testListenIntercept(t *testing.T, testCase testListenInterceptCase) {
 	}
 	// stop listener
 	assert.Equal(t, testCase.expectedInterceptCount, interceptorCount)
+	assert.Equal(t, testCase.handleStatus.GetErr(), interceptorError)
 	cancel()
 }

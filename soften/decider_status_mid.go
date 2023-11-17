@@ -79,12 +79,12 @@ func (d *statusDecider) Decide(ctx context.Context, msg consumerMessage, decisio
 	statusMessageCounter := message.Parser.GetStatusMessageCounter(d.options.status, msg.Message)
 	// check to dead if exceed max status reconsume times
 	if *d.policy.ConsumeMaxTimes > 0 && statusMessageCounter.ConsumeReckonTimes >= int(*d.policy.ConsumeMaxTimes) {
-		return d.tryDeadInternal(ctx, msg)
+		return d.tryDeadInternal(ctx, msg, decision)
 	}
 	msgCounter := message.Parser.GetMessageCounter(msg.Message)
 	// check to dead if exceed max total reconsume times
 	if d.options.consumeMaxTimes > 0 && msgCounter.ConsumeReckonTimes >= d.options.consumeMaxTimes {
-		return d.tryDeadInternal(ctx, msg)
+		return d.tryDeadInternal(ctx, msg, decision)
 	}
 	// check Nack for equal status
 	delay := d.policy.BackoffDelayPolicy.Next(0, statusMessageCounter.ConsumeTimes)
@@ -120,18 +120,19 @@ func (d *statusDecider) Decide(ctx context.Context, msg consumerMessage, decisio
 		message.Helper.InjectPreviousLevel(msg.Message, props)
 		message.Helper.InjectPreviousStatus(msg.Message, props)
 	}
+	message.Helper.InjectPreviousErrorMessage(props, decision.GetErr())
 	// consume time and reentrant time
 	now := time.Now()
 	message.Helper.InjectConsumeTime(props, now.Add(time.Duration(delay)*time.Second))
 	// reentrant
-	return d.Reentrant(ctx, msg, props)
+	return d.Reentrant(ctx, msg, props, decision)
 }
 
-func (d *statusDecider) Reentrant(ctx context.Context, msg consumerMessage, props map[string]string) bool {
+func (d *statusDecider) Reentrant(ctx context.Context, msg consumerMessage, props map[string]string, decision decider.Decision) bool {
 	statusMsgCounter := message.Parser.GetStatusMessageCounter(d.options.status, msg.Message)
 	// check to dead if exceed max reentrant times
 	if *d.policy.ReentrantMaxTimes > 0 && statusMsgCounter.PublishTimes >= int(*d.policy.ReentrantMaxTimes) {
-		return d.tryDeadInternal(ctx, msg)
+		return d.tryDeadInternal(ctx, msg, decision)
 	}
 	message.Helper.InjectReentrantTime(props, time.Now().Add(time.Duration(*d.policy.ReentrantDelay)*time.Second))
 	// increase status reentrant times
@@ -173,9 +174,15 @@ func (d *statusDecider) Reentrant(ctx context.Context, msg consumerMessage, prop
 	return true
 }
 
-func (d *statusDecider) tryDeadInternal(ctx context.Context, msg consumerMessage) bool {
+func (d *statusDecider) tryDeadInternal(ctx context.Context, msg consumerMessage, decision decider.Decision) bool {
 	if d.options.deaDecider != nil {
-		return d.options.deaDecider.Decide(ctx, msg, newDecisionByCheckStatus(internal.GotoDead, checker.CheckStatusPassed))
+		checkStatus := checker.CheckStatusPassed
+		if decision != nil {
+			checkStatus = checkStatus.WithErr(decision.GetErr()).WithGotoExtra(decision.GetGotoExtra())
+		} else if errMsg := message.Parser.GetPreviousErrorMessage(msg); errMsg != "" { // use previous err for consume reentrant
+			checkStatus.WithErr(fmt.Errorf(errMsg))
+		}
+		return d.options.deaDecider.Decide(ctx, msg, newDecisionByCheckStatus(internal.GotoDead, checkStatus))
 	}
 	return false
 }

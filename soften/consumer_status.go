@@ -136,7 +136,7 @@ func (sc *statusConsumer) start() {
 			continue
 		}*/
 		// reentrant again util meet the reconsume time
-		if ok := sc.decider.Reentrant(meta.AsMetas(context.Background()), consumerMsg, originalProps); ok {
+		if ok := sc.decider.Reentrant(meta.AsMetas(context.Background()), consumerMsg, originalProps, nil); ok {
 			continue
 		}
 		// delivery the msg to client as well for other cases, such as decide failed

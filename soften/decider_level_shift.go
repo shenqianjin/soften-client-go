@@ -125,6 +125,7 @@ func (d *shiftDecider) Decide(ctx context.Context, msg consumerMessage, decision
 	// record previous level/status information
 	message.Helper.InjectPreviousLevel(msg.Message, props)
 	message.Helper.InjectPreviousStatus(msg.Message, props)
+	message.Helper.InjectPreviousErrorMessage(props, decision.GetErr())
 	// consume time info
 	message.Helper.InjectConsumeTime(props, decision.GetGotoExtra().ConsumeTime)
 
